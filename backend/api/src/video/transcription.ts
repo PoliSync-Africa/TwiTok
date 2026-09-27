@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 export const SUPPORTED_STT_LANGUAGES = [
   "en","fr","ar","sw","tw","ha","yo","ig","zu","xh","am","pt"
@@ -80,4 +81,31 @@ export async function updateCaptions(
   await db.collection("video_captions").deleteMany({ videoId });
   if (safe.length) await db.collection("video_captions").insertMany(safe);
   return safe;
+}
+
+function captionVttTime(ms: number) {
+  const total = Math.max(0, Math.round(ms));
+  const h = Math.floor(total / 3600000);
+  const m = Math.floor((total % 3600000) / 60000);
+  const s = Math.floor((total % 60000) / 1000);
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(total % 1000).padStart(3,"0")}`;
+}
+
+export async function regenerateCaptionTrack(db: Db, videoId: ObjectId, captions: any[]) {
+  const bucket = process.env.MEDIA_BUCKET ?? "";
+  const key = `videos/${videoId.toHexString()}/captions/creator.vtt`;
+  const publicBase = (process.env.MEDIA_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
+  if (!bucket || !process.env.MEDIA_S3_ACCESS_KEY_ID || !process.env.MEDIA_S3_SECRET_ACCESS_KEY) return null;
+  const s3 = new S3Client({
+    region: process.env.MEDIA_S3_REGION ?? "auto",
+    endpoint: process.env.MEDIA_S3_ENDPOINT || undefined,
+    forcePathStyle: process.env.MEDIA_S3_FORCE_PATH_STYLE === "true",
+    credentials: { accessKeyId: process.env.MEDIA_S3_ACCESS_KEY_ID, secretAccessKey: process.env.MEDIA_S3_SECRET_ACCESS_KEY }
+  });
+  const lines = ["WEBVTT", ""];
+  captions.forEach((item, index) => {
+    lines.push(String(index + 1), `${captionVttTime(item.startMs)} --> ${captionVttTime(item.endMs)}`, item.text, "");
+  });
+  await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: Buffer.from(lines.join("\n"), "utf8"), ContentType: "text/vtt", CacheControl: "no-cache" }));
+  return publicBase ? `${publicBase}/${key}` : key;
 }
