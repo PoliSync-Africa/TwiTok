@@ -43,6 +43,8 @@ export default function CreatePage() {
   const [overlayStartMs, setOverlayStartMs] = useState(0);
   const [overlayEndMs, setOverlayEndMs] = useState(3000);
   const [textOverlays, setTextOverlays] = useState<Array<{text:string;startMs:number;endMs:number;x:number;y:number;fontSize:number}>>([]);
+  const [autoCaptions, setAutoCaptions] = useState(true);
+  const [captionLanguage, setCaptionLanguage] = useState("auto");
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
@@ -215,7 +217,7 @@ export default function CreatePage() {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
           uploadId: session.uploadId, caption, hashtags: tags, visibility,
-          allowComments, allowDuet, allowStitch, coverTimeMs, trimStartMs, trimEndMs, speed, soundId: selectedSound?._id, originalVolume, addedSoundVolume, textOverlays
+          allowComments, allowDuet, allowStitch, coverTimeMs, trimStartMs, trimEndMs, speed, soundId: selectedSound?._id, originalVolume, addedSoundVolume, textOverlays, autoCaptions, captionLanguage
         })
       });
       const draftData = await draft.json();
@@ -313,7 +315,7 @@ export default function CreatePage() {
               <small>Select the start and end of the clip.</small>
             </div>
 
-            <div className="text-overlay-editor"><b>Text overlay</b><input maxLength={200} value={overlayText} onChange={e => setOverlayText(e.target.value)} placeholder="Add text to your video…" /><div className="overlay-time"><label>Start (s)<input type="number" min="0" step="0.1" value={overlayStartMs / 1000} onChange={e => setOverlayStartMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label><label>End (s)<input type="number" min="0.1" step="0.1" value={overlayEndMs / 1000} onChange={e => setOverlayEndMs(Math.max(500, Number(e.target.value) * 1000 || 500))} /></label></div><button type="button" className="secondary-action" onClick={addTextOverlay}>＋ Add text</button>{textOverlays.length > 0 && <div className="overlay-list">{textOverlays.map((item, index) => <div key={index}><span>{item.text}</span><small>{(item.startMs/1000).toFixed(1)}–{(item.endMs/1000).toFixed(1)}s</small><button type="button" onClick={() => setTextOverlays(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>}</div>
+            <div className="caption-editor"><b>Accessibility captions</b><label><input type="checkbox" checked={autoCaptions} onChange={e => setAutoCaptions(e.target.checked)} /> Generate automatic captions from speech</label>{autoCaptions && <label>Video language<select value={captionLanguage} onChange={e => setCaptionLanguage(e.target.value)}><option value="auto">Detect automatically</option><option value="en">English</option><option value="fr">French</option><option value="ar">Arabic</option><option value="sw">Swahili</option><option value="tw">Twi</option><option value="ha">Hausa</option><option value="yo">Yoruba</option><option value="ig">Igbo</option><option value="zu">Zulu</option><option value="xh">Xhosa</option><option value="am">Amharic</option><option value="pt">Portuguese</option></select></label>}<small>Captions are generated after upload and can be reviewed before wider accessibility support is enabled.</small></div>\n\n            <div className="text-overlay-editor"><b>Text overlay</b><input maxLength={200} value={overlayText} onChange={e => setOverlayText(e.target.value)} placeholder="Add text to your video…" /><div className="overlay-time"><label>Start (s)<input type="number" min="0" step="0.1" value={overlayStartMs / 1000} onChange={e => setOverlayStartMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label><label>End (s)<input type="number" min="0.1" step="0.1" value={overlayEndMs / 1000} onChange={e => setOverlayEndMs(Math.max(500, Number(e.target.value) * 1000 || 500))} /></label></div><button type="button" className="secondary-action" onClick={addTextOverlay}>＋ Add text</button>{textOverlays.length > 0 && <div className="overlay-list">{textOverlays.map((item, index) => <div key={index}><span>{item.text}</span><small>{(item.startMs/1000).toFixed(1)}–{(item.endMs/1000).toFixed(1)}s</small><button type="button" onClick={() => setTextOverlays(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>}</div>
 
             <div className="option-grid">
               <label>Visibility<select value={visibility} onChange={e => setVisibility(e.target.value as typeof visibility)}><option value="PUBLIC">Everyone</option><option value="FOLLOWERS">Followers</option><option value="PRIVATE">Only me</option></select></label>
