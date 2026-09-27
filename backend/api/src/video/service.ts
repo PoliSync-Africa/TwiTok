@@ -68,7 +68,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -123,6 +123,25 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     createdAt: now, updatedAt: now, publishedAt: null
   };
   await db.collection("videos").insertOne(video);
+  if (input.autoCaptions) {
+    const requestedLanguage = String(input.captionLanguage ?? "auto");
+    await db.collection("transcription_jobs").updateOne(
+      { videoId },
+      {
+        $setOnInsert: {
+          videoId,
+          userId,
+          status: "QUEUED",
+          language: requestedLanguage,
+          attempts: 0,
+          createdAt: now
+        },
+        $set: { updatedAt: now }
+      },
+      { upsert: true }
+    );
+    await db.collection("videos").updateOne({ _id: videoId }, { $set: { autoCaptionsStatus: "QUEUED", autoCaptionLanguage: requestedLanguage } });
+  }
   if (input.soundId) {
     if (!ObjectId.isValid(input.soundId)) throw new Error("Invalid sound id");
     const sound = await db.collection("sounds").findOne({ _id: new ObjectId(input.soundId), status: "ACTIVE" });
