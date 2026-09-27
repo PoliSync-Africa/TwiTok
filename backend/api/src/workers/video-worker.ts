@@ -93,7 +93,7 @@ async function runFfmpeg(
     originalVolume: number;
     addedSoundVolume: number;
     outputDurationSec: number;
-    textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number }>;
+    textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number; color?: string; background?: string; align?: string }>;
     captions: Array<{ text: string; startMs: number; endMs: number }>;
     effect: string;
   }
@@ -139,11 +139,11 @@ async function runFfmpeg(
     current = effectOut;
     textOverlays.forEach((overlay, index) => {
       const next = `${variant.out}_${index}`;
-      const x = `(w*${overlay.x}-text_w/2)`;
+      const x = overlay.align === "left" ? `(w*${overlay.x})` : overlay.align === "right" ? `(w*${overlay.x}-text_w)` : `(w*${overlay.x}-text_w/2)`;
       const y = `(h*${overlay.y}-text_h/2)`;
       const start = Math.max(0, overlay.startMs / 1000);
       const end = Math.max(start + 0.01, overlay.endMs / 1000);
-      filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${overlayInputs[index]}:fontsize=${Math.round(overlay.fontSize)}:fontcolor=white:borderw=3:bordercolor=black@0.85:x=${x}:y=${y}:enable=between(t\\,${start}\\,${end})[${next}]`);
+      filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${overlayInputs[index]}:fontsize=${Math.round(overlay.fontSize)}:fontcolor=${overlay.color ?? "#FFFFFF"}:box=1:boxcolor=${overlay.background ?? "#000000@0.55"}:boxborderw=12:borderw=2:bordercolor=black@0.85:x=${x}:y=${y}:enable=between(t\\,${start}\\,${end})[${next}]`);
       current = next;
     });
     captions.forEach((caption, index) => {
