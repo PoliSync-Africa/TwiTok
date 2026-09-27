@@ -86,7 +86,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     allowComments: input.allowComments !== false,
     allowDuet: input.allowDuet !== false,
     allowStitch: input.allowStitch !== false,
-    status: safety.decision === "RESTRICT" ? "BLOCKED" : "READY",
+    status: safety.decision === "RESTRICT" ? "BLOCKED" : (upload.status === "READY" ? "READY" : "PROCESSING"),
     sourceObjectKey: upload.objectKey,
     playback: null,
     thumbnail: null,
