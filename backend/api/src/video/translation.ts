@@ -1,4 +1,4 @@
-import { Db, ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 export const TRANSLATION_LANGUAGES = [
   "en","fr","ar","sw","tw","ha","yo","ig","zu","xh","am","pt"
