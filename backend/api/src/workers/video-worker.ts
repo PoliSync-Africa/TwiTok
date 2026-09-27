@@ -221,19 +221,37 @@ async function getDurationMs(input: string) {
   } catch { return null; }
 }
 
-async function concatClips(files: string[], output: string) {
+async function concatClips(files: string[], output: string, transitions: Array<{ type: string; durationMs: number }> = []) {
   if (files.length === 1) { await fs.promises.copyFile(files[0], output); return; }
+  const durations = await Promise.all(files.map(async file => Math.max(0.1, (await getDurationMs(file) ?? 100) / 1000)));
   const inputs: string[] = [];
+  for (const file of files) inputs.push("-i", file);
   const filters: string[] = [];
   for (let i = 0; i < files.length; i += 1) {
-    inputs.push("-i", files[i]);
     const audio = await hasAudio(files[i]);
-    const duration = Math.max(0.1, (await getDurationMs(files[i]) ?? 100) / 1000);
     filters.push(`[${i}:v]fps=30,format=yuv420p,setpts=PTS-STARTPTS[v${i}]`);
     if (audio) filters.push(`[${i}:a]aresample=48000,asetpts=PTS-STARTPTS[a${i}]`);
-    else filters.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${duration.toFixed(3)},asetpts=N/SR/TB[a${i}]`);
+    else filters.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${durations[i].toFixed(3)},asetpts=N/SR/TB[a${i}]`);
   }
-  filters.push(files.map((_, i) => `[v${i}][a${i}]`).join("") + `concat=n=${files.length}:v=1:a=1[vout][aout]`);
+  let currentV = "v0", currentA = "a0", currentDuration = durations[0];
+  for (let i = 1; i < files.length; i += 1) {
+    const transition = transitions[i - 1] ?? { type: "NONE", durationMs: 0 };
+    const d = Math.max(0, Math.min(1.5, Number(transition.durationMs ?? 0) / 1000));
+    if (transition.type === "NONE" || d <= 0) {
+      filters.push(`[${currentV}][v${i}]concat=n=2:v=1:a=0[vcat${i}]`);
+      filters.push(`[${currentA}][a${i}]concat=n=2:v=0:a=1[acat${i}]`);
+      currentV = `vcat${i}`; currentA = `acat${i}`; currentDuration += durations[i];
+      continue;
+    }
+    const safeD = Math.min(d, Math.max(0.05, currentDuration - 0.05), Math.max(0.05, durations[i] - 0.05));
+    const transitionName = transition.type === "FADE" ? "fade" : transition.type === "DISSOLVE" ? "fade" : transition.type === "WIPELEFT" ? "wipeleft" : transition.type === "WIPERIGHT" ? "wiperight" : transition.type === "SLIDELEFT" ? "slideleft" : "slideright";
+    const offset = Math.max(0.05, currentDuration - safeD);
+    filters.push(`[${currentV}][v${i}]xfade=transition=${transitionName}:duration=${safeD.toFixed(3)}:offset=${offset.toFixed(3)}[vtrans${i}]`);
+    filters.push(`[${currentA}][a${i}]acrossfade=d=${safeD.toFixed(3)}[atrans${i}]`);
+    currentV = `vtrans${i}`; currentA = `atrans${i}`; currentDuration = currentDuration + durations[i] - safeD;
+  }
+  filters.push(`[${currentV}]format=yuv420p[vout]`);
+  filters.push(`[${currentA}]aresample=48000[aout]`);
   await runProcess(ffmpegBin, [
     "-hide_banner", "-loglevel", "error", "-y", ...inputs,
     "-filter_complex", filters.join(";"),
@@ -282,7 +300,7 @@ async function processJob(db: Db, job: any) {
     const clipRanges = Array.isArray(video.clipTrimRanges) ? video.clipTrimRanges : [];
     const trimmedFiles: string[] = [];
     for (let i = 0; i < clipFiles.length; i += 1) { const range = clipRanges[i] ?? {}; const start = Math.max(0, Number(range.startMs ?? 0)); const end = Number(range.endMs ?? 0); if (start > 0 || end > start) { const trimmed = path.join(workDir, `trimmed-${i}.mp4`); const args = ["-hide_banner","-loglevel","error","-y", ...(start > 0 ? ["-ss", String(start/1000)] : []), "-i", clipFiles[i], ...(end > start ? ["-t", String((end-start)/1000)] : []), "-c:v","libx264","-preset","veryfast","-crf","20","-c:a","aac","-b:a","128k","-ar","48000","-movflags","+faststart",trimmed]; await runProcess(ffmpegBin,args); trimmedFiles.push(trimmed); } else trimmedFiles.push(clipFiles[i]); }
-    await concatClips(trimmedFiles, input);
+    await concatClips(trimmedFiles, input, Array.isArray(video.clipTransitions) ? video.clipTransitions : []);
     const hasOriginalAudio = await hasAudio(input);
 
     if (soundLink?.soundId) {
