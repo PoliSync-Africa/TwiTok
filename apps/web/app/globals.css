@@ -5,3 +5,5 @@
 .effect-selector{display:grid;gap:10px;margin:16px 0}.effect-options{display:flex;gap:8px;flex-wrap:wrap}.effect-options button{border:1px solid rgba(255,255,255,.14);background:#151515;color:#fff;border-radius:999px;padding:8px 12px}.effect-options button.selected{background:#fff;color:#000}.effect-selector small{opacity:.65}
 
 .overlay-style-row{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}.overlay-style-row label{display:grid;gap:4px}.overlay-style-row input,.overlay-style-row select{min-height:34px}
+
+.sticker-editor{display:grid;gap:10px;margin:16px 0}.sticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}.sticker-grid button{display:grid;gap:4px;place-items:center;border:1px solid rgba(255,255,255,.12);background:#151515;color:#fff;border-radius:12px;padding:8px}.sticker-grid span{font-size:30px}.sticker-grid small{font-size:10px;opacity:.7}
