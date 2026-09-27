@@ -2,7 +2,8 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { completeUpload, createUploadSession, createVideoDraft, publishVideo } from "../video/service.js";\nimport { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
+import { completeUpload, createUploadSession, createVideoDraft, publishVideo } from "../video/service.js";
+import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
 
 export const videoRouter = Router();
 
