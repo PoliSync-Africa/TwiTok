@@ -36,7 +36,7 @@ export async function ensureOwnerAccount(db: Db) {
       role: "OWNER",
       passwordHash,
       isActive: true,
-      mfaRequired: true,
+      mfaRequired: process.env.TWITOK_OWNER_MFA_ENABLED === "true",
       createdAt: new Date(),
       updatedAt: new Date()
     });
