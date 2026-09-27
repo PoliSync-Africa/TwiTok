@@ -6,6 +6,7 @@ import { completeUpload, createUploadSession, createVideoDraft, publishVideo } f
 import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
+import { listStickers } from "../video/stickers.js";
 
 export const videoRouter = Router();
 
@@ -172,4 +173,9 @@ videoRouter.get("/:videoId/caption-tracks", requireUser, async (req, res) => {
     if (!video) return res.status(404).json({ error: "Video not found" });
     res.json({ tracks: await getCaptionTracks(await getDb(), videoId) });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load caption tracks" }); }
+});
+
+
+videoRouter.get("/stickers", requireUser, async (req, res) => {
+  res.json({ stickers: listStickers(typeof req.query.category === "string" ? req.query.category : undefined) });
 });
