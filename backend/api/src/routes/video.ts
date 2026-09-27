@@ -167,7 +167,7 @@ videoRouter.post("/:videoId/caption-translations", requireUser, async (req, res)
 videoRouter.get("/:videoId/caption-tracks", requireUser, async (req, res) => {
   try {
     const videoId = new ObjectId(String(req.params.videoId));
-    const video = await (await getDb()).collection("videos").findOne({ _id: videoId, ownerId: req.userId }, { projection: { _id: 1 } });
+    const video = await (await getDb()).collection("videos").findOne({ _id: videoId, status: "PUBLISHED", visibility: "PUBLIC" }, { projection: { _id: 1 } });
     if (!video) return res.status(404).json({ error: "Video not found" });
     res.json({ tracks: await getCaptionTracks(await getDb(), videoId) });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load caption tracks" }); }
