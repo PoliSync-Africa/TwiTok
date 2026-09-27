@@ -136,7 +136,7 @@ export default function CreatePage() {
               <input value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#Ghana #Africa #TwiTok" />
             </label>
 
-            <div className="settings-grid">
+            <label>Cover position (seconds)<input type="number" min="0" step="0.1" value={coverTimeMs / 1000} onChange={e => setCoverTimeMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label>\n\n            <div className="settings-grid">
               <label>Who can view
                 <select value={visibility} onChange={e => setVisibility(e.target.value as typeof visibility)}>
                   <option value="PUBLIC">Everyone</option>
