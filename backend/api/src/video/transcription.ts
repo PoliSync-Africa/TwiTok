@@ -55,3 +55,29 @@ export async function getTranscription(db: Db, userId: ObjectId, videoId: Object
     .toArray();
   return { job, captions };
 }
+
+
+export async function updateCaptions(
+  db: Db,
+  userId: ObjectId,
+  videoId: ObjectId,
+  captions: Array<{ text: string; startMs: number; endMs: number }>
+) {
+  const video = await db.collection("videos").findOne({ _id: videoId, ownerId: userId });
+  if (!video) throw new Error("Video not found");
+  const safe = [];
+  for (const item of captions.slice(0, 1000)) {
+    const text = String(item.text ?? "").trim().slice(0, 500);
+    const startMs = Math.max(0, Number(item.startMs ?? 0));
+    const endMs = Math.max(startMs + 100, Number(item.endMs ?? startMs + 100));
+    if (!text || !Number.isFinite(startMs) || !Number.isFinite(endMs)) continue;
+    const decision = await (await import("../safety/engine.js")).evaluateText(db, {
+      userId: userId.toHexString(), contentId: videoId.toHexString(), text, actionType: "VIDEO_CAPTION"
+    });
+    if (decision.decision === "BLOCK") continue;
+    safe.push({ videoId, source: "CREATOR", language: video.autoCaptionLanguage ?? "auto", text, startMs, endMs, createdAt: new Date(), updatedAt: new Date() });
+  }
+  await db.collection("video_captions").deleteMany({ videoId });
+  if (safe.length) await db.collection("video_captions").insertMany(safe);
+  return safe;
+}
