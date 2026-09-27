@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "worker:video": "tsx src/workers/video-worker.ts",
     "test:types": "tsc --noEmit",
-    "worker:stt": "tsx src/workers/transcription-worker.ts"
+    "worker:stt": "tsx src/workers/transcription-worker.ts",
+    "worker:translate": "tsx src/workers/translation-worker.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
