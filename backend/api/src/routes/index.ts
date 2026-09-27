@@ -8,12 +8,14 @@ import { monetizationRouter } from "./monetization.js";
 import { authRouter } from "./auth.js";
 import { profileRouter } from "./profile.js";
 import { videoRouter } from "./video.js";
+import { feedRouter } from "./feed.js";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/profile", profileRouter);
 apiRouter.use("/video", videoRouter);
+apiRouter.use("/feed", feedRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/money", moneyRouter);
 apiRouter.use("/creator", creatorRouter);
