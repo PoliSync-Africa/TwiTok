@@ -96,9 +96,10 @@ async function runFfmpeg(
     textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number; color?: string; background?: string; align?: string }>;
     captions: Array<{ text: string; startMs: number; endMs: number }>;
     effect: string;
+    stickers: Array<{ stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number }>;
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -134,6 +135,18 @@ async function runFfmpeg(
   }
   for (const variant of variants) {
     let current = variant.base;
+    for (let si = 0; si < stickers.length; si++) {
+      const sticker = stickers[si];
+      const glyph = stickerMap[sticker.stickerId] ?? "";
+      if (!glyph) continue;
+      const file = path.join(workDir, `sticker-${si}.txt`);
+      await fs.promises.writeFile(file, glyph, "utf8");
+      const out = `${variant.out}_sticker_${si}`;
+      const x = `(w*${sticker.x}-text_w/2)`;
+      const y = `(h*${sticker.y}-text_h/2)`;
+      filters.push(`[${current}]drawtext=fontfile='${fontFile}':textfile='${file}':fontsize=${Math.round(sticker.size)}:fontcolor=white:borderw=2:bordercolor=black@0.8:x=${x}:y=${y}:enable='between(t,${sticker.startMs/1000},${sticker.endMs/1000})'[${out}]`);
+      current = out;
+    }
     const effectOut = `${variant.out}_effect`;
     filters.push(effectFilter(current, effectOut));
     current = effectOut;
@@ -266,7 +279,8 @@ async function processJob(db: Db, job: any) {
       outputDurationSec,
       textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : [],
       captions: Array.isArray(video.captions) ? video.captions : [],
-      effect: String(video.effect ?? "NONE")
+      effect: String(video.effect ?? "NONE"),
+      stickers: Array.isArray(video.stickers) ? video.stickers : []
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));
