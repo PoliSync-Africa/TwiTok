@@ -20,6 +20,7 @@ const ffmpegBin = process.env.FFMPEG_BIN ?? "ffmpeg";
 const ffprobeBin = process.env.FFPROBE_BIN ?? "ffprobe";
 const pollMs = Number(process.env.TWITOK_VIDEO_WORKER_POLL_MS ?? 2000);
 const fontFile = process.env.TWITOK_FONT_FILE ?? "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+const stickerMap: Record<string,string> = { africa:"🌍", ghana:"🇬🇭", nigeria:"🇳🇬", kenya:"🇰🇪", "south-africa":"🇿🇦", celebrate:"🎉", love:"❤️", fire:"🔥", laugh:"😂", wow:"😮", clap:"👏", dance:"💃", drum:"🥁", music:"🎶", community:"🤝", food:"🍲" };
 
 if (!bucket || !accessKeyId || !secretAccessKey) throw new Error("Media storage credentials are required");
 const s3 = new S3Client({
@@ -139,7 +140,7 @@ async function runFfmpeg(
       const sticker = stickers[si];
       const glyph = stickerMap[sticker.stickerId] ?? "";
       if (!glyph) continue;
-      const file = path.join(workDir, `sticker-${si}.txt`);
+      const file = path.join(outputDir, `sticker-${si}.txt`);
       await fs.promises.writeFile(file, glyph, "utf8");
       const out = `${variant.out}_sticker_${si}`;
       const x = `(w*${sticker.x}-text_w/2)`;
