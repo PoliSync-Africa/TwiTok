@@ -38,6 +38,16 @@ async function downloadSource(key: string, target: string) {
   await pipeline(response.Body as NodeJS.ReadableStream, fs.createWriteStream(target));
 }
 
+async function downloadSoundAsset(audioUrl: string, target: string) {
+  if (/^https?:\/\//i.test(audioUrl)) {
+    const response = await fetch(audioUrl);
+    if (!response.ok || !response.body) throw new Error(`Unable to download sound asset: HTTP ${response.status}`);
+    await pipeline(response.body as any, fs.createWriteStream(target));
+    return;
+  }
+  await downloadSource(audioUrl, target);
+}
+
 async function uploadFile(file: string, key: string, contentType: string) {
   await s3.send(new PutObjectCommand({
     Bucket: bucket,
@@ -70,22 +80,66 @@ async function hasAudio(input: string) {
   }
 }
 
-async function runFfmpeg(input: string, outputDir: string, audio: boolean, trimStartMs = 0, trimEndMs: number | null = null, speed = 1) {
+async function runFfmpeg(
+  input: string,
+  outputDir: string,
+  options: {
+    hasOriginalAudio: boolean;
+    trimStartMs: number;
+    trimEndMs: number | null;
+    speed: number;
+    soundFile?: string;
+    originalVolume: number;
+    addedSoundVolume: number;
+    outputDurationSec: number;
+  }
+) {
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec } = options;
+  const inputArgs = [
+    ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
+    ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
+    "-i", input
+  ];
+  if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
+
+  const filters = [
+    "[0:v]split=3[v0][v1][v2]",
+    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360]`,
+    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540]`,
+    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720]`
+  ];
+
+  if (soundFile) {
+    const soundInput = 1;
+    const soundFilter = `[${soundInput}:a]atrim=duration=${Math.max(0.1, outputDurationSec.toFixed(3))},asetpts=N/SR/TB,volume=${addedSoundVolume}[added]`;
+    filters.push(soundFilter);
+    if (hasOriginalAudio && originalVolume > 0) {
+      filters.push(`[0:a]atempo=${speed},volume=${originalVolume},atrim=duration=${Math.max(0.1, outputDurationSec.toFixed(3))},asetpts=N/SR/TB[original]`);
+      filters.push("[original][added]amix=inputs=2:duration=first:dropout_transition=0:normalize=1[mixed]");
+    } else {
+      filters.push("[added]anull[mixed]");
+    }
+  } else if (hasOriginalAudio) {
+    filters.push(`[0:a]atempo=${speed},volume=1,atrim=duration=${Math.max(0.1, outputDurationSec.toFixed(3))},asetpts=N/SR/TB[audio]`);
+  }
+
+  const audioMap = soundFile ? ["-map", "[mixed]"] : hasOriginalAudio ? ["-map", "[audio]"] : [];
   const args = [
-    "-hide_banner", "-loglevel", "error", "-y", ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []), ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []), "-i", input,
-    "-filter_complex",
-    "[0:v]split=3[v0][v1][v2];[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease[v360];[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease[v540];[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease[v720]",
+    "-hide_banner", "-loglevel", "error", "-y",
+    ...inputArgs,
+    "-filter_complex", filters.join(";"),
     "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
     "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
     "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
-    ...(audio ? ["-map", "0:a?", "-map", "0:a?", "-map", "0:a?", "-filter:a", `atempo=${speed}`, "-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
+    ...audioMap,
+    ...(audioMap.length ? ["-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
     "-force_key_frames", "expr:gte(t,n_forced*2)",
     "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
     "-f", "hls", "-hls_time", "2", "-hls_playlist_type", "vod",
     "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init_%v.mp4",
     "-hls_segment_filename", path.join(outputDir, "seg_%v_%05d.m4s"),
     "-master_pl_name", "master.m3u8",
-    "-var_stream_map", audio ? "v:0,a:0 v:1,a:1 v:2,a:2" : "v:0 v:1 v:2",
+    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0" : "v:0 v:1 v:2",
     path.join(outputDir, "stream_%v.m3u8")
   ];
   await runProcess(ffmpegBin, args);
@@ -121,19 +175,51 @@ async function processJob(db: Db, job: any) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: job.uploadId, userId: job.userId });
   if (!upload) throw new Error("Upload session no longer exists");
 
+  const video = await db.collection("videos").findOne({ uploadId: job.uploadId, ownerId: job.userId });
+  if (!video) throw new Error("Video draft not found; waiting for creator settings");
+
+  const soundLink = await db.collection("video_sounds").findOne({ videoId: video._id });
+  let sound: any = null;
+  let soundFile: string | undefined;
   const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "twitok-video-"));
   const input = path.join(workDir, "source");
   const outputDir = path.join(workDir, "hls");
   const thumbnail = path.join(workDir, "thumbnail.jpg");
-  const audioFile = path.join(workDir, "original.m4a");
-  await fs.promises.mkdir(outputDir);
+  const originalSoundFile = path.join(workDir, "original-sound.m4a");
   try {
+    await fs.promises.mkdir(outputDir);
     await downloadSource(upload.objectKey, input);
-    const audio = await hasAudio(input);
-    await runFfmpeg(input, outputDir, audio);
-    await createThumbnail(input, thumbnail);
-    const durationMs = await getDurationMs(input);
+    const hasOriginalAudio = await hasAudio(input);
 
+    if (soundLink?.soundId) {
+      sound = await db.collection("sounds").findOne({ _id: soundLink.soundId, status: "ACTIVE" });
+      if (!sound?.audioUrl) throw new Error("Selected sound has no playable audio asset");
+      soundFile = path.join(workDir, "selected-sound");
+      await downloadSoundAsset(String(sound.audioUrl), soundFile);
+    }
+
+    const sourceDurationMs = await getDurationMs(input);
+    const trimStartMs = Math.max(0, Number(video.trimStartMs ?? 0));
+    const rawTrimEndMs = video.trimEndMs == null ? null : Number(video.trimEndMs);
+    const trimEndMs = rawTrimEndMs && rawTrimEndMs > trimStartMs ? rawTrimEndMs : null;
+    const availableMs = Math.max(100, (trimEndMs ?? sourceDurationMs ?? Number(upload.durationMs ?? 1000)) - trimStartMs);
+    const speed = [0.5, 0.75, 1, 1.5, 2].includes(Number(video.speed)) ? Number(video.speed) : 1;
+    const outputDurationSec = availableMs / 1000 / speed;
+    const originalVolume = Math.max(0, Math.min(1, Number(soundLink?.originalVolume ?? 1)));
+    const addedSoundVolume = Math.max(0, Math.min(1, Number(soundLink?.addedSoundVolume ?? 1)));
+
+    await runFfmpeg(input, outputDir, {
+      hasOriginalAudio,
+      trimStartMs,
+      trimEndMs,
+      speed,
+      soundFile,
+      originalVolume,
+      addedSoundVolume,
+      outputDurationSec
+    });
+
+    await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));
     const baseKey = upload.objectKey.replace(/\/source$/, "");
     const files = await fs.promises.readdir(outputDir);
     for (const file of files) {
@@ -146,11 +232,26 @@ async function processJob(db: Db, job: any) {
     const thumbnailKey = `${baseKey}/thumbnail.jpg`;
     await uploadFile(thumbnail, thumbnailKey, "image/jpeg");
 
+    if (hasOriginalAudio) {
+      const originalDurationSec = Math.max(0.1, outputDurationSec);
+      await runProcess(ffmpegBin, [
+        "-hide_banner", "-loglevel", "error", "-y",
+        ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
+        ...(trimEndMs ? ["-to", String(trimEndMs / 1000)] : []),
+        "-i", input,
+        "-vn", "-af", `atempo=${speed},atrim=duration=${originalDurationSec.toFixed(3)},asetpts=N/SR/TB`,
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", originalSoundFile
+      ]);
+      const originalSoundKey = `${baseKey}/original-sound.m4a`;
+      await uploadFile(originalSoundFile, originalSoundKey, "audio/mp4");
+      await createOriginalSound(db, video._id, urlFor(originalSoundKey), Math.round(outputDurationSec * 1000));
+    }
+
     const playbackKey = `${baseKey}/hls/master.m3u8`;
     await markVideoProcessingSucceeded(db, job._id, {
       hlsUrl: urlFor(playbackKey),
       thumbnailUrl: urlFor(thumbnailKey),
-      durationMs: durationMs ?? upload.durationMs ?? null
+      durationMs: Math.round(outputDurationSec * 1000)
     });
   } finally {
     await fs.promises.rm(workDir, { recursive: true, force: true });
