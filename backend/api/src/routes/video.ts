@@ -107,7 +107,11 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
       allowStitch: req.body?.allowStitch,
       coverTimeMs: req.body?.coverTimeMs,
       trimStartMs: req.body?.trimStartMs,
-      trimEndMs: req.body?.trimEndMs,\n      speed: req.body?.speed,\n      soundId: req.body?.soundId,\n      originalVolume: req.body?.originalVolume,\n      addedSoundVolume: req.body?.addedSoundVolume
+      trimEndMs: req.body?.trimEndMs,
+      speed: req.body?.speed,
+      soundId: req.body?.soundId,
+      originalVolume: req.body?.originalVolume,
+      addedSoundVolume: req.body?.addedSoundVolume
     }));
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create video draft" });
