@@ -98,6 +98,18 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     createdAt: now, updatedAt: now, publishedAt: null
   };
   await db.collection("videos").insertOne(video);
+  if (input.soundId) {
+    if (!ObjectId.isValid(input.soundId)) throw new Error("Invalid sound id");
+    const sound = await db.collection("sounds").findOne({ _id: new ObjectId(input.soundId), status: "ACTIVE" });
+    if (!sound) throw new Error("Selected sound is unavailable");
+    const originalVolume = Math.max(0, Math.min(1, Number(input.originalVolume ?? 1)));
+    const addedSoundVolume = Math.max(0, Math.min(1, Number(input.addedSoundVolume ?? 1)));
+    await db.collection("video_sounds").updateOne(
+      { videoId },
+      { $set: { videoId, soundId: sound._id, originalVolume, addedSoundVolume, updatedAt: now }, $setOnInsert: { createdAt: now } },
+      { upsert: true }
+    );
+  }
   return { videoId: videoId.toHexString(), status: video.status, safety: safety.decision };
 }
 
