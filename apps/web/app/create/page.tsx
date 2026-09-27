@@ -28,6 +28,7 @@ export default function CreatePage() {
   const [trimStartMs, setTrimStartMs] = useState(0);
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [speed, setSpeed] = useState(1);
+  const [effect, setEffect] = useState("NONE");
   const [soundQuery, setSoundQuery] = useState("");
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
@@ -280,7 +281,7 @@ export default function CreatePage() {
       <section className="composer-shell">
         <div className="composer-preview">
           {preview ? (
-            <video ref={videoRef} src={preview} controls playsInline muted={muted} className="composer-video" onLoadedMetadata={onLoadedMetadata} />
+            <video ref={videoRef} src={preview} controls playsInline muted={muted} style={{ filter: effect === "VIBRANT" ? "saturate(1.35) contrast(1.08) brightness(1.02)" : effect === "WARM" ? "sepia(.18) saturate(1.08)" : effect === "COOL" ? "hue-rotate(8deg) saturate(.95)" : effect === "NOIR" ? "grayscale(1) contrast(1.2)" : effect === "VINTAGE" ? "sepia(.2) saturate(.72) contrast(.92)" : effect === "BRIGHT" ? "brightness(1.08) contrast(1.02)" : effect === "FADE" ? "contrast(.86) brightness(1.05) saturate(.82)" : "none" }} className="composer-video" onLoadedMetadata={onLoadedMetadata} />
           ) : (
             <label className="dropzone">
               <span className="plus">＋</span><b>Upload a video</b><small>MP4, MOV or WebM · up to 500 MB</small>
@@ -338,7 +339,11 @@ export default function CreatePage() {
               <input type="number" min="0" step="0.1" value={coverTimeMs / 1000} onChange={e => setCoverTimeMs(Math.max(0, Number(e.target.value) * 1000 || 0))} />
             </label>
 
-            <div className="speed-selector"><b>Speed</b><div className="speed-options">{[0.5, 0.75, 1, 1.5, 2].map(value => <button type="button" key={value} className={speed === value ? "selected" : ""} onClick={() => setSpeed(value)}>{value}×</button>)}</div></div>
+            <div className="effect-selector"><b>Effects</b><div className="effect-options">{[
+  ["NONE","Original"],["VIBRANT","Vibrant"],["WARM","Warm"],["COOL","Cool"],["NOIR","Noir"],["VINTAGE","Vintage"],["BRIGHT","Bright"],["FADE","Fade"]
+].map(([value,label]) => <button type="button" key={value} className={effect === value ? "selected" : ""} onClick={() => setEffect(value)}>{label}</button>)}</div><small>Effects are rendered into the final video after upload.</small></div>
+
+<div className="speed-selector"><b>Speed</b><div className="speed-options">{[0.5, 0.75, 1, 1.5, 2].map(value => <button type="button" key={value} className={speed === value ? "selected" : ""} onClick={() => setSpeed(value)}>{value}×</button>)}</div></div>
 
             <div className="trim-editor">
               <b>Trim video</b>
