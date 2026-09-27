@@ -82,6 +82,8 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   const now = new Date();
   const allowedEffects = new Set(["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE","BRIGHT","FADE"]);
   const effect = allowedEffects.has(String(input.effect ?? "NONE")) ? String(input.effect ?? "NONE") : "NONE";
+  const rawStickers = Array.isArray((input as any).stickers) ? (input as any).stickers : [];
+  const stickers = rawStickers.slice(0, 20).map((item: any) => ({ stickerId: String(item?.stickerId ?? "").slice(0, 40), startMs: Math.max(0, Number(item?.startMs ?? 0)), endMs: Math.max(100, Number(item?.endMs ?? 3000)), x: Math.max(0, Math.min(1, Number(item?.x ?? 0.5))), y: Math.max(0, Math.min(1, Number(item?.y ?? 0.5))), size: Math.max(24, Math.min(180, Number(item?.size ?? 72))), rotation: Math.max(-180, Math.min(180, Number(item?.rotation ?? 0))) })).filter((x: any) => x.stickerId);
   const rawOverlays = Array.isArray(input.textOverlays) ? input.textOverlays.slice(0, 20) : [];
   const textOverlays = rawOverlays.map((item: any) => ({
     text: String(item?.text ?? "").trim().slice(0, 200),
@@ -93,7 +95,8 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     fontFamily: String(item?.fontFamily ?? "sans").slice(0, 32),
     color: /^#[0-9a-fA-F]{6}$/.test(String(item?.color ?? "")) ? String(item.color) : "#FFFFFF",
     background: /^#[0-9a-fA-F]{6}(?:@[0-9.]+)?$/.test(String(item?.background ?? "")) ? String(item.background) : "#000000@0.55",
-    align: ["left","center","right"].includes(String(item?.align)) ? String(item.align) : "center"
+    align: ["left","center","right"].includes(String(item?.align)) ? String(item.align) : "center",
+    stickerId: item?.stickerId ? String(item.stickerId).slice(0, 40) : undefined
   })).filter((item: any) => item.text && item.endMs > item.startMs); 
   for (const overlay of textOverlays) {
     const overlaySafety = await evaluateText(db, { userId: userId.toHexString(), contentId: videoId.toHexString(), text: overlay.text, actionType: "VIDEO_TEXT_OVERLAY" });
