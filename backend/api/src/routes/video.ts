@@ -86,6 +86,15 @@ videoRouter.post("/uploads/:uploadId/complete", requireUser, async (req, res) =>
   }
 });
 
+videoRouter.get("/:videoId", requireUser, async (req, res) => {
+  try {
+    const videoId = new ObjectId(req.params.videoId);
+    const video = await (await getDb()).collection("videos").findOne({ _id: videoId, ownerId: req.userId });
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    res.json({ id: video._id.toHexString(), status: video.status, playback: video.playback ?? null, thumbnail: video.thumbnail ?? null, coverTimeMs: video.coverTimeMs ?? 0 });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load video" }); }
+});
+
 videoRouter.post("/drafts", requireUser, async (req, res) => {
   try {
     res.status(201).json(await createVideoDraft(await getDb(), req.userId!, {
@@ -95,7 +104,8 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
       visibility: req.body?.visibility,
       allowComments: req.body?.allowComments,
       allowDuet: req.body?.allowDuet,
-      allowStitch: req.body?.allowStitch
+      allowStitch: req.body?.allowStitch,
+      coverTimeMs: req.body?.coverTimeMs
     }));
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create video draft" });
