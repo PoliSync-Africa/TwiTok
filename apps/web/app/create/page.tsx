@@ -136,39 +136,4 @@ export default function CreatePage() {
               <input value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#Ghana #Africa #TwiTok" />
             </label>
 
-            <label>Cover position (seconds)<input type="number" min="0" step="0.1" value={coverTimeMs / 1000} onChange={e => setCoverTimeMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label>\n\n            <div className="settings-grid">
-              <label>Who can view
-                <select value={visibility} onChange={e => setVisibility(e.target.value as typeof visibility)}>
-                  <option value="PUBLIC">Everyone</option>
-                  <option value="FOLLOWERS">Followers</option>
-                  <option value="PRIVATE">Only me</option>
-                </select>
-              </label>
-              <button className="toggle-row" onClick={() => setMuted(v => !v)}>Preview sound <b>{muted ? "Off" : "On"}</b></button>
-            </div>
-
-            <div className="switches">
-              <button onClick={() => setAllowComments(v => !v)}><span>Comments</span><b className={allowComments ? "on" : ""}>{allowComments ? "ON" : "OFF"}</b></button>
-              <button onClick={() => setAllowDuet(v => !v)}><span>Duet</span><b className={allowDuet ? "on" : ""}>{allowDuet ? "ON" : "OFF"}</b></button>
-              <button onClick={() => setAllowStitch(v => !v)}><span>Stitch</span><b className={allowStitch ? "on" : ""}>{allowStitch ? "ON" : "OFF"}</b></button>
-            </div>
-
-            <div className="composer-note">
-              <b>Safety before publishing</b>
-              <span>TwiTok checks the caption and applies platform safety rules before the post can become public.</span>
-            </div>
-
-            {step === "UPLOADING" && <div className="progress"><span style={{ width: uploadProgress + "%" }} /></div>}
-            {message && <div className="composer-message">{message}</div>}
-
-            <button className="publish-button" disabled={step === "UPLOADING" || step === "PROCESSING"} onClick={publishDraft}>
-              {step === "UPLOADING" ? "Uploading…" : step === "PROCESSING" ? "Processing…" : "Post to TwiTok"}
-            </button>
-          </>}
-
-          {!file && <p className="composer-hint">Choose a video to open the creator editor. TwiTok will upload the original securely, run the safety gate, and send the media to the transcoding pipeline.</p>}
-        </div>
-      </section>
-    </main>
-  );
-}
+            <label>Cover position (seconds)<input type="number" min="0" step="0.1" value={coverTimeMs / 1000} onChange={e => setCoverTimeMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label>\n\n            <div className="trim-editor"><b>Trim video</b><div className="trim-values"><span>{(trimStartMs / 1000).toFixed(1)}s</span><span>{(trimEndMs / 1000).toFixed(1)}s</span></div><input type="range" min="0" max={Math.max(durationMs, 1)} step="100" value={trimStartMs} onChange={e => setTrimStartMs(Math.min(Number(e.target.value), Math.max(0, trimEndMs - 100)))} /><input type="range" min="0" max={Math.max(durationMs, 1)} step="100" value={trimEndMs} onChange={e => setTrimEndMs(Math.max(Number(e.target.value), trimStartMs + 100))} /><small>Select the start and end of the clip.</small></div>
