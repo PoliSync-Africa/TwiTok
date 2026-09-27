@@ -294,7 +294,7 @@ export default function CreatePage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
-          uploadId: session.uploadId, clipUploadIds: uploadIds, caption, hashtags: tags, visibility,
+          uploadId: session.uploadId, clipUploadIds: uploadIds, clipTrimRanges: selectedClips.map((_, i) => ({ startMs: timelineStartMs[i] ?? 0, endMs: timelineEndMs[i] ?? 0 })), caption, hashtags: tags, visibility,
           allowComments, allowDuet, allowStitch, coverTimeMs, trimStartMs, trimEndMs, speed, soundId: selectedSound?._id, originalVolume, addedSoundVolume, textOverlays, stickers, autoCaptions, captionLanguage, effect
         })
       });
