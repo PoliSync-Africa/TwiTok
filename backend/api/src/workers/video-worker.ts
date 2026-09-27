@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { Db } from "mongodb";
+import type { Db } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { claimNextVideoJob, markVideoProcessingFailed, markVideoProcessingSucceeded, recoverExpiredVideoJobs } from "../video/processing.js";
 import { createOriginalSound } from "../music/service.js";
