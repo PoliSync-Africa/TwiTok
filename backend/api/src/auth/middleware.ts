@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { verifyUserToken } from "./user.js";
