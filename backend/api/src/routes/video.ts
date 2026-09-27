@@ -22,8 +22,8 @@ videoRouter.post("/uploads", requireUser, async (req, res) => {
 
 videoRouter.post("/uploads/:uploadId/multipart", requireUser, async (req, res) => {
   try {
-    const uploadId = req.params.uploadId;
-    const upload = await getDb().collection("video_uploads").findOne({ uploadId, userId: req.userId });
+    const uploadId = String(req.params.uploadId);
+    const upload = await (await getDb()).collection("video_uploads").findOne({ uploadId, userId: req.userId });
     if (!upload) return res.status(404).json({ error: "Upload session not found" });
     if (upload.multipartUploadId) return res.json({ uploadId, multipartUploadId: upload.multipartUploadId });
 
@@ -88,7 +88,7 @@ videoRouter.post("/uploads/:uploadId/complete", requireUser, async (req, res) =>
 
 videoRouter.get("/:videoId", requireUser, async (req, res) => {
   try {
-    const videoId = new ObjectId(req.params.videoId);
+    const videoId = new ObjectId(String(req.params.videoId));
     const video = await (await getDb()).collection("videos").findOne({ _id: videoId, ownerId: req.userId });
     if (!video) return res.status(404).json({ error: "Video not found" });
     res.json({ id: video._id.toHexString(), status: video.status, playback: video.playback ?? null, thumbnail: video.thumbnail ?? null, coverTimeMs: video.coverTimeMs ?? 0 });
