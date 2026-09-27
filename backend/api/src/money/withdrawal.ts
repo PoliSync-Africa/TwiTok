@@ -1,4 +1,4 @@
-import { Db } from "mongodb";
+import type { Db } from "mongodb";
 import { withdrawalMethods, PLATFORM_CURRENCY } from "./policy.js";
 
 export async function initializeWithdrawalIndexes(db: Db) {
