@@ -45,12 +45,16 @@ export async function createUploadSession(db: Db, userId: ObjectId, input: {
     uploadId, userId, objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes,
     durationMs: input.durationMs ?? null, status: "UPLOADING", createdAt: now, updatedAt: now
   });
+  const signed = mediaConfigured()
+    ? await createPresignedUpload({ objectKey, mimeType: input.mimeType, expiresInSeconds: 900 })
+    : null;
   return {
     uploadId,
     objectKey,
     status: "UPLOADING",
-    uploadUrl: process.env.TWITOK_MEDIA_UPLOAD_URL ?? null,
-    expiresInSeconds: 900
+    uploadUrl: signed?.url ?? null,
+    expiresInSeconds: signed?.expiresInSeconds ?? null,
+    storageConfigured: Boolean(signed)
   };
 }
 
