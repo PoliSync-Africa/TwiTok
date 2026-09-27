@@ -90,9 +90,9 @@ async function runFfmpeg(input: string, outputDir: string, audio: boolean) {
   await runProcess(ffmpegBin, args);
 }
 
-async function createThumbnail(input: string, output: string) {
+async function getDurationMs(input: string) {\n  try {\n    const result = await new Promise<string>((resolve, reject) => {\n      const child = spawn(ffprobeBin, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input], { stdio: ["ignore", "pipe", "pipe"] });\n      let out = ""; let err = "";\n      child.stdout.on("data", chunk => { out += chunk.toString(); });\n      child.stderr.on("data", chunk => { err += chunk.toString(); });\n      child.on("error", reject);\n      child.on("close", code => code === 0 ? resolve(out) : reject(new Error(err)));\n    });\n    const seconds = Number.parseFloat(result.trim());\n    return Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;\n  } catch { return null; }\n}\n\nasync function createThumbnail(input: string, output: string, coverTimeMs = 0) {
   await runProcess(ffmpegBin, [
-    "-hide_banner", "-loglevel", "error", "-y", "-ss", "1", "-i", input,
+    "-hide_banner", "-loglevel", "error", "-y", "-ss", String(Math.max(0, coverTimeMs) / 1000), "-i", input,
     "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", output
   ]);
 }
@@ -128,7 +128,7 @@ async function processJob(db: Db, job: any) {
     await markVideoProcessingSucceeded(db, job._id, {
       hlsUrl: urlFor(playbackKey),
       thumbnailUrl: urlFor(thumbnailKey),
-      durationMs: upload.durationMs ?? null
+      durationMs: durationMs ?? upload.durationMs ?? null
     });
   } finally {
     await fs.promises.rm(workDir, { recursive: true, force: true });
