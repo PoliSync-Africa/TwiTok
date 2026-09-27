@@ -6,7 +6,8 @@ import { pipeline } from "node:stream/promises";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Db } from "mongodb";
 import { getDb } from "../db/mongo.js";
-import { claimNextVideoJob, markVideoProcessingFailed, markVideoProcessingSucceeded, recoverExpiredVideoJobs } from "../video/processing.js";\nimport { createOriginalSound } from "../music/service.js";
+import { claimNextVideoJob, markVideoProcessingFailed, markVideoProcessingSucceeded, recoverExpiredVideoJobs } from "../video/processing.js";
+import { createOriginalSound } from "../music/service.js";
 
 const bucket = process.env.MEDIA_BUCKET ?? "";
 const region = process.env.MEDIA_S3_REGION ?? "auto";
@@ -14,7 +15,7 @@ const endpoint = process.env.MEDIA_S3_ENDPOINT || undefined;
 const accessKeyId = process.env.MEDIA_S3_ACCESS_KEY_ID ?? "";
 const secretAccessKey = process.env.MEDIA_S3_SECRET_ACCESS_KEY ?? "";
 const publicBase = (process.env.MEDIA_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
-const workerId = process.env.TWITOK_VIDEO_WORKER_ID ?? \`video-worker-\${process.pid}\`;
+const workerId = process.env.TWITOK_VIDEO_WORKER_ID ?? `video-worker-\${process.pid}`;
 const ffmpegBin = process.env.FFMPEG_BIN ?? "ffmpeg";
 const ffprobeBin = process.env.FFPROBE_BIN ?? "ffprobe";
 const pollMs = Number(process.env.TWITOK_VIDEO_WORKER_POLL_MS ?? 2000);
@@ -28,7 +29,7 @@ const s3 = new S3Client({
 });
 
 function urlFor(key: string) {
-  return publicBase ? \`\${publicBase}/\${key}\` : key;
+  return publicBase ? `\${publicBase}/\${key}` : key;
 }
 
 async function downloadSource(key: string, target: string) {
@@ -53,7 +54,7 @@ function runProcess(bin: string, args: string[]) {
     let stderr = "";
     child.stderr.on("data", chunk => { stderr += chunk.toString(); });
     child.on("error", reject);
-    child.on("close", code => code === 0 ? resolve() : reject(new Error(\`\${bin} exited \${code}: \${stderr.slice(-4000)}\`)));
+    child.on("close", code => code === 0 ? resolve() : reject(new Error(`\${bin} exited \${code}: \${stderr.slice(-4000)}`)));
   });
 }
 
@@ -90,7 +91,26 @@ async function runFfmpeg(input: string, outputDir: string, audio: boolean, trimS
   await runProcess(ffmpegBin, args);
 }
 
-async function getDurationMs(input: string) {\n  try {\n    const result = await new Promise<string>((resolve, reject) => {\n      const child = spawn(ffprobeBin, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input], { stdio: ["ignore", "pipe", "pipe"] });\n      let out = ""; let err = "";\n      child.stdout.on("data", chunk => { out += chunk.toString(); });\n      child.stderr.on("data", chunk => { err += chunk.toString(); });\n      child.on("error", reject);\n      child.on("close", code => code === 0 ? resolve(out) : reject(new Error(err)));\n    });\n    const seconds = Number.parseFloat(result.trim());\n    return Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;\n  } catch { return null; }\n}\n\nasync function extractAudio(input: string, output: string) {\n  await runProcess(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", output]);\n}\n\nasync function createThumbnail(input: string, output: string, coverTimeMs = 0) {
+async function getDurationMs(input: string) {
+  try {
+    const result = await new Promise<string>((resolve, reject) => {
+      const child = spawn(ffprobeBin, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input], { stdio: ["ignore", "pipe", "pipe"] });
+      let out = ""; let err = "";
+      child.stdout.on("data", chunk => { out += chunk.toString(); });
+      child.stderr.on("data", chunk => { err += chunk.toString(); });
+      child.on("error", reject);
+      child.on("close", code => code === 0 ? resolve(out) : reject(new Error(err)));
+    });
+    const seconds = Number.parseFloat(result.trim());
+    return Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;
+  } catch { return null; }
+}
+
+async function extractAudio(input: string, output: string) {
+  await runProcess(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", output]);
+}
+
+async function createThumbnail(input: string, output: string, coverTimeMs = 0) {
   await runProcess(ffmpegBin, [
     "-hide_banner", "-loglevel", "error", "-y", "-ss", String(Math.max(0, coverTimeMs) / 1000), "-i", input,
     "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", output
@@ -104,7 +124,8 @@ async function processJob(db: Db, job: any) {
   const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "twitok-video-"));
   const input = path.join(workDir, "source");
   const outputDir = path.join(workDir, "hls");
-  const thumbnail = path.join(workDir, "thumbnail.jpg");\n  const audioFile = path.join(workDir, "original.m4a");
+  const thumbnail = path.join(workDir, "thumbnail.jpg");
+  const audioFile = path.join(workDir, "original.m4a");
   await fs.promises.mkdir(outputDir);
   try {
     await downloadSource(upload.objectKey, input);
@@ -118,13 +139,13 @@ async function processJob(db: Db, job: any) {
       const type = file.endsWith(".m3u8") ? "application/vnd.apple.mpegurl"
         : file.endsWith(".m4s") ? "video/iso.segment"
         : file.endsWith(".mp4") ? "video/mp4" : "application/octet-stream";
-      await uploadFile(path.join(outputDir, file), \`\${baseKey}/hls/\${file}\`, type);
+      await uploadFile(path.join(outputDir, file), `\${baseKey}/hls/\${file}`, type);
     }
 
-    const thumbnailKey = \`\${baseKey}/thumbnail.jpg\`;
+    const thumbnailKey = `\${baseKey}/thumbnail.jpg`;
     await uploadFile(thumbnail, thumbnailKey, "image/jpeg");
 
-    const playbackKey = \`\${baseKey}/hls/master.m3u8\`;
+    const playbackKey = `\${baseKey}/hls/master.m3u8`;
     await markVideoProcessingSucceeded(db, job._id, {
       hlsUrl: urlFor(playbackKey),
       thumbnailUrl: urlFor(thumbnailKey),
@@ -137,7 +158,7 @@ async function processJob(db: Db, job: any) {
 
 async function loop() {
   const db = await getDb();
-  console.log(\`TwiTok video worker \${workerId} started\`);
+  console.log(`TwiTok video worker \${workerId} started`);
   for (;;) {
     await recoverExpiredVideoJobs(db);
     const job = await claimNextVideoJob(db, workerId);
@@ -147,10 +168,10 @@ async function loop() {
     }
     try {
       await processJob(db, job);
-      console.log(\`processed \${job.uploadId}\`);
+      console.log(`processed \${job.uploadId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown processing error";
-      console.error(\`failed \${job.uploadId}: \${message}\`);
+      console.error(`failed \${job.uploadId}: \${message}`);
       await markVideoProcessingFailed(db, job._id, message);
     }
   }
