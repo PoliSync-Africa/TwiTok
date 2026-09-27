@@ -69,7 +69,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown; clipTrimRanges?: unknown;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -115,6 +115,8 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   }
   const rawClipIds = Array.isArray((input as any).clipUploadIds) ? (input as any).clipUploadIds.map(String).slice(0, 20) : [input.uploadId];
   const clipIds = [...new Set(rawClipIds.filter(Boolean))];
+  const rawTrimRanges = Array.isArray((input as any).clipTrimRanges) ? (input as any).clipTrimRanges : [];
+  const clipTrimRanges = clipIds.map((_: string, index: number) => { const x = rawTrimRanges[index] ?? {}; const startMs = Math.max(0, Number(x?.startMs ?? 0)); const endRaw = Number(x?.endMs ?? 0); return { startMs, endMs: Number.isFinite(endRaw) && endRaw > startMs + 100 ? endRaw : null }; });
   const clipUploads = [] as any[];
   for (const clipId of clipIds) {
     const clipUpload = await db.collection("video_uploads").findOne({ uploadId: clipId, userId });
@@ -122,7 +124,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     clipUploads.push({ uploadId: clipId, objectKey: clipUpload.objectKey });
   }
   const video = {
-    _id: videoId, ownerId: userId, uploadId: input.uploadId, clipUploadIds: clipIds, clips: clipUploads, caption,
+    _id: videoId, ownerId: userId, uploadId: input.uploadId, clipUploadIds: clipIds, clipTrimRanges, clips: clipUploads, caption,
     hashtags: normalizeHashtags(input.hashtags),
     visibility: input.visibility ?? "PUBLIC",
     allowComments: input.allowComments !== false,
