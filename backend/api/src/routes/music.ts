@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDb } from "../db/mongo";
+import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware";
 import { attachSound, searchSounds, getSoundPage } from "../music/service";
 
