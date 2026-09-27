@@ -48,3 +48,19 @@ export async function attachSound(db: Db, userId: ObjectId, videoId: string, sou
   await db.collection<Sound>("sounds").updateOne({ _id: sound._id }, { $inc: { usageCount: 1 }, $set: { updatedAt: new Date() } });
   return sound;
 }
+
+
+export async function getSoundPage(db: Db, soundId: string, limit = 20) {
+  if (!ObjectId.isValid(soundId)) throw new Error("Invalid sound id");
+  const _id = new ObjectId(soundId);
+  const sound = await db.collection<Sound>("sounds").findOne({ _id, status: "ACTIVE" });
+  if (!sound) throw new Error("Sound not found");
+  const links = await db.collection("video_sounds").find({ soundId: _id }).sort({ createdAt: -1 }).limit(Math.min(limit, 50)).toArray();
+  const videoIds = links.map(link => link.videoId).filter(Boolean);
+  const videos = await db.collection("videos").find({
+    _id: { $in: videoIds }, status: "PUBLISHED", visibility: "PUBLIC"
+  }).project({
+    ownerId: 1, caption: 1, hashtags: 1, playback: 1, thumbnail: 1, publishedAt: 1
+  }).limit(Math.min(limit, 50)).toArray();
+  return { sound, videos };
+}
