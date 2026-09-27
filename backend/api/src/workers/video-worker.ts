@@ -69,9 +69,9 @@ async function hasAudio(input: string) {
   }
 }
 
-async function runFfmpeg(input: string, outputDir: string, audio: boolean) {
+async function runFfmpeg(input: string, outputDir: string, audio: boolean, trimStartMs = 0, trimEndMs: number | null = null) {
   const args = [
-    "-hide_banner", "-loglevel", "error", "-y", "-i", input,
+    "-hide_banner", "-loglevel", "error", "-y", ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []), ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []), "-i", input,
     "-filter_complex",
     "[0:v]split=3[v0][v1][v2];[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease[v360];[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease[v540];[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease[v720]",
     "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
