@@ -69,7 +69,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown; clipTrimRanges?: unknown;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown; clipTrimRanges?: unknown; clipTransitions?: unknown;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -117,6 +117,8 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   const clipIds = [...new Set(rawClipIds.filter(Boolean))];
   const rawTrimRanges = Array.isArray((input as any).clipTrimRanges) ? (input as any).clipTrimRanges : [];
   const clipTrimRanges = clipIds.map((_: string, index: number) => { const x = rawTrimRanges[index] ?? {}; const startMs = Math.max(0, Number(x?.startMs ?? 0)); const endRaw = Number(x?.endMs ?? 0); return { startMs, endMs: Number.isFinite(endRaw) && endRaw > startMs + 100 ? endRaw : null }; });
+  const rawTransitions = Array.isArray((input as any).clipTransitions) ? (input as any).clipTransitions : [];
+  const clipTransitions = clipIds.slice(0, Math.max(0, clipIds.length - 1)).map((_: string, index: number) => { const x = rawTransitions[index] ?? {}; const type = ["NONE","FADE","DISSOLVE","WIPELEFT","WIPERIGHT","SLIDELEFT","SLIDERIGHT"].includes(String(x?.type)) ? String(x.type) : "NONE"; const durationMs = Math.max(0, Math.min(1500, Number(x?.durationMs ?? 500))); return { type, durationMs }; });
   const clipUploads = [] as any[];
   for (const clipId of clipIds) {
     const clipUpload = await db.collection("video_uploads").findOne({ uploadId: clipId, userId });
@@ -124,7 +126,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     clipUploads.push({ uploadId: clipId, objectKey: clipUpload.objectKey });
   }
   const video = {
-    _id: videoId, ownerId: userId, uploadId: input.uploadId, clipUploadIds: clipIds, clipTrimRanges, clips: clipUploads, caption,
+    _id: videoId, ownerId: userId, uploadId: input.uploadId, clipUploadIds: clipIds, clipTrimRanges, clipTransitions, clips: clipUploads, caption,
     hashtags: normalizeHashtags(input.hashtags),
     visibility: input.visibility ?? "PUBLIC",
     allowComments: input.allowComments !== false,
