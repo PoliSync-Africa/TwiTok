@@ -360,7 +360,189 @@ export default function CreatePage() {
         </div>
 
         <div className="composer-panel">
-          {clipFiles.length > 1 && <div className="clip-list"><b>Timeline</b><div className="timeline-preview"><video ref={timelineVideoRef} src={preview || undefined} controls={false} muted playsInline onTimeUpdate={e=>setTimelinePlayheadMs((e.currentTarget.currentTime*1000))} /></div><div className="timeline-playhead"><input aria-label="Timeline playhead" type="range" min="0" max={timelineTotalMs} step="10" value={timelinePlayheadMs} onChange={e=>seekTimeline(Number(e.target.value))}/><span>{(timelinePlayheadMs/1000).toFixed(2)}s / {(timelineTotalMs/1000).toFixed(2)}s</span><button type="button" onClick={()=>{setIsTimelinePlaying(v=>!v); if(timelineVideoRef.current){ if(isTimelinePlaying) timelineVideoRef.current.pause(); else void timelineVideoRef.current.play();}}}>{isTimelinePlaying ? "Pause" : "Play"}</button></div><div className="timeline-actions"><button type="button" onClick={undoTimeline} disabled={!timelineHistory.length}>Undo</button><button type="button" onClick={redoTimeline} disabled={!timelineFuture.length}>Redo</button></div><div className="timeline-ruler">{clipFiles.map((_,i)=><span className="timeline-marker" key={i} onClick={()=>{let t=0; for(let j=0;j<i;j++){const s=timelineStartMs[j]??0,e=timelineEndMs[j]??10000,sp=clipSettings[j]?.speed??1;t+=Math.max(100,e-s)/sp;} seekTimeline(t)}}>Clip {i+1}</span>)}</div><div className="timeline-track">{clipFiles.map((clip,index) => { const start=timelineStartMs[index] ?? 0; const end=timelineEndMs[index] ?? 10000; return <div className="timeline-clip" onClick={()=>setSelectedClip(index)} key={clip.name + index}><div><strong>{index+1}</strong><span>{clip.name}</span></div><small>{((end-start)/1000).toFixed(1)}s</small><label>Start <input type="range" min="0" max={Math.max(1000,end-100)} value={start} onChange={e=>updateClipTrim(index,Number(e.target.value),end)} /></label><label>End <input type="range" min={Math.min(1000,start+100)} max={Math.max(1000,end)} value={end} onChange={e=>updateClipTrim(index,start,Number(e.target.value))} /></label><button type="button" onClick={()=>splitClip(index)}>Split</button><button type="button" onClick={()=>duplicateClip(index)}>Duplicate</button><button type="button" onClick={()=>deleteClip(index)} disabled={clipFiles.length<=1}>Delete</button><button type="button" onClick={()=>moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={()=>moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>})}</div><b>Clips</b>{clipFiles.map((clip,index) => <div key={clip.name + index}><span>{index + 1}. {clip.name}</span><button type="button" onClick={() => moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>)}</div>}
+          {clipFiles.length > 1 && (
+            <div className="clip-list">
+              <b>Timeline</b>
+              <div className="timeline-preview">
+                <video
+                  ref={timelineVideoRef}
+                  src={preview || undefined}
+                  controls={false}
+                  muted
+                  playsInline
+                  onTimeUpdate={e => setTimelinePlayheadMs(e.currentTarget.currentTime * 1000)}
+                />
+              </div>
+              <div className="timeline-playhead">
+                <input
+                  aria-label="Timeline playhead"
+                  type="range"
+                  min="0"
+                  max={timelineTotalMs}
+                  step="10"
+                  value={timelinePlayheadMs}
+                  onChange={e => seekTimeline(Number(e.target.value))}
+                />
+                <span>{(timelinePlayheadMs / 1000).toFixed(2)}s / {(timelineTotalMs / 1000).toFixed(2)}s</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const video = timelineVideoRef.current;
+                    if (!video) return;
+                    if (video.paused) {
+                      void video.play();
+                      setIsTimelinePlaying(true);
+                    } else {
+                      video.pause();
+                      setIsTimelinePlaying(false);
+                    }
+                  }}
+                >
+                  {isTimelinePlaying ? "Pause" : "Play"}
+                </button>
+              </div>
+              <div className="timeline-actions">
+                <button type="button" onClick={undoTimeline} disabled={!timelineHistory.length}>Undo</button>
+                <button type="button" onClick={redoTimeline} disabled={!timelineFuture.length}>Redo</button>
+              </div>
+              <div className="timeline-ruler">
+                {clipFiles.map((_, index) => (
+                  <button
+                    type="button"
+                    className="timeline-marker"
+                    key={index}
+                    onClick={() => {
+                      let offset = 0;
+                      for (let i = 0; i < index; i += 1) {
+                        const s = timelineStartMs[i] ?? 0;
+                        const e = timelineEndMs[i] ?? 10000;
+                        const sp = clipSettings[i]?.speed ?? 1;
+                        offset += Math.max(100, e - s) / sp;
+                      }
+                      seekTimeline(offset);
+                    }}
+                  >
+                    Clip {index + 1}
+                  </button>
+                ))}
+              </div>
+              <div className="timeline-track">
+                {clipFiles.map((clip, index) => {
+                  const startMs = timelineStartMs[index] ?? 0;
+                  const endMs = timelineEndMs[index] ?? 10000;
+                  const clipDurationMs = Math.max(100, endMs - startMs);
+                  const isActive = activeTimelineClip.index === index;
+                  return (
+                    <div
+                      className={isActive ? "timeline-clip active" : "timeline-clip"}
+                      onClick={() => setSelectedClip(index)}
+                      key={`${clip.name}-${index}`}
+                    >
+                      <div>
+                        <strong>{index + 1}</strong>
+                        <span>{clip.name}</span>
+                      </div>
+                      <small>{(clipDurationMs / 1000).toFixed(1)}s</small>
+                      <label>
+                        Start
+                        <input
+                          type="range"
+                          min="0"
+                          max={Math.max(100, endMs - 100)}
+                          value={Math.min(startMs, Math.max(0, endMs - 100))}
+                          onChange={e => updateClipTrim(index, Number(e.target.value), endMs)}
+                        />
+                      </label>
+                      <label>
+                        End
+                        <input
+                          type="range"
+                          min={Math.min(endMs, startMs + 100)}
+                          max={Math.max(endMs, startMs + 100)}
+                          value={endMs}
+                          onChange={e => updateClipTrim(index, startMs, Number(e.target.value))}
+                        />
+                      </label>
+                      <button type="button" onClick={() => splitClip(index)} disabled={clipDurationMs < 400}>Split</button>
+                      <button type="button" onClick={() => duplicateClip(index)}>Duplicate</button>
+                      <button type="button" onClick={() => deleteClip(index)} disabled={clipFiles.length <= 1}>Delete</button>
+                      <button type="button" onClick={() => moveClip(index, -1)} disabled={index === 0}>↑</button>
+                      <button type="button" onClick={() => moveClip(index, 1)} disabled={index === clipFiles.length - 1}>↓</button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="clip-settings">
+                <b>Clip {activeTimelineClip.index + 1} controls</b>
+                <label>
+                  Speed
+                  <select
+                    value={clipSettings[activeTimelineClip.index]?.speed ?? 1}
+                    onChange={e => updateClipSetting(activeTimelineClip.index, { speed: Number(e.target.value) })}
+                  >
+                    <option value="0.5">0.5×</option>
+                    <option value="0.75">0.75×</option>
+                    <option value="1">1×</option>
+                    <option value="1.5">1.5×</option>
+                    <option value="2">2×</option>
+                  </select>
+                </label>
+                <label>
+                  Volume
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={clipSettings[activeTimelineClip.index]?.volume ?? 1}
+                    onChange={e => updateClipSetting(activeTimelineClip.index, { volume: Number(e.target.value) })}
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={clipSettings[activeTimelineClip.index]?.muted ?? false}
+                    onChange={e => updateClipSetting(activeTimelineClip.index, { muted: e.target.checked })}
+                  />
+                  Mute
+                </label>
+              </div>
+              <div className="transition-row">
+                <b>Transitions</b>
+                {clipFiles.slice(0, -1).map((_, index) => (
+                  <label key={index}>
+                    After clip {index + 1}
+                    <select
+                      value={clipTransitions[index]?.type ?? "NONE"}
+                      onChange={e => setTransition(index, e.target.value)}
+                    >
+                      <option value="NONE">None</option>
+                      <option value="FADE">Fade</option>
+                      <option value="DISSOLVE">Dissolve</option>
+                      <option value="WIPELEFT">Wipe left</option>
+                      <option value="WIPERIGHT">Wipe right</option>
+                      <option value="SLIDELEFT">Slide left</option>
+                      <option value="SLIDERIGHT">Slide right</option>
+                    </select>
+                    <input
+                      type="range"
+                      min="100"
+                      max="1500"
+                      step="50"
+                      value={clipTransitions[index]?.durationMs ?? 500}
+                      onChange={e => setClipTransitions(items => items.map((item, i) => i === index ? { ...item, durationMs: Number(e.target.value) } : item))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <b>Clips</b>
+              {clipFiles.map((clip, index) => (
+                <div key={`list-${clip.name}-${index}`}>
+                  <span>{index + 1}. {clip.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="composer-title">
             <div><span>VIDEO POST</span><h1>Create</h1></div>
             {file && <label className="secondary">Replace<input type="file" accept="video/*" onChange={e => chooseFile(e.target.files?.[0] ?? null)} /></label>}
