@@ -95,7 +95,7 @@ export default function Home() {
         <Link href="/creator/studio">▣ <span>Creator Studio</span></Link>
         <Link href="/inbox">✉ <span>Inbox</span></Link>
       </nav>
-      <div className="rail-bottom"><button>＋ Create</button><small>Africa's Video Platform</small></div>
+      <div className="rail-bottom"><Link className="primary" href="/create">＋ Create</Link><small>Africa's Video Platform</small></div>
     </aside>
 
     <section className="feed">
