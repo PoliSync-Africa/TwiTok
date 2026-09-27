@@ -39,9 +39,8 @@ async function claimJob(db: Db) {
 }
 
 async function processJob(db: Db, job: any) {
-  const captions = await db.collection("video_captions")
-    .find({ videoId: job.videoId, source: { $in: ["AUTO_STT", "CREATOR"] } })
-    .sort({ startMs: 1 }).limit(1000).toArray();
+  let captions = await db.collection("video_captions").find({ videoId: job.videoId, source: "CREATOR" }).sort({ startMs: 1 }).limit(1000).toArray();
+  if (!captions.length) captions = await db.collection("video_captions").find({ videoId: job.videoId, source: "AUTO_STT" }).sort({ startMs: 1 }).limit(1000).toArray();
   if (!captions.length) throw new Error("No source captions available for translation");
 
   const provider = getCaptionTranslationProvider();
@@ -96,7 +95,7 @@ async function processJob(db: Db, job: any) {
     );
     await db.collection("videos").updateOne(
       { _id: job.videoId },
-      { $set: { updatedAt: new Date() }, $addToSet: { captionLanguages: job.targetLanguage } }
+      { $set: { updatedAt: new Date(), [`captionTracks.${job.targetLanguage}`]: { language: job.targetLanguage, label: LANGUAGE_NAMES[job.targetLanguage] ?? job.targetLanguage, sourceLanguage: job.sourceLanguage ?? "auto", url } }, $addToSet: { captionLanguages: job.targetLanguage } }
     );
     await db.collection("translation_jobs").updateOne(
       { _id: job._id },
