@@ -279,7 +279,10 @@ async function processJob(db: Db, job: any) {
       await downloadSource(String(clipUploads[i].objectKey), clipFile);
       clipFiles.push(clipFile);
     }
-    await concatClips(clipFiles, input);
+    const clipRanges = Array.isArray(video.clipTrimRanges) ? video.clipTrimRanges : [];
+    const trimmedFiles: string[] = [];
+    for (let i = 0; i < clipFiles.length; i += 1) { const range = clipRanges[i] ?? {}; const start = Math.max(0, Number(range.startMs ?? 0)); const end = Number(range.endMs ?? 0); if (start > 0 || end > start) { const trimmed = path.join(workDir, `trimmed-${i}.mp4`); const args = ["-hide_banner","-loglevel","error","-y", ...(start > 0 ? ["-ss", String(start/1000)] : []), "-i", clipFiles[i], ...(end > start ? ["-t", String((end-start)/1000)] : []), "-c:v","libx264","-preset","veryfast","-crf","20","-c:a","aac","-b:a","128k","-ar","48000","-movflags","+faststart",trimmed]; await runProcess(ffmpegBin,args); trimmedFiles.push(trimmed); } else trimmedFiles.push(clipFiles[i]); }
+    await concatClips(trimmedFiles, input);
     const hasOriginalAudio = await hasAudio(input);
 
     if (soundLink?.soundId) {
