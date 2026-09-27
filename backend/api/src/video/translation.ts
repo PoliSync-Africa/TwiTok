@@ -18,10 +18,11 @@ export async function ensureTranslationIndexes(db: Db) {
 }
 
 export async function queueCaptionTranslation(db: Db, userId: ObjectId, videoId: ObjectId, targetLanguage: string) {
-  const video = await db.collection("videos").findOne({ _id: videoId, ownerId: userId });
+  const video = await db.collection("videos").findOne({ _id: videoId, status: "PUBLISHED", visibility: "PUBLIC" });
   if (!video) throw new Error("Video not found");
   if (!TRANSLATION_LANGUAGES.includes(targetLanguage as any)) throw new Error("Unsupported translation language");
   const sourceLanguage = String(video.autoCaptionLanguage ?? "auto");
+  const ownerId = video.ownerId instanceof ObjectId ? video.ownerId : userId;
   if (sourceLanguage !== "auto" && sourceLanguage === targetLanguage) throw new Error("Target language matches source language");
   const now = new Date();
   await db.collection("translation_jobs").updateOne(
