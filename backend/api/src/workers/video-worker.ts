@@ -95,9 +95,10 @@ async function runFfmpeg(
     outputDurationSec: number;
     textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number }>;
     captions: Array<{ text: string; startMs: number; endMs: number }>;
+    effect: string;
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -133,6 +134,9 @@ async function runFfmpeg(
   }
   for (const variant of variants) {
     let current = variant.base;
+    const effectOut = `${variant.out}_effect`;
+    filters.push(effectFilter(current, effectOut));
+    current = effectOut;
     textOverlays.forEach((overlay, index) => {
       const next = `${variant.out}_${index}`;
       const x = `(w*${overlay.x}-text_w/2)`;
@@ -261,7 +265,8 @@ async function processJob(db: Db, job: any) {
       addedSoundVolume,
       outputDurationSec,
       textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : [],
-      captions: Array.isArray(video.captions) ? video.captions : []
+      captions: Array.isArray(video.captions) ? video.captions : [],
+      effect: String(video.effect ?? "NONE")
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));
