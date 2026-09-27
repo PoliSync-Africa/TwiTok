@@ -1,4 +1,4 @@
-import { Db, ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 export const SUPPORTED_STT_LANGUAGES = [
