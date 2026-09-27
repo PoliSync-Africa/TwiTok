@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { SyntheticEvent } from "react";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -185,7 +186,7 @@ export default function CreatePage() {
 
   const sizeText = useMemo(() => file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "", [file]);
 
-  function onLoadedMetadata(e: React.SyntheticEvent<HTMLVideoElement>) {
+  function onLoadedMetadata(e: SyntheticEvent<HTMLVideoElement>) {
     const d = e.currentTarget.duration;
     if (Number.isFinite(d)) {
       const ms = Math.round(d * 1000);
