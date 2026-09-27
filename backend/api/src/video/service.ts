@@ -1,6 +1,8 @@
 import { Db, ObjectId } from "mongodb";
 import crypto from "node:crypto";
-import { evaluateText } from "../safety/engine.js";\nimport { createPresignedUpload, mediaConfigured } from "../media/storage.js";\nimport { verifySourceAndQueue } from "./processing.js";
+import { evaluateText } from "../safety/engine.js";
+import { createPresignedUpload, mediaConfigured } from "../media/storage.js";
+import { verifySourceAndQueue } from "./processing.js";
 
 export type VideoVisibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
 export type VideoStatus = "UPLOADING" | "PROCESSING" | "READY" | "PUBLISHED" | "BLOCKED" | "FAILED";
@@ -56,13 +58,8 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
   const upload = await db.collection("video_uploads").findOne({ uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
   if (upload.status !== "UPLOADING") return upload;
-  await db.collection("video_uploads").updateOne({ _id: upload._id }, {
-    $set: { status: "PROCESSING", updatedAt: new Date() }
-  });
-  await db.collection("video_processing_jobs").insertOne({
-    uploadId, userId, type: "VIDEO_TRANSCODE", status: "QUEUED", createdAt: new Date()
-  });
-  return { uploadId, status: "PROCESSING" };
+  await verifySourceAndQueue(db, userId, uploadId);
+  return { uploadId, status: "PROCESSING", verified: true };
 }
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
