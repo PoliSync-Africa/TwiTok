@@ -26,11 +26,12 @@ export async function allocateQualifyingRevenue(
   const client = new MongoClient(uri);
   await client.connect();
   const session = client.startSession();
+  const txDb = client.db(db.databaseName);
 
   try {
     let result;
     await session.withTransaction(async () => {
-      await db.collection("financial_ledger").insertOne({
+      await txDb.collection("financial_ledger").insertOne({
         transactionId: input.transactionId,
         userId: input.userId,
         source: input.source,
@@ -42,19 +43,19 @@ export async function allocateQualifyingRevenue(
         createdAt: now
       }, { session });
 
-      await db.collection("wallets").updateOne(
+      await txDb.collection("wallets").updateOne(
         { userId: input.userId },
         { $inc: { balanceUsd: split.creatorUsd }, $setOnInsert: { userId: input.userId, currency: PLATFORM_CURRENCY, createdAt: now } },
         { upsert: true, session }
       );
 
-      await db.collection("platform_money_account").updateOne(
+      await txDb.collection("platform_money_account").updateOne(
         { currency: PLATFORM_CURRENCY },
         { $inc: { balanceUsd: split.platformUsd }, $setOnInsert: { currency: PLATFORM_CURRENCY, createdAt: now } },
         { upsert: true, session }
       );
     });
-    result = await db.collection("financial_ledger").findOne({ transactionId: input.transactionId });
+    result = await txDb.collection("financial_ledger").findOne({ transactionId: input.transactionId });
     return result;
   } finally {
     await session.endSession();
