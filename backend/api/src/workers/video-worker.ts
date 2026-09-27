@@ -221,6 +221,29 @@ async function getDurationMs(input: string) {
   } catch { return null; }
 }
 
+async function concatClips(files: string[], output: string) {
+  if (files.length === 1) { await fs.promises.copyFile(files[0], output); return; }
+  const inputs: string[] = [];
+  const filters: string[] = [];
+  for (let i = 0; i < files.length; i += 1) {
+    inputs.push("-i", files[i]);
+    const audio = await hasAudio(files[i]);
+    const duration = Math.max(0.1, (await getDurationMs(files[i]) ?? 100) / 1000);
+    filters.push(`[${i}:v]fps=30,format=yuv420p,setpts=PTS-STARTPTS[v${i}]`);
+    if (audio) filters.push(`[${i}:a]aresample=48000,asetpts=PTS-STARTPTS[a${i}]`);
+    else filters.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${duration.toFixed(3)},asetpts=N/SR/TB[a${i}]`);
+  }
+  filters.push(files.map((_, i) => `[v${i}][a${i}]`).join("") + `concat=n=${files.length}:v=1:a=1[vout][aout]`);
+  await runProcess(ffmpegBin, [
+    "-hide_banner", "-loglevel", "error", "-y", ...inputs,
+    "-filter_complex", filters.join(";"),
+    "-map", "[vout]", "-map", "[aout]",
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+    "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+    "-movflags", "+faststart", output
+  ]);
+}
+
 async function extractAudio(input: string, output: string) {
   await runProcess(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-vn", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", output]);
 }
@@ -249,7 +272,14 @@ async function processJob(db: Db, job: any) {
   const originalSoundFile = path.join(workDir, "original-sound.m4a");
   try {
     await fs.promises.mkdir(outputDir);
-    await downloadSource(upload.objectKey, input);
+    const clipUploads = Array.isArray(video.clips) && video.clips.length > 0 ? video.clips : [{ objectKey: upload.objectKey }];
+    const clipFiles: string[] = [];
+    for (let i = 0; i < clipUploads.length; i += 1) {
+      const clipFile = path.join(workDir, `clip-${i}`);
+      await downloadSource(String(clipUploads[i].objectKey), clipFile);
+      clipFiles.push(clipFile);
+    }
+    await concatClips(clipFiles, input);
     const hasOriginalAudio = await hasAudio(input);
 
     if (soundLink?.soundId) {
