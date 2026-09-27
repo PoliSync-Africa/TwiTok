@@ -10,6 +10,7 @@ import { initializeCreatorIndexes } from "./creator/studio.js";
 import { initializeLiveIndexes } from "./live/service.js";
 import { initializeSafetyIndexes } from "./safety/engine.js";
 import { initializeMonetizationIndexes } from "./monetization/programs.js";
+import { ensureUserIndexes } from "./auth/user.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -34,6 +35,7 @@ async function start() {
     await initializeLiveIndexes(db);
     await initializeSafetyIndexes(db);
     await initializeMonetizationIndexes(db);
+    await ensureUserIndexes(db);
   } else {
     console.warn("MONGODB_URI is not configured. Database features are disabled.");
   }
