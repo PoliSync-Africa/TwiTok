@@ -172,7 +172,7 @@ export default function Home() {
             <div className="video-stage">
               {playback
                 ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
-                    {v.autoCaptionsUrl && <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" />{Object.values(v.captionTracks ?? {}).map(track => <track key={track.language} kind="captions" src={track.url} srcLang={track.language} label={track.label} />)}}
+                    {v.autoCaptionsUrl && (<><track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" />{Object.values(v.captionTracks ?? {}).map(track => <track key={track.language} kind="captions" src={track.url} srcLang={track.language} label={track.label} />)}</>)}
                   </video>
                 : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
               <div className="gradient"/>
