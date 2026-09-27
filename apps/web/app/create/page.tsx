@@ -11,6 +11,7 @@ type Sound = { _id: string; title: string; artist: string; durationMs: number; c
 export default function CreatePage() {
   const [file, setFile] = useState<File | null>(null);
   const [clipFiles, setClipFiles] = useState<File[]>([]);
+  const [clipTransitions, setClipTransitions] = useState<any[]>([]);
   const [preview, setPreview] = useState("");
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
@@ -179,12 +180,14 @@ export default function CreatePage() {
   function chooseFiles(nextFiles: FileList | null) {
     const next = Array.from(nextFiles ?? []).filter(f => f.type.startsWith("video/") && f.size <= 500 * 1024 * 1024).slice(0, 20);
     if (!next.length) return setMessage("Please choose one or more video files under 500 MB each.");
-    setClipFiles(next); chooseFile(next[0]); setMessage(next.length > 1 ? `${next.length} clips selected. Reorder them before posting.` : "");
+    setClipFiles(next); setClipTransitions(next.slice(1).map(() => ({ type: "NONE", durationMs: 500 }))); chooseFile(next[0]); setMessage(next.length > 1 ? `${next.length} clips selected. Reorder them before posting.` : "");
   }
 
   function updateClipTrim(index: number, start: number, end: number) { setTimelineStartMs(v => ({...v, [index]: Math.max(0, start)})); setTimelineEndMs(v => ({...v, [index]: Math.max(start + 100, end)})); }
 
   function updateClipSpeed(index: number, value: number) { setClipFiles(items => items.map((f,i) => i === index ? f : f)); }
+
+  function setTransition(index: number, type: string) { setClipTransitions(items => items.map((x,i) => i === index ? {...x, type} : x)); }
 
   function moveClip(index: number, direction: -1 | 1) {
     setClipFiles(items => { const next = [...items]; const target = index + direction; if (target < 0 || target >= next.length) return next; [next[index], next[target]] = [next[target], next[index]]; if (next[0]) { setFile(next[0]); if (preview) URL.revokeObjectURL(preview); setPreview(URL.createObjectURL(next[0])); } return next; });
@@ -294,7 +297,7 @@ export default function CreatePage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
-          uploadId: session.uploadId, clipUploadIds: uploadIds, clipTrimRanges: selectedClips.map((_, i) => ({ startMs: timelineStartMs[i] ?? 0, endMs: timelineEndMs[i] ?? 0 })), caption, hashtags: tags, visibility,
+          uploadId: session.uploadId, clipUploadIds: uploadIds, clipTrimRanges: selectedClips.map((_, i) => ({ startMs: timelineStartMs[i] ?? 0, endMs: timelineEndMs[i] ?? 0 })), clipTransitions, caption, hashtags: tags, visibility,
           allowComments, allowDuet, allowStitch, coverTimeMs, trimStartMs, trimEndMs, speed, soundId: selectedSound?._id, originalVolume, addedSoundVolume, textOverlays, stickers, autoCaptions, captionLanguage, effect
         })
       });
