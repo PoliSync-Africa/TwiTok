@@ -15,7 +15,7 @@ mediaRouter.post("/upload-url", requireUser, async (req, res) => {
     const mimeType = String(req.body?.mimeType ?? "");
     if (!objectKey || !mimeType) return res.status(400).json({ error: "objectKey and mimeType are required" });
 
-    const owned = await getDb().collection("video_uploads").findOne({
+    const owned = (await getDb()).collection("video_uploads").findOne({
       userId: req.userId,
       objectKey
     });
@@ -30,7 +30,7 @@ mediaRouter.post("/upload-url", requireUser, async (req, res) => {
 
 mediaRouter.get("/playback/:videoId", requireUser, async (req, res) => {
   try {
-    const video = await getDb().collection("videos").findOne({ _id: new (await import("mongodb")).ObjectId(req.params.videoId) });
+    const video = (await getDb()).collection("videos").findOne({ _id: new (await import("mongodb")).ObjectId(req.params.videoId) });
     if (!video || video.status !== "PUBLISHED") return res.status(404).json({ error: "Video not found" });
 
     if (video.playback?.hlsUrl) return res.json({ url: video.playback.hlsUrl, type: "HLS" });
