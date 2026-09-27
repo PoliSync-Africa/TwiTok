@@ -91,7 +91,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     trimStartMs: Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0,
     trimEndMs: Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > 0 ? Number(input.trimEndMs) : null,
     speed: [0.5, 0.75, 1, 1.5, 2].includes(Number(input.speed)) ? Number(input.speed) : 1,
-    status: safety.decision === "BLOCK" ? "BLOCKED" : (upload.status === "READY" ? "READY" : "PROCESSING"),
+    status: upload.status === "READY" ? "READY" : "PROCESSING",
     sourceObjectKey: upload.objectKey,
     playback: null,
     thumbnail: null,
