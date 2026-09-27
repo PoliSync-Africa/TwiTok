@@ -80,6 +80,8 @@ export async function updateCaptions(
   }
   await db.collection("video_captions").deleteMany({ videoId });
   if (safe.length) await db.collection("video_captions").insertMany(safe);
+  const trackUrl = await regenerateCaptionTrack(db, videoId, safe);
+  if (trackUrl) await db.collection("videos").updateOne({ _id: videoId }, { $set: { autoCaptionsUrl: trackUrl, autoCaptionsStatus: "READY", updatedAt: new Date() } });
   return safe;
 }
 
