@@ -23,7 +23,7 @@ router.get("/sounds/:soundId", requireUser, async (req, res) => {
 
 router.get("/videos/:videoId/sound", requireUser, async (req, res) => {
   try {
-    const link = await (await getDb()).collection("video_sounds").findOne({ videoId: new (await import("mongodb")).ObjectId(req.params.videoId) });
+    const link = await (await getDb()).collection("video_sounds").findOne({ videoId: new (await import("mongodb")).ObjectId(String(req.params.videoId)) });
     if (!link) return res.status(404).json({ error: "No sound attached" });
     const sound = await (await getDb()).collection("sounds").findOne({ _id: link.soundId, status: "ACTIVE" });
     if (!sound) return res.status(404).json({ error: "Sound unavailable" });
