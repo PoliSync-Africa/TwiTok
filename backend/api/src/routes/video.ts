@@ -104,6 +104,7 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
       uploadId: String(req.body?.uploadId ?? ""),
       clipUploadIds: req.body?.clipUploadIds,
       clipTrimRanges: req.body?.clipTrimRanges,
+      clipTransitions: req.body?.clipTransitions,
       caption: req.body?.caption,
       hashtags: req.body?.hashtags,
       visibility: req.body?.visibility,
