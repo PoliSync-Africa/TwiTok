@@ -19,6 +19,7 @@ const workerId = process.env.TWITOK_VIDEO_WORKER_ID ?? `video-worker-${process.p
 const ffmpegBin = process.env.FFMPEG_BIN ?? "ffmpeg";
 const ffprobeBin = process.env.FFPROBE_BIN ?? "ffprobe";
 const pollMs = Number(process.env.TWITOK_VIDEO_WORKER_POLL_MS ?? 2000);
+const fontFile = process.env.TWITOK_FONT_FILE ?? "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
 if (!bucket || !accessKeyId || !secretAccessKey) throw new Error("Media storage credentials are required");
 const s3 = new S3Client({
@@ -92,9 +93,10 @@ async function runFfmpeg(
     originalVolume: number;
     addedSoundVolume: number;
     outputDurationSec: number;
+    textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number }>;
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -104,10 +106,36 @@ async function runFfmpeg(
 
   const filters = [
     "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720]`
+    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360base]`,
+    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540base]`,
+    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720base]`
   ];
+
+  const overlayInputs: string[] = [];
+  for (let index = 0; index < textOverlays.length; index += 1) {
+    const overlay = textOverlays[index];
+    const textFile = path.join(outputDir, `overlay-${index}.txt`);
+    fs.writeFileSync(textFile, overlay.text, "utf8");
+    overlayInputs.push(textFile);
+  }
+  const variants = [
+    { base: "v360base", out: "v360", width: 360 },
+    { base: "v540base", out: "v540", width: 540 },
+    { base: "v720base", out: "v720", width: 720 }
+  ];
+  for (const variant of variants) {
+    let current = variant.base;
+    textOverlays.forEach((overlay, index) => {
+      const next = `${variant.out}_${index}`;
+      const x = `(w*${overlay.x}-text_w/2)`;
+      const y = `(h*${overlay.y}-text_h/2)`;
+      const start = Math.max(0, overlay.startMs / 1000);
+      const end = Math.max(start + 0.01, overlay.endMs / 1000);
+      filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${overlayInputs[index]}:fontsize=${Math.round(overlay.fontSize)}:fontcolor=white:borderw=3:bordercolor=black@0.85:x=${x}:y=${y}:enable=between(t\\,${start}\\,${end})[${next}]`);
+      current = next;
+    });
+    filters.push(`[${current}]null[${variant.out}]`);
+  }
 
   if (soundFile) {
     const soundInput = 1;
@@ -216,7 +244,8 @@ async function processJob(db: Db, job: any) {
       soundFile,
       originalVolume,
       addedSoundVolume,
-      outputDurationSec
+      outputDurationSec,
+      textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : []
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));
