@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-type Step = "SELECT" | "EDIT" | "UPLOADING" | "PROCESSING";
+type Step = "SELECT" | "EDIT" | "UPLOADING" | "PROCESSING" | "READY";
 
 type Sound = { _id: string; title: string; artist: string; durationMs: number; coverUrl?: string; audioUrl?: string };
 
@@ -20,6 +20,8 @@ export default function CreatePage() {
   const [muted, setMuted] = useState(false);
   const [step, setStep] = useState<Step>("SELECT");
   const [message, setMessage] = useState("");
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>("PROCESSING");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [coverTimeMs, setCoverTimeMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
@@ -42,6 +44,55 @@ export default function CreatePage() {
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
 
   useEffect(() => () => { soundAudioRef.current?.pause(); }, []);
+
+  useEffect(() => {
+    if (step !== "PROCESSING" || !videoId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      const token = window.localStorage.getItem("twitok_user_token");
+      if (!token) return;
+      try {
+        const response = await fetch(API + "/video/" + encodeURIComponent(videoId), { headers: { Authorization: "Bearer " + token } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Unable to check processing status.");
+        if (cancelled) return;
+        setProcessingStatus(data.status ?? "PROCESSING");
+        if (data.status === "READY") {
+          setStep("READY");
+          setMessage("Your video is ready. Review the result and publish it.");
+          return;
+        }
+        if (data.status === "BLOCKED" || data.status === "FAILED") {
+          setStep("EDIT");
+          setMessage(data.status === "BLOCKED" ? "The video was blocked by the TwiTok Safety Engine." : "Video processing failed. Please try again.");
+          return;
+        }
+        timer = setTimeout(poll, 2000);
+      } catch (error) {
+        if (!cancelled) timer = setTimeout(poll, 4000);
+      }
+    };
+    poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [step, videoId]);
+
+  async function publishReadyVideo() {
+    if (!videoId) return;
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return setMessage("Sign in to publish this video.");
+    try {
+      setMessage("Publishing your video…");
+      const response = await fetch(API + "/video/" + encodeURIComponent(videoId) + "/publish", { method: "POST", headers: { Authorization: "Bearer " + token } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to publish video.");
+      setStep("READY");
+      setProcessingStatus("PUBLISHED");
+      setMessage("Published successfully. Your video is now live on TwiTok.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to publish video.");
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -144,6 +195,8 @@ export default function CreatePage() {
       if (!draft.ok) throw new Error(draftData.error ?? "Unable to create draft.");
 
       setUploadProgress(100);
+      setVideoId(String(draftData.videoId));
+      setProcessingStatus(String(draftData.status ?? "PROCESSING"));
       setStep("PROCESSING");
       setMessage(draftData.safety === "RESTRICT"
         ? "The post was held by the TwiTok Safety Engine."
@@ -240,11 +293,19 @@ export default function CreatePage() {
               <label>Stitch<select value={allowStitch ? "ON" : "OFF"} onChange={e => setAllowStitch(e.target.value === "ON")}><option>ON</option><option>OFF</option></select></label>
             </div>
 
-            <button type="button" className="primary-action" onClick={publishDraft} disabled={step === "UPLOADING" || step === "PROCESSING"}>
-              {step === "UPLOADING" ? "Uploading…" : step === "PROCESSING" ? "Processing…" : "Post"}
-            </button>
+            {step === "READY" && processingStatus === "PUBLISHED" ? (
+              <Link href="/" className="primary-action">View your video</Link>
+            ) : step === "READY" ? (
+              <button type="button" className="primary-action" onClick={publishReadyVideo}>Publish video</button>
+            ) : (
+              <button type="button" className="primary-action" onClick={publishDraft} disabled={step === "UPLOADING" || step === "PROCESSING"}>
+                {step === "UPLOADING" ? "Uploading…" : step === "PROCESSING" ? "Processing…" : "Post"}
+              </button>
+            )}
             <button type="button" className="secondary-action" onClick={() => setMuted(v => !v)}>Preview sound: {muted ? "Off" : "On"}</button>
             {step === "UPLOADING" && <small>Upload progress: {uploadProgress}%</small>}
+            {step === "PROCESSING" && <small>Processing status: {processingStatus} · We’ll notify this page when the video is ready.</small>}
+            {step === "READY" && processingStatus !== "PUBLISHED" && <small>Processing complete. The video has passed the media pipeline and is waiting for your publication confirmation.</small>}
             {message && <p className="composer-message">{message}</p>}
           </>}
         </div>
