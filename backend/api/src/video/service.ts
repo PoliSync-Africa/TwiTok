@@ -1,6 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import crypto from "node:crypto";
 import { evaluateText } from "../safety/engine.js";
+import { getSticker } from "./stickers.js";
 import { createPresignedUpload, mediaConfigured } from "../media/storage.js";
 import { verifySourceAndQueue } from "./processing.js";
 
@@ -83,7 +84,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   const allowedEffects = new Set(["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE","BRIGHT","FADE"]);
   const effect = allowedEffects.has(String(input.effect ?? "NONE")) ? String(input.effect ?? "NONE") : "NONE";
   const rawStickers = Array.isArray((input as any).stickers) ? (input as any).stickers : [];
-  const stickers = rawStickers.slice(0, 20).map((item: any) => ({ stickerId: String(item?.stickerId ?? "").slice(0, 40), startMs: Math.max(0, Number(item?.startMs ?? 0)), endMs: Math.max(100, Number(item?.endMs ?? 3000)), x: Math.max(0, Math.min(1, Number(item?.x ?? 0.5))), y: Math.max(0, Math.min(1, Number(item?.y ?? 0.5))), size: Math.max(24, Math.min(180, Number(item?.size ?? 72))), rotation: Math.max(-180, Math.min(180, Number(item?.rotation ?? 0))) })).filter((x: any) => x.stickerId);
+  const stickers = rawStickers.slice(0, 20).map((item: any) => ({ stickerId: String(item?.stickerId ?? "").slice(0, 40), startMs: Math.max(0, Number(item?.startMs ?? 0)), endMs: Math.max(100, Number(item?.endMs ?? 3000)), x: Math.max(0, Math.min(1, Number(item?.x ?? 0.5))), y: Math.max(0, Math.min(1, Number(item?.y ?? 0.5))), size: Math.max(24, Math.min(180, Number(item?.size ?? 72))), rotation: Math.max(-180, Math.min(180, Number(item?.rotation ?? 0))) })).filter((x: any) => x.stickerId && getSticker(x.stickerId));
   const rawOverlays = Array.isArray(input.textOverlays) ? input.textOverlays.slice(0, 20) : [];
   const textOverlays = rawOverlays.map((item: any) => ({
     text: String(item?.text ?? "").trim().slice(0, 200),
