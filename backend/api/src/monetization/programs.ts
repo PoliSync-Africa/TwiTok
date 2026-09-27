@@ -1,4 +1,4 @@
-import { Db } from "mongodb";
+import type { Db } from "mongodb";
 
 export const MONETIZATION_PROGRAMS = [
   "CREATOR_REWARDS",
