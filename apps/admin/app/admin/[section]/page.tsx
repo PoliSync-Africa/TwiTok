@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+const API_URL = process.env.TWITOK_API_URL ?? "http://localhost:4000";
 
 const modules: Record<string, {title:string; description:string; controls:string[]}> = {
   users:{title:"Users & Accounts",description:"Manage ordinary TwiTok users. Owner authority is never stored as a user role.",controls:["Search accounts","Suspend or restore accounts","Verification","Account safety history"]},
@@ -14,7 +18,20 @@ const modules: Record<string, {title:string; description:string; controls:string
   security:{title:"Security & Audit",description:"Control privileged access and review administrative activity.",controls:["Owner sessions","Staff roles","MFA","Audit logs"]}
 };
 
+async function isOwnerSessionValid() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("twitok_owner_session")?.value;
+  if (!token) return false;
+
+  const response = await fetch(`${API_URL}/api/v1/admin/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  return response.ok;
+}
+
 export default async function AdminModule({params}:{params:Promise<{section:string}>}) {
+  if (!(await isOwnerSessionValid())) redirect("/admin/login");
   const {section}=await params;
   const module=modules[section] ?? {title:"Control Module",description:"TwiTok administrative control.",controls:["Configuration","Monitoring","Audit"]};
 
