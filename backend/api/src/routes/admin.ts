@@ -85,12 +85,18 @@ adminRouter.get("/overview", async (req, res) => {
 
     const db = await getDb();
 
-    const [users, videos, reports, live, creators] = await Promise.all([
+    const [users, videos, reports, live, creators, streams, wallets, withdrawals, ledgerTotals] = await Promise.all([
       db.collection("users").countDocuments(),
       db.collection("videos").countDocuments({ status: "PUBLISHED" }),
       db.collection("moderation_cases").countDocuments({ status: "OPEN" }),
       db.collection("live_streams").countDocuments({ status: "LIVE" }),
-      db.collection("creator_profiles").countDocuments()
+      db.collection("creator_profiles").countDocuments(),
+      db.collection("live_streams").countDocuments(),
+      db.collection("wallets").countDocuments(),
+      db.collection("withdrawals").countDocuments({ status: "PENDING" }),
+      db.collection("financial_ledger").aggregate([
+        { $group: { _id: null, grossUsd: { $sum: "$grossUsd" }, platformUsd: { $sum: "$platformUsd" }, creatorUsd: { $sum: "$creatorUsd" } } }
+      ]).toArray()
     ]);
 
     return res.json({
@@ -98,7 +104,11 @@ adminRouter.get("/overview", async (req, res) => {
       videos,
       reports,
       live,
-      creators
+      creators,
+      streams,
+      wallets,
+      pendingWithdrawals: withdrawals,
+      money: ledgerTotals[0] ?? { grossUsd: 0, platformUsd: 0, creatorUsd: 0 }
     });
   } catch {
     return res.status(401).json({ error: "Administrator session expired" });
