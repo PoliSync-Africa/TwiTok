@@ -40,7 +40,7 @@ videoRouter.post("/uploads/:uploadId/multipart", requireUser, async (req, res) =
 
 videoRouter.post("/uploads/:uploadId/multipart/part-url", requireUser, async (req, res) => {
   try {
-    const upload = (await getDb()).collection("video_uploads").findOne({ uploadId: String(req.params.uploadId), userId: req.userId });
+    const upload = await (await getDb()).collection("video_uploads").findOne({ uploadId: String(req.params.uploadId), userId: req.userId });
     if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
     const partNumber = Number(req.body?.partNumber);
     res.json(await createPresignedUploadPart({
