@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { Db } from "mongodb";
+import type { Db } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { getSpeechToTextProvider } from "../video/stt.js";
 import { evaluateText } from "../safety/engine.js";
