@@ -40,5 +40,5 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !excluded.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
   const videos = await db.collection("videos").find(query).sort({ publishedAt: -1, _id: -1 }).limit(Math.min(Math.max(limit, 1), 20)).toArray();
-  return videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, publishedAt: v.publishedAt ?? null }));
+  return videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, publishedAt: v.publishedAt ?? null }));
 }
