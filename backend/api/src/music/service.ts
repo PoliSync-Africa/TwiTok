@@ -34,11 +34,11 @@ export async function searchSounds(db: Db, q: string, countryCode?: string, limi
   return db.collection<Sound>("sounds").find(filter).sort({ usageCount: -1 }).limit(Math.min(limit, 50)).toArray();
 }
 
-export async function attachSound(db: Db, videoId: string, soundId: string) {
+export async function attachSound(db: Db, userId: ObjectId, videoId: string, soundId: string) {
   if (!ObjectId.isValid(videoId) || !ObjectId.isValid(soundId)) throw new Error("Invalid video or sound id");
   const sound = await db.collection<Sound>("sounds").findOne({ _id: new ObjectId(soundId), status: "ACTIVE" });
   if (!sound) throw new Error("Sound unavailable");
-  const video = await db.collection("videos").findOne({ _id: new ObjectId(videoId) });
+  const video = await db.collection("videos").findOne({ _id: new ObjectId(videoId), ownerId: userId });
   if (!video) throw new Error("Video not found");
   await db.collection("video_sounds").updateOne(
     { videoId: new ObjectId(videoId) },
