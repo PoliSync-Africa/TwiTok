@@ -19,7 +19,7 @@ liveRouter.post("/streams/:streamId/status", async (req, res) => {
   try {
     const status = req.body?.status;
     if (!["LIVE","ENDED","SUSPENDED"].includes(status)) return res.status(400).json({ error: "Invalid LIVE status" });
-    return res.json(await setLiveStatus(await getDb(), req.params.streamId, status));
+    return res.json(await setLiveStatus(await getDb(), String(req.params.streamId), status));
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE status update failed" });
   }
