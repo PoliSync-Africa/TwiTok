@@ -94,9 +94,10 @@ async function runFfmpeg(
     addedSoundVolume: number;
     outputDurationSec: number;
     textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number }>;
+    captions: Array<{ text: string; startMs: number; endMs: number }>;
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -123,6 +124,13 @@ async function runFfmpeg(
     { base: "v540base", out: "v540", width: 540 },
     { base: "v720base", out: "v720", width: 720 }
   ];
+  const captionInputs: string[] = [];
+  for (let index = 0; index < captions.length; index += 1) {
+    const caption = captions[index];
+    const file = path.join(outputDir, `caption-${index}.txt`);
+    fs.writeFileSync(file, caption.text, "utf8");
+    captionInputs.push(file);
+  }
   for (const variant of variants) {
     let current = variant.base;
     textOverlays.forEach((overlay, index) => {
@@ -132,6 +140,13 @@ async function runFfmpeg(
       const start = Math.max(0, overlay.startMs / 1000);
       const end = Math.max(start + 0.01, overlay.endMs / 1000);
       filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${overlayInputs[index]}:fontsize=${Math.round(overlay.fontSize)}:fontcolor=white:borderw=3:bordercolor=black@0.85:x=${x}:y=${y}:enable=between(t\\,${start}\\,${end})[${next}]`);
+      current = next;
+    });
+    captions.forEach((caption, index) => {
+      const next = `${variant.out}_caption_${index}`;
+      const start = Math.max(0, caption.startMs / 1000);
+      const end = Math.max(start + 0.01, caption.endMs / 1000);
+      filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${captionInputs[index]}:fontsize=34:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-80:enable=between(t\\,${start}\\,${end})[${next}]`);
       current = next;
     });
     filters.push(`[${current}]null[${variant.out}]`);
@@ -245,7 +260,8 @@ async function processJob(db: Db, job: any) {
       originalVolume,
       addedSoundVolume,
       outputDurationSec,
-      textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : []
+      textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : [],
+      captions: Array.isArray(video.captions) ? video.captions : []
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));
