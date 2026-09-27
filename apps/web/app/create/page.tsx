@@ -113,16 +113,6 @@ export default function CreatePage() {
       const draftData = await draft.json();
       if (!draft.ok) throw new Error(draftData.error ?? "Unable to create draft.");
 
-      if (false && selectedSound && draftData.videoId) {
-        const soundResponse = await fetch(API + "/music/videos/" + draftData.videoId + "/sound", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-          body: JSON.stringify({ soundId: selectedSound._id })
-        });
-        const soundData = await soundResponse.json();
-        if (!soundResponse.ok) throw new Error(soundData.error ?? "Unable to attach selected sound.");
-      }
-
       setUploadProgress(100);
       setStep("PROCESSING");
       setMessage(draftData.safety === "RESTRICT"
