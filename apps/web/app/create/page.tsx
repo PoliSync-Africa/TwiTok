@@ -20,7 +20,7 @@ export default function CreatePage() {
   const [step, setStep] = useState<Step>("SELECT");
   const [message, setMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [coverTimeMs, setCoverTimeMs] = useState(0);\n  const [durationMs, setDurationMs] = useState(0);\n  const [trimStartMs, setTrimStartMs] = useState(0);\n  const [trimEndMs, setTrimEndMs] = useState(0);
+  const [coverTimeMs, setCoverTimeMs] = useState(0);\n  const [durationMs, setDurationMs] = useState(0);\n  const [trimStartMs, setTrimStartMs] = useState(0);\n  const [trimEndMs,\n          speed, setTrimEndMs] = useState(0);\n  const [speed, setSpeed] = useState(1);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -136,4 +136,4 @@ export default function CreatePage() {
               <input value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#Ghana #Africa #TwiTok" />
             </label>
 
-            <label>Cover position (seconds)<input type="number" min="0" step="0.1" value={coverTimeMs / 1000} onChange={e => setCoverTimeMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label>\n\n            <div className="trim-editor"><b>Trim video</b><div className="trim-values"><span>{(trimStartMs / 1000).toFixed(1)}s</span><span>{(trimEndMs / 1000).toFixed(1)}s</span></div><input type="range" min="0" max={Math.max(durationMs, 1)} step="100" value={trimStartMs} onChange={e => setTrimStartMs(Math.min(Number(e.target.value), Math.max(0, trimEndMs - 100)))} /><input type="range" min="0" max={Math.max(durationMs, 1)} step="100" value={trimEndMs} onChange={e => setTrimEndMs(Math.max(Number(e.target.value), trimStartMs + 100))} /><small>Select the start and end of the clip.</small></div>
+            <label>Cover position (seconds)<input type="number" min="0" step="0.1" value={coverTimeMs / 1000} onChange={e => setCoverTimeMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label>\n\n            <div className="speed-selector"><b>Speed</b><div className="speed-options">{[0.5,0.75,1,1.5,2].map(value => <button type="button" key={value} className={speed === value ? "selected" : ""} onClick={() => setSpeed(value)}>{value}×</button>)}</div></div>\n\n            <div className="trim-editor"><b>Trim video</b><div className="trim-values"><span>{(trimStartMs / 1000).toFixed(1)}s</span><span>{(trimEndMs / 1000).toFixed(1)}s</span></div><input type="range" min="0" max={Math.max(durationMs, 1)} step="100" value={trimStartMs} onChange={e => setTrimStartMs(Math.min(Number(e.target.value), Math.max(0, trimEndMs - 100)))} /><input type="range" min="0" max={Math.max(durationMs, 1)} step="100" value={trimEndMs} onChange={e => setTrimEndMs(Math.max(Number(e.target.value), trimStartMs + 100))} /><small>Select the start and end of the clip.</small></div>
