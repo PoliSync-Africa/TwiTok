@@ -131,7 +131,8 @@ async function processJob(db: Db, job: any) {
     await downloadSource(upload.objectKey, input);
     const audio = await hasAudio(input);
     await runFfmpeg(input, outputDir, audio);
-    await createThumbnail(input, thumbnail);\n    const durationMs = await getDurationMs(input);
+    await createThumbnail(input, thumbnail);
+    const durationMs = await getDurationMs(input);
 
     const baseKey = upload.objectKey.replace(/\/source$/, "");
     const files = await fs.promises.readdir(outputDir);
