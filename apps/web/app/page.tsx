@@ -31,7 +31,8 @@ export default function Home() {
   const [videos, setVideos] = useState<FeedVideo[]>(demoVideos);
   const [muted, setMuted] = useState(true);
   const api = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-  const activeRef = useRef<string | null>(null);\n  const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
+  const activeRef = useRef<string | null>(null);
+  const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +53,17 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [api, tab]);
 
-  useEffect(() => {\n    const token = window.localStorage.getItem("twitok_user_token");\n    if (!token) return;\n    let cancelled = false;\n    Promise.all(videos.filter(v => !v.id.startsWith("demo-")).map(async v => {\n      try { const r = await fetch(`${api}/music/videos/${v.id}/sound`, { headers: { Authorization: `Bearer ${token}` } }); if (!r.ok) return null; const d = await r.json(); return d.sound ? [v.id, d.sound] as const : null; } catch { return null; }\n    })).then(items => { if (!cancelled) setSoundMap(prev => { const next = { ...prev }; items.forEach(item => { if (item) next[item[0]] = item[1]; }); return next; }); });\n    return () => { cancelled = true; };\n  }, [videos, api]);\n\n  async function track(videoId: string, type: string, watchMs = 0) {
+  useEffect(() => {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    let cancelled = false;
+    Promise.all(videos.filter(v => !v.id.startsWith("demo-")).map(async v => {
+      try { const r = await fetch(`${api}/music/videos/${v.id}/sound`, { headers: { Authorization: `Bearer ${token}` } }); if (!r.ok) return null; const d = await r.json(); return d.sound ? [v.id, d.sound] as const : null; } catch { return null; }
+    })).then(items => { if (!cancelled) setSoundMap(prev => { const next = { ...prev }; items.forEach(item => { if (item) next[item[0]] = item[1]; }); return next; }); });
+    return () => { cancelled = true; };
+  }, [videos, api]);
+
+  async function track(videoId: string, type: string, watchMs = 0) {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token || videoId.startsWith("demo-")) return;
     try {
@@ -119,7 +130,8 @@ export default function Home() {
               <div className="video-copy">
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
                 <h2>{v.caption ?? ""}</h2>
-                <p>{(v.hashtags ?? []).map(tag => `#${tag}`).join(" ")}</p>\n                {soundMap[v.id] && <Link className="video-sound" href={`/sound/${soundMap[v.id]._id}`}>♪ {soundMap[v.id].title} — {soundMap[v.id].artist}</Link>}
+                <p>{(v.hashtags ?? []).map(tag => `#${tag}`).join(" ")}</p>
+                {soundMap[v.id] && <Link className="video-sound" href={`/sound/${soundMap[v.id]._id}`}>♪ {soundMap[v.id].title} — {soundMap[v.id].artist}</Link>}
               </div>
             </div>
             <div className="actions">
