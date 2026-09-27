@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo";
 import { requireUser } from "../auth/middleware";
-import { attachSound, searchSounds } from "../music/service";
+import { attachSound, searchSounds, getSoundPage } from "../music/service";
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.get("/sounds", requireUser, async (req, res) => {
   }
 });
 
-router.post("/videos/:videoId/sound", requireUser, async (req, res) => {
+router.get("/sounds/:soundId", requireUser, async (req, res) => {\n  try { res.json(await getSoundPage(getDb(), req.params.soundId)); }\n  catch (error: any) { res.status(404).json({ error: error?.message || "Sound not found" }); }\n});\n\nrouter.post("/videos/:videoId/sound", requireUser, async (req, res) => {
   try {
     const soundId = String(req.body?.soundId || "");
     const sound = await attachSound(getDb(), req.userId!, req.params.videoId, soundId);
