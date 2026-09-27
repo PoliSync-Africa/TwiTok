@@ -68,7 +68,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
