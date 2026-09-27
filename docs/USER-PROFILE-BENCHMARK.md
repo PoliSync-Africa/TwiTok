@@ -13,3 +13,7 @@ TikTok publicly documents profiles with usernames/nicknames, public/private acco
 - Follow counts are computed from the relationship store.
 - Authentication is bearer-token based at the API layer and will later support secure device sessions/passkeys.
 - Private-account approval is the next required enhancement: the current relationship record marks a private follow as pending, but content visibility and approval workflows must not be treated as complete yet.
+
+
+## Privacy/follow controls added
+TikTok documents private-account approval, removing followers, and blocking. TwiTok implements these as server-side relationship states rather than treating a private follow as an immediate follower. Blocking removes both-direction follow relationships and pending requests. Public profile access hides sensitive account fields. citeturn0search0turn0search2
