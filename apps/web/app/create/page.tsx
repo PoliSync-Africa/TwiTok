@@ -156,6 +156,22 @@ export default function CreatePage() {
     }
   }
 
+
+  function uploadWithProgress(url: string, uploadFile: File, onProgress: (value: number) => void) {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("Content-Type", uploadFile.type);
+      xhr.upload.onprogress = event => {
+        if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      };
+      xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Video upload failed."));
+      xhr.onerror = () => reject(new Error("Video upload failed. Check your connection and try again."));
+      xhr.onabort = () => reject(new Error("Video upload was cancelled."));
+      xhr.send(uploadFile);
+    });
+  }
+
   async function publishDraft() {
     if (!file) return;
     const token = window.localStorage.getItem("twitok_user_token");
@@ -172,9 +188,8 @@ export default function CreatePage() {
       const session = await create.json();
       if (!create.ok || !session.uploadUrl) throw new Error(session.error ?? "Media storage is not configured.");
 
-      const put = await fetch(session.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!put.ok) throw new Error("Video upload failed.");
-      setUploadProgress(75);
+      setUploadProgress(0);
+      await uploadWithProgress(session.uploadUrl, file, setUploadProgress);
 
       const complete = await fetch(API + "/video/uploads/" + session.uploadId + "/complete", {
         method: "POST", headers: { Authorization: "Bearer " + token }
