@@ -25,6 +25,6 @@ monetizationRouter.post("/eligibility/evaluate", async (req, res) => {
 });
 
 monetizationRouter.get("/eligibility/:userId", async (req, res) => {
-  try { return res.json(await getEligibility(await getDb(), req.params.userId)); }
+  try { return res.json(await getEligibility(await getDb(), String(req.params.userId))); }
   catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Eligibility lookup failed" }); }
 });
