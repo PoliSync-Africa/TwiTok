@@ -15,7 +15,8 @@ const modules: Record<string, {title:string; description:string; controls:string
   marketplace:{title:"Marketplace",description:"Manage sellers, products and commerce safety.",controls:["Seller verification","Listings","Orders","Disputes"]},
   analytics:{title:"Analytics",description:"Monitor platform performance and safety metrics.",controls:["Growth","Engagement","Retention","Safety analytics"]},
   settings:{title:"Platform Settings",description:"Control global TwiTok configuration.",controls:["Countries","Languages","Feature flags","Maintenance mode"]},
-  security:{title:"Security & Audit",description:"Control privileged access and review administrative activity.",controls:["Owner sessions","Staff roles","MFA","Audit logs"]}
+  security:{title:"Security & Audit",description:"Control privileged access and review administrative activity.",controls:["Owner sessions","Staff roles","MFA","Audit logs"]},
+  money:{title:"Money & Revenue",description:"Operate the USD wallet, 60/40 revenue allocation and global withdrawal controls.",controls:["USD balances","Automatic 60/40 split","Platform money account","Withdrawals","Exchange rates","Bank and mobile-money rules","Financial audit ledger"]}
 };
 
 async function isOwnerSessionValid() {
