@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { Db } from "mongodb";
+import type { Db } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { getCaptionTranslationProvider } from "../video/translation-provider.js";
 import { LANGUAGE_NAMES } from "../video/translation.js";
