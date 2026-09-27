@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
-import { requireUser } from "../auth/middleware";
+import { requireUser } from "../auth/middleware.js";
 import { attachSound, searchSounds, getSoundPage } from "../music/service";
 
 const router = Router();
