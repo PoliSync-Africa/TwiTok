@@ -18,7 +18,6 @@ export default function CreatePage() {
   const [timelinePlayheadMs, setTimelinePlayheadMs] = useState(0);
   const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
   const timelineVideoRef = useRef<HTMLVideoElement | null>(null);
-  const timelineTotalMs = Math.max(1, clipFiles.reduce((sum,_,i) => { const s=timelineStartMs[i] ?? 0; const e=timelineEndMs[i] ?? 10000; const speed=clipSettings[i]?.speed ?? 1; return sum + Math.max(100,e-s)/speed; },0));
   function getTimelineClipAt(ms:number) { let cursor=0; for (let i=0;i<clipFiles.length;i++){ const s=timelineStartMs[i] ?? 0; const e=timelineEndMs[i] ?? 10000; const speed=clipSettings[i]?.speed ?? 1; const duration=Math.max(100,e-s)/speed; if(ms <= cursor+duration || i===clipFiles.length-1) return {index:i, localMs:Math.max(0,ms-cursor)*speed}; cursor+=duration; } return {index:0,localMs:0}; }
   function seekTimeline(ms:number) { const value=Math.max(0,Math.min(timelineTotalMs,ms)); const target=getTimelineClipAt(value); setTimelinePlayheadMs(value); setSelectedClip(target.index); if (timelineVideoRef.current) timelineVideoRef.current.currentTime=(target.localMs+(timelineStartMs[target.index] ?? 0))/1000; }
   const [timelineHistory, setTimelineHistory] = useState<any[]>([]);
@@ -46,6 +45,7 @@ export default function CreatePage() {
   const [trimStartMs, setTrimStartMs] = useState(0);
   const [timelineStartMs, setTimelineStartMs] = useState<Record<number, number>>({});
   const [timelineEndMs, setTimelineEndMs] = useState<Record<number, number>>({});
+  const timelineTotalMs = Math.max(1, clipFiles.reduce((sum,_,i) => { const s=timelineStartMs[i] ?? 0; const e=timelineEndMs[i] ?? 10000; const speed=clipSettings[i]?.speed ?? 1; return sum + Math.max(100,e-s)/speed; },0));
   const activeTimelineClip = getTimelineClipAt(timelinePlayheadMs);
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [speed, setSpeed] = useState(1);
