@@ -8,14 +8,16 @@ import { monetizationRouter } from "./monetization.js";
 import { authRouter } from "./auth.js";
 import { profileRouter } from "./profile.js";
 import { videoRouter } from "./video.js";
-import { feedRouter } from "./feed.js";\nimport { mediaRouter } from "./media.js";
+import { feedRouter } from "./feed.js";
+import { mediaRouter } from "./media.js";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/profile", profileRouter);
 apiRouter.use("/video", videoRouter);
-apiRouter.use("/feed", feedRouter);\napiRouter.use("/media", mediaRouter);
+apiRouter.use("/feed", feedRouter);
+apiRouter.use("/media", mediaRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/money", moneyRouter);
 apiRouter.use("/creator", creatorRouter);
