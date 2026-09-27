@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const bucket = process.env.MEDIA_BUCKET || "";
@@ -47,6 +47,55 @@ export async function createPresignedUpload(input: {
 
 export async function headMediaObject(objectKey: string) {
   return getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: objectKey }));
+}
+
+export async function createMultipartUpload(input: { objectKey: string; mimeType: string }) {
+  const response = await getClient().send(new CreateMultipartUploadCommand({
+    Bucket: bucket,
+    Key: input.objectKey,
+    ContentType: input.mimeType
+  }));
+  if (!response.UploadId) throw new Error("Storage did not return a multipart upload ID");
+  return response.UploadId;
+}
+
+export async function createPresignedUploadPart(input: {
+  objectKey: string;
+  uploadId: string;
+  partNumber: number;
+  expiresInSeconds?: number;
+}) {
+  if (!Number.isInteger(input.partNumber) || input.partNumber < 1 || input.partNumber > 10000) {
+    throw new Error("Invalid multipart part number");
+  }
+  const url = await getSignedUrl(
+    getClient(),
+    new UploadPartCommand({
+      Bucket: bucket,
+      Key: input.objectKey,
+      UploadId: input.uploadId,
+      PartNumber: input.partNumber
+    }),
+    { expiresIn: input.expiresInSeconds ?? 900 }
+  );
+  return { url, partNumber: input.partNumber, expiresInSeconds: input.expiresInSeconds ?? 900 };
+}
+
+export async function completeMultipartUpload(input: {
+  objectKey: string;
+  uploadId: string;
+  parts: Array<{ partNumber: number; etag: string }>;
+}) {
+  const sorted = [...input.parts].sort((a, b) => a.partNumber - b.partNumber);
+  const response = await getClient().send(new CompleteMultipartUploadCommand({
+    Bucket: bucket,
+    Key: input.objectKey,
+    UploadId: input.uploadId,
+    MultipartUpload: {
+      Parts: sorted.map(part => ({ PartNumber: part.partNumber, ETag: part.etag }))
+    }
+  }));
+  return { etag: response.ETag ?? null };
 }
 
 export async function createPresignedPlayback(objectKey: string, expiresInSeconds = 3600) {
