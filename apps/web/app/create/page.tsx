@@ -11,7 +11,9 @@ type Sound = { _id: string; title: string; artist: string; durationMs: number; c
 export default function CreatePage() {
   const [file, setFile] = useState<File | null>(null);
   const [clipFiles, setClipFiles] = useState<File[]>([]);
-  const [clipTransitions, setClipTransitions] = useState<any[]>([]);
+  const [clipTransitions, clipSettings, setClipTransitions] = useState<any[]>([]);
+  const [clipSettings, setClipSettings] = useState<any[]>([]);
+  const [selectedClip, setSelectedClip] = useState(0);
   const [timelineHistory, setTimelineHistory] = useState<any[]>([]);
   const [timelineFuture, setTimelineFuture] = useState<any[]>([]);
   const timelineSnapshot = () => ({ files: clipFiles, starts: timelineStartMs, ends: timelineEndMs, transitions: clipTransitions });
@@ -187,7 +189,7 @@ export default function CreatePage() {
   function chooseFiles(nextFiles: FileList | null) {
     const next = Array.from(nextFiles ?? []).filter(f => f.type.startsWith("video/") && f.size <= 500 * 1024 * 1024).slice(0, 20);
     if (!next.length) return setMessage("Please choose one or more video files under 500 MB each.");
-    setClipFiles(next); setClipTransitions(next.slice(1).map(() => ({ type: "NONE", durationMs: 500 }))); chooseFile(next[0]); setMessage(next.length > 1 ? `${next.length} clips selected. Reorder them before posting.` : "");
+    setClipFiles(next); setClipTransitions(next.slice(1).map(() => ({ type: "NONE", durationMs: 500 }))); setClipSettings(next.map(() => ({speed:1,volume:1,muted:false}))); chooseFile(next[0]); setMessage(next.length > 1 ? `${next.length} clips selected. Reorder them before posting.` : "");
   }
 
   function updateClipTrim(index: number, start: number, end: number) { setTimelineStartMs(v => ({...v, [index]: Math.max(0, start)})); setTimelineEndMs(v => ({...v, [index]: Math.max(start + 100, end)})); }
@@ -197,6 +199,7 @@ export default function CreatePage() {
   function deleteClip(index: number) { if (clipFiles.length <= 1) return; pushTimelineHistory(); setClipFiles(items => items.filter((_,i)=>i!==index)); setClipTransitions(items => items.filter((_,i)=>i!==index && i!==index-1)); }
   function duplicateClip(index: number) { pushTimelineHistory(); setClipFiles(items => { const next=[...items]; next.splice(index+1,0,items[index]); return next; }); setClipTransitions(items => [...items, {type:"NONE",durationMs:500}].slice(0,Math.max(0,clipFiles.length))); }
   function splitClip(index: number) { const start=timelineStartMs[index] ?? 0; const end=timelineEndMs[index] ?? 0; if (end-start < 400) return; const mid=Math.floor((start+end)/2); pushTimelineHistory(); setTimelineEndMs(v=>({...v,[index]:mid})); setTimelineStartMs(v=>({...v,[index+1]:mid})); setTimelineEndMs(v=>({...v,[index+1]:end})); setClipFiles(items=>{const next=[...items]; next.splice(index+1,0,items[index]); return next;}); setClipTransitions(items=>{const next=[...items]; next.splice(index,0,{type:"NONE",durationMs:500}); return next;}); }
+  function updateClipSetting(index:number, patch:any) { setClipSettings(items => items.map((x,i)=>i===index ? {...x,...patch}:x)); }
   function setTransition(index: number, type: string) { setClipTransitions(items => items.map((x,i) => i === index ? {...x, type} : x)); }
 
   function moveClip(index: number, direction: -1 | 1) {
@@ -348,7 +351,7 @@ export default function CreatePage() {
         </div>
 
         <div className="composer-panel">
-          {clipFiles.length > 1 && <div className="clip-list"><b>Timeline</b><div className="timeline-actions"><button type="button" onClick={undoTimeline} disabled={!timelineHistory.length}>Undo</button><button type="button" onClick={redoTimeline} disabled={!timelineFuture.length}>Redo</button></div><div className="timeline-track">{clipFiles.map((clip,index) => { const start=timelineStartMs[index] ?? 0; const end=timelineEndMs[index] ?? 10000; return <div className="timeline-clip" key={clip.name + index}><div><strong>{index+1}</strong><span>{clip.name}</span></div><small>{((end-start)/1000).toFixed(1)}s</small><label>Start <input type="range" min="0" max={Math.max(1000,end-100)} value={start} onChange={e=>updateClipTrim(index,Number(e.target.value),end)} /></label><label>End <input type="range" min={Math.min(1000,start+100)} max={Math.max(1000,end)} value={end} onChange={e=>updateClipTrim(index,start,Number(e.target.value))} /></label><button type="button" onClick={()=>splitClip(index)}>Split</button><button type="button" onClick={()=>duplicateClip(index)}>Duplicate</button><button type="button" onClick={()=>deleteClip(index)} disabled={clipFiles.length<=1}>Delete</button><button type="button" onClick={()=>moveClip(index,-1) disabled={index===0}>↑</button><button type="button" onClick={()=>moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>})}</div></div><b>Clips</b>{clipFiles.map((clip,index) => <div key={clip.name + index}><span>{index + 1}. {clip.name}</span><button type="button" onClick={() => moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>)}</div>}
+          {clipFiles.length > 1 && <div className="clip-list"><b>Timeline</b><div className="timeline-actions"><button type="button" onClick={undoTimeline} disabled={!timelineHistory.length}>Undo</button><button type="button" onClick={redoTimeline} disabled={!timelineFuture.length}>Redo</button></div><div className="timeline-track">{clipFiles.map((clip,index) => { const start=timelineStartMs[index] ?? 0; const end=timelineEndMs[index] ?? 10000; return <div className="timeline-clip" onClick={()=>setSelectedClip(index)} key={clip.name + index}><div><strong>{index+1}</strong><span>{clip.name}</span></div><small>{((end-start)/1000).toFixed(1)}s</small><label>Start <input type="range" min="0" max={Math.max(1000,end-100)} value={start} onChange={e=>updateClipTrim(index,Number(e.target.value),end)} /></label><label>End <input type="range" min={Math.min(1000,start+100)} max={Math.max(1000,end)} value={end} onChange={e=>updateClipTrim(index,start,Number(e.target.value))} /></label><button type="button" onClick={()=>splitClip(index)}>Split</button><button type="button" onClick={()=>duplicateClip(index)}>Duplicate</button><button type="button" onClick={()=>deleteClip(index)} disabled={clipFiles.length<=1}>Delete</button><button type="button" onClick={()=>moveClip(index,-1) disabled={index===0}>↑</button><button type="button" onClick={()=>moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>})}</div></div><b>Clips</b>{clipFiles.map((clip,index) => <div key={clip.name + index}><span>{index + 1}. {clip.name}</span><button type="button" onClick={() => moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>)}</div>}
           <div className="composer-title">
             <div><span>VIDEO POST</span><h1>Create</h1></div>
             {file && <label className="secondary">Replace<input type="file" accept="video/*" onChange={e => chooseFile(e.target.files?.[0] ?? null)} /></label>}
