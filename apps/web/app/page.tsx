@@ -12,6 +12,8 @@ type FeedVideo = {
   playback?: { hlsUrl?: string; mp4Url?: string };
   thumbnail?: string | null;
   country?: string;
+  autoCaptionsUrl?: string;
+  autoCaptionsStatus?: string;
 };
 
 const demoVideos: FeedVideo[] = [
@@ -124,7 +126,9 @@ export default function Home() {
           return <article className="video-card" data-video-id={v.id} key={v.id}>
             <div className="video-stage">
               {playback
-                ? <video className="real-video" src={playback} poster={v.thumbnail ?? undefined} playsInline loop muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")} />
+                ? <video className="real-video" src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
+                    {v.autoCaptionsUrl && <track kind="captions" src={v.autoCaptionsUrl} srcLang="en" label="TwiTok captions" default />}
+                  </video>
                 : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
               <div className="gradient"/>
               <div className="video-copy">
