@@ -22,7 +22,7 @@ profileRouter.get("/:username", async (req, res) => {
 profileRouter.post("/:username/follow", requireUser, async (req, res) => {
   try {
     const db = await getDb();
-    const target = await db.collection("users").findOne({ username: req.params.username.trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
+    const target = await db.collection("users").findOne({ username: String(req.params.username).trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
     if (!target) return res.status(404).json({ error: "User not found" });
     res.json(await followUser(db, req.userId!, target._id));
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Unable to follow user" }); }
@@ -31,7 +31,7 @@ profileRouter.post("/:username/follow", requireUser, async (req, res) => {
 profileRouter.delete("/:username/follow", requireUser, async (req, res) => {
   try {
     const db = await getDb();
-    const target = await db.collection("users").findOne({ username: req.params.username.trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
+    const target = await db.collection("users").findOne({ username: String(req.params.username).trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
     if (!target) return res.status(404).json({ error: "User not found" });
     res.json(await unfollowUser(db, req.userId!, target._id));
   } catch { res.status(400).json({ error: "Unable to unfollow user" }); }
@@ -44,23 +44,23 @@ profileRouter.get("/requests/incoming", requireUser, async (req, res) => {
 });
 
 profileRouter.post("/requests/:requesterId/approve", requireUser, async (req, res) => {
-  try { res.json(await respondToFollowRequest(await getDb(), req.userId!, new ObjectId(req.params.requesterId), true)); }
+  try { res.json(await respondToFollowRequest(await getDb(), req.userId!, new ObjectId(String(req.params.requesterId)), true)); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to approve request" }); }
 });
 
 profileRouter.post("/requests/:requesterId/reject", requireUser, async (req, res) => {
-  try { res.json(await respondToFollowRequest(await getDb(), req.userId!, new ObjectId(req.params.requesterId), false)); }
+  try { res.json(await respondToFollowRequest(await getDb(), req.userId!, new ObjectId(String(req.params.requesterId)), false)); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to reject request" }); }
 });
 
 profileRouter.delete("/:username/followers/:followerId", requireUser, async (req, res) => {
-  try { res.json(await removeFollower(await getDb(), req.userId!, new ObjectId(req.params.followerId))); }
+  try { res.json(await removeFollower(await getDb(), req.userId!, new ObjectId(String(req.params.followerId)))); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to remove follower" }); }
 });
 
 profileRouter.post("/:username/block", requireUser, async (req, res) => {
   try {
-    const target = await (await getDb()).collection("users").findOne({ username: req.params.username.trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
+    const target = await (await getDb()).collection("users").findOne({ username: String(req.params.username).trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
     if (!target) return res.status(404).json({ error: "User not found" });
     res.json(await blockUser(await getDb(), req.userId!, target._id));
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to block user" }); }
@@ -69,7 +69,7 @@ profileRouter.post("/:username/block", requireUser, async (req, res) => {
 profileRouter.delete("/:username/block", requireUser, async (req, res) => {
   try {
     const db = await getDb();
-    const target = await db.collection("users").findOne({ username: req.params.username.trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
+    const target = await db.collection("users").findOne({ username: String(req.params.username).trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
     if (!target) return res.status(404).json({ error: "User not found" });
     res.json(await unblockUser(db, req.userId!, target._id));
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to unblock user" }); }
