@@ -14,6 +14,7 @@ export default function CreatePage() {
   const [clipTransitions, clipSettings, setClipTransitions] = useState<any[]>([]);
   const [clipSettings, setClipSettings] = useState<any[]>([]);
   const [selectedClip, setSelectedClip] = useState(0);
+  const [timelineTransition, setTimelineTransition] = useState(0);
   const [timelinePlayheadMs, setTimelinePlayheadMs] = useState(0);
   const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
   const timelineVideoRef = useRef<HTMLVideoElement | null>(null);
