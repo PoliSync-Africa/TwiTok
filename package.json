@@ -1,0 +1,10 @@
+{
+  "name": "twitok",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev:admin": "npm --workspace apps/admin run dev",
+    "build:admin": "npm --workspace apps/admin run build",
+    "start:admin": "npm --workspace apps/admin run start"
+  }
+}
