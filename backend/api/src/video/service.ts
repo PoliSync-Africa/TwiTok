@@ -68,7 +68,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -80,6 +80,8 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   });
   if (safety.decision === "BLOCK") throw new Error("Caption blocked by TwiTok Safety Engine");
   const now = new Date();
+  const allowedEffects = new Set(["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE","BRIGHT","FADE"]);
+  const effect = allowedEffects.has(String(input.effect ?? "NONE")) ? String(input.effect ?? "NONE") : "NONE";
   const rawOverlays = Array.isArray(input.textOverlays) ? input.textOverlays.slice(0, 20) : [];
   const textOverlays = rawOverlays.map((item: any) => ({
     text: String(item?.text ?? "").trim().slice(0, 200),
