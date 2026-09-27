@@ -26,7 +26,7 @@ export default function CreatePage() {
 
   const sizeText = useMemo(() => file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "", [file]);
 
-  function chooseFile(next: File | null) {
+  function onLoadedMetadata(e: React.SyntheticEvent<HTMLVideoElement>) { const d = e.currentTarget.duration; if (Number.isFinite(d)) { const ms = Math.round(d * 1000); setDurationMs(ms); setTrimEndMs(ms); } }\n\n  function chooseFile(next: File | null) {
     if (!next) return;
     if (!next.type.startsWith("video/")) return setMessage("Please choose a video file.");
     if (next.size > 500 * 1024 * 1024) return setMessage("Maximum video size is 500 MB.");
@@ -107,7 +107,7 @@ export default function CreatePage() {
       <section className="composer-shell">
         <div className="composer-preview">
           {preview ? (
-            <video src={preview} controls playsInline muted={muted} className="composer-video" />
+            <video src={preview} controls playsInline muted={muted} className="composer-video" onLoadedMetadata={onLoadedMetadata} />
           ) : (
             <label className="dropzone">
               <span className="plus">＋</span>
