@@ -89,7 +89,11 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     endMs: Math.max(0, Number(item?.endMs ?? 3000)),
     x: Math.max(0, Math.min(1, Number(item?.x ?? 0.5))),
     y: Math.max(0, Math.min(1, Number(item?.y ?? 0.8))),
-    fontSize: Math.max(16, Math.min(96, Number(item?.fontSize ?? 42)))
+    fontSize: Math.max(16, Math.min(96, Number(item?.fontSize ?? 42))),
+    fontFamily: String(item?.fontFamily ?? "sans").slice(0, 32),
+    color: /^#[0-9a-fA-F]{6}$/.test(String(item?.color ?? "")) ? String(item.color) : "#FFFFFF",
+    background: /^#[0-9a-fA-F]{6}(?:@[0-9.]+)?$/.test(String(item?.background ?? "")) ? String(item.background) : "#000000@0.55",
+    align: ["left","center","right"].includes(String(item?.align)) ? String(item.align) : "center"
   })).filter((item: any) => item.text && item.endMs > item.startMs); 
   for (const overlay of textOverlays) {
     const overlaySafety = await evaluateText(db, { userId: userId.toHexString(), contentId: videoId.toHexString(), text: overlay.text, actionType: "VIDEO_TEXT_OVERLAY" });
