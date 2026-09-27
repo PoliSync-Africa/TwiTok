@@ -82,6 +82,47 @@ export default function Home() {
   }
 
   useEffect(() => {
+    document.querySelectorAll<HTMLVideoElement>(".real-video").forEach(video => {
+      const selected = video.dataset.captionLanguage ?? "";
+      Array.from(video.textTracks).forEach(track => {
+        track.mode = selected && track.language === selected ? "showing" : "hidden";
+      });
+    });
+  }, [videos, captionLanguage]);
+
+  async function requestTranslation(videoId: string, language: string) {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token || !language) return;
+    setTranslationBusy(prev => ({ ...prev, [videoId]: true }));
+    try {
+      const response = await fetch(`${api}/video/${videoId}/caption-translations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ targetLanguage: language })
+      });
+      if (!response.ok) return;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        const tracksResponse = await fetch(`${api}/video/${videoId}/caption-tracks`, {
+          headers: { Authorization: "Bearer " + token }
+        });
+        if (!tracksResponse.ok) continue;
+        const data = await tracksResponse.json();
+        const track = Array.isArray(data.tracks) ? data.tracks.find((x: any) => x.language === language) : null;
+        if (track) {
+          setVideos(items => items.map(item => item.id === videoId
+            ? { ...item, captionTracks: { ...(item.captionTracks ?? {}), [language]: track } }
+            : item));
+          setCaptionLanguage(prev => ({ ...prev, [videoId]: language }));
+          break;
+        }
+      }
+    } finally {
+      setTranslationBusy(prev => ({ ...prev, [videoId]: false }));
+    }
+  }
+
+  useEffect(() => {
     const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-video-id]"));
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -130,8 +171,8 @@ export default function Home() {
           return <article className="video-card" data-video-id={v.id} key={v.id}>
             <div className="video-stage">
               {playback
-                ? <video className="real-video" src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
-                    {v.autoCaptionsUrl && <track kind="captions" src={v.autoCaptionsUrl} srcLang="en" label="TwiTok captions" default />}
+                ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
+                    {v.autoCaptionsUrl && <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" />{Object.values(v.captionTracks ?? {}).map(track => <track key={track.language} kind="captions" src={track.url} srcLang={track.language} label={track.label} />)}}
                   </video>
                 : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
               <div className="gradient"/>
