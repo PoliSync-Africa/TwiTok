@@ -68,7 +68,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -80,6 +80,19 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   });
   if (safety.decision === "BLOCK") throw new Error("Caption blocked by TwiTok Safety Engine");
   const now = new Date();
+  const rawOverlays = Array.isArray(input.textOverlays) ? input.textOverlays.slice(0, 20) : [];
+  const textOverlays = rawOverlays.map((item: any) => ({
+    text: String(item?.text ?? "").trim().slice(0, 200),
+    startMs: Math.max(0, Number(item?.startMs ?? 0)),
+    endMs: Math.max(0, Number(item?.endMs ?? 3000)),
+    x: Math.max(0, Math.min(1, Number(item?.x ?? 0.5))),
+    y: Math.max(0, Math.min(1, Number(item?.y ?? 0.8))),
+    fontSize: Math.max(16, Math.min(96, Number(item?.fontSize ?? 42)))
+  })).filter((item: any) => item.text && item.endMs > item.startMs); 
+  for (const overlay of textOverlays) {
+    const overlaySafety = await evaluateText(db, { userId: userId.toHexString(), contentId: videoId.toHexString(), text: overlay.text, actionType: "VIDEO_TEXT_OVERLAY" });
+    if (overlaySafety.decision === "BLOCK") throw new Error("Text overlay blocked by TwiTok Safety Engine");
+  }
   const video = {
     _id: videoId, ownerId: userId, uploadId: input.uploadId, caption,
     hashtags: normalizeHashtags(input.hashtags),
@@ -91,6 +104,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     trimStartMs: Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0,
     trimEndMs: Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > 0 ? Number(input.trimEndMs) : null,
     speed: [0.5, 0.75, 1, 1.5, 2].includes(Number(input.speed)) ? Number(input.speed) : 1,
+    textOverlays,
     status: upload.status === "READY" ? "READY" : "PROCESSING",
     sourceObjectKey: upload.objectKey,
     playback: null,
