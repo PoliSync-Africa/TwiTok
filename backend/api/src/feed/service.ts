@@ -1,4 +1,4 @@
-import { Db, ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
