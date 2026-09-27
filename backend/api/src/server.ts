@@ -17,6 +17,7 @@ import { initializeFeedIndexes } from "./feed/service.js";
 import { initializeVideoProcessingIndexes } from "./video/processing.js";
 import { ensureSoundIndexes } from "./music/service.js";
 import { ensureTranscriptionIndexes } from "./video/transcription.js";
+import { ensureTranslationIndexes } from "./video/translation.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -48,6 +49,7 @@ async function start() {
     await initializeFeedIndexes(db);
     await ensureSoundIndexes(db);
     await ensureTranscriptionIndexes(db);
+    await ensureTranslationIndexes(db);
   } else {
     console.warn("MONGODB_URI is not configured. Database features are disabled.");
   }
