@@ -20,6 +20,7 @@ export default function CreatePage() {
   const [step, setStep] = useState<Step>("SELECT");
   const [message, setMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [coverTimeMs, setCoverTimeMs] = useState(0);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
