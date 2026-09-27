@@ -9,7 +9,7 @@ router.get("/sounds", requireUser, async (req, res) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q : "";
     const countryCode = typeof req.query.countryCode === "string" ? req.query.countryCode : undefined;
-    const sounds = await searchSounds(getDb(), q, countryCode);
+    const sounds = await searchSounds(await getDb(), q, countryCode);
     res.json({ sounds });
   } catch {
     res.status(500).json({ error: "Unable to search sounds" });
@@ -23,7 +23,7 @@ router.get("/sounds/:soundId", requireUser, async (req, res) => {
 
 router.get("/videos/:videoId/sound", requireUser, async (req, res) => {
   try {
-    const link = await getDb().collection("video_sounds").findOne({ videoId: new (await import("mongodb")).ObjectId(req.params.videoId) });
+    const link = await (await getDb()).collection("video_sounds").findOne({ videoId: new (await import("mongodb")).ObjectId(req.params.videoId) });
     if (!link) return res.status(404).json({ error: "No sound attached" });
     const sound = await getDb().collection("sounds").findOne({ _id: link.soundId, status: "ACTIVE" });
     if (!sound) return res.status(404).json({ error: "Sound unavailable" });
