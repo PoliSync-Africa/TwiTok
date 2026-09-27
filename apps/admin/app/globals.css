@@ -1,0 +1,48 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; min-height: 100%; background: #070707; color: #f7f7f7; font-family: Inter, Arial, sans-serif; }
+a { color: inherit; text-decoration: none; }
+.admin-shell { min-height: 100vh; display: flex; background: radial-gradient(circle at 80% 0%, rgba(212,168,45,.10), transparent 30%), #070707; }
+.sidebar { width: 255px; min-height: 100vh; position: fixed; left: 0; top: 0; padding: 24px 16px; border-right: 1px solid #242424; background: #0b0b0b; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 12px; padding: 4px 10px 28px; }
+.brand-mark { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(145deg,#ffe08a,#a96b00); color: #090909; font-size: 24px; font-weight: 900; }
+.brand strong { display:block; font-size: 19px; }
+.brand span { display:block; color:#d5aa3c; font-size:10px; letter-spacing:2px; margin-top:3px; }
+nav { display:grid; gap:6px; }
+nav a { padding: 12px 13px; border-radius: 10px; color:#a9a9a9; font-size:14px; }
+nav a:hover, nav a.active { color:#fff; background:#1b1b1b; }
+nav a.active { box-shadow: inset 3px 0 0 #e1b94d; }
+.sidebar-footer { margin-top:auto; padding:14px 10px; border-top:1px solid #242424; }
+.admin-badge { color:#e6bf58; font-size:10px; font-weight:800; letter-spacing:1.4px; }
+.sidebar-footer small { display:block; color:#777; margin-top:6px; }
+.content { width: calc(100% - 255px); margin-left:255px; padding: 34px 42px 60px; }
+.topbar { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; }
+.eyebrow { color:#d6ae4d; font-size:10px; font-weight:800; letter-spacing:2px; margin:0 0 8px; }
+h1 { font-size:34px; margin:0 0 8px; letter-spacing:-1px; }
+h2 { font-size:19px; margin:0; }
+.muted { color:#8e8e8e; margin:0; max-width:680px; line-height:1.5; }
+.admin-session { display:flex; align-items:center; gap:10px; border:1px solid #2a2a2a; border-radius:12px; padding:9px 13px; background:#0d0d0d; }
+.admin-session strong, .admin-session span { display:block; }
+.admin-session strong { font-size:13px; }
+.admin-session span { color:#777; font-size:11px; margin-top:3px; }
+.avatar { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:#d9ad43; color:#111; font-weight:900; }
+.notice { margin:28px 0 20px; padding:14px 16px; border:1px solid #59481e; background:#17130a; border-radius:12px; color:#cfc5a8; font-size:13px; }
+.notice strong { color:#f0cb63; }
+.stats { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
+.stat, .panel { background:#0d0d0d; border:1px solid #242424; border-radius:14px; }
+.stat { padding:17px; }
+.stat span { color:#888; font-size:12px; }
+.stat strong { display:block; font-size:27px; margin:12px 0 4px; }
+.stat small { color:#666; font-size:10px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+.panel { padding:20px; }
+.panel.wide { grid-column:1/-1; }
+.panel-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.panel-head a { color:#e4bd55; font-size:12px; }
+.status-dot { color:#73d99a; font-size:12px; }
+.metric-row { display:flex; justify-content:space-between; padding:13px 0; border-top:1px solid #202020; color:#999; font-size:13px; }
+.metric-row strong { color:#eee; }
+.metric-row .ok { color:#73d99a; }
+.power-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.power { padding:12px; border:1px solid #242424; border-radius:9px; color:#c7c7c7; font-size:12px; background:#101010; }
+@media (max-width: 1050px) { .stats { grid-template-columns:repeat(3,1fr); } .power-grid { grid-template-columns:repeat(2,1fr); } }
+@media (max-width: 760px) { .sidebar { position:static; width:100%; min-height:auto; } .admin-shell { display:block; } .content { width:100%; margin-left:0; padding:24px 16px; } .topbar { display:block; } .admin-session { margin-top:18px; width:max-content; } .stats { grid-template-columns:repeat(2,1fr); } .grid { grid-template-columns:1fr; } .panel.wide { grid-column:auto; } }
