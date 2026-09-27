@@ -4,6 +4,8 @@ import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { completeUpload, createUploadSession, createVideoDraft, publishVideo } from "../video/service.js";
 import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
+import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
+import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
 
 export const videoRouter = Router();
 
@@ -129,4 +131,44 @@ videoRouter.post("/:videoId/publish", requireUser, async (req, res) => {
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to publish video" });
   }
+});
+
+
+videoRouter.post("/:videoId/transcription", requireUser, async (req, res) => {
+  try {
+    const videoId = new ObjectId(String(req.params.videoId));
+    res.status(202).json({ job: await queueTranscription(await getDb(), req.userId!, videoId, req.body?.language) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to queue transcription" }); }
+});
+
+videoRouter.get("/:videoId/captions", requireUser, async (req, res) => {
+  try {
+    const videoId = new ObjectId(String(req.params.videoId));
+    res.json(await getTranscription(await getDb(), req.userId!, videoId));
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load captions" }); }
+});
+
+videoRouter.put("/:videoId/captions", requireUser, async (req, res) => {
+  try {
+    const videoId = new ObjectId(String(req.params.videoId));
+    res.json({ captions: await updateCaptions(await getDb(), req.userId!, videoId, Array.isArray(req.body?.captions) ? req.body.captions : []) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to save captions" }); }
+});
+
+videoRouter.post("/:videoId/caption-translations", requireUser, async (req, res) => {
+  try {
+    const videoId = new ObjectId(String(req.params.videoId));
+    const language = String(req.body?.targetLanguage ?? "");
+    if (!TRANSLATION_LANGUAGES.includes(language as any)) return res.status(400).json({ error: "Unsupported translation language" });
+    res.status(202).json({ job: await queueCaptionTranslation(await getDb(), req.userId!, videoId, language) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to queue caption translation" }); }
+});
+
+videoRouter.get("/:videoId/caption-tracks", requireUser, async (req, res) => {
+  try {
+    const videoId = new ObjectId(String(req.params.videoId));
+    const video = await (await getDb()).collection("videos").findOne({ _id: videoId, ownerId: req.userId }, { projection: { _id: 1 } });
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    res.json({ tracks: await getCaptionTracks(await getDb(), videoId) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load caption tracks" }); }
 });
