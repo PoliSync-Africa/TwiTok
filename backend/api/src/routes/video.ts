@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { completeUpload, createUploadSession, createVideoDraft, publishVideo } from "../video/service.js";
+import { completeUpload, createUploadSession, createVideoDraft, publishVideo } from "../video/service.js";\nimport { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
 
 export const videoRouter = Router();
 
@@ -16,6 +16,64 @@ videoRouter.post("/uploads", requireUser, async (req, res) => {
     res.status(201).json(result);
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create upload" });
+  }
+});
+
+videoRouter.post("/uploads/:uploadId/multipart", requireUser, async (req, res) => {
+  try {
+    const uploadId = req.params.uploadId;
+    const upload = await getDb().collection("video_uploads").findOne({ uploadId, userId: req.userId });
+    if (!upload) return res.status(404).json({ error: "Upload session not found" });
+    if (upload.multipartUploadId) return res.json({ uploadId, multipartUploadId: upload.multipartUploadId });
+
+    const multipartUploadId = await createMultipartUpload({ objectKey: upload.objectKey, mimeType: upload.mimeType });
+    await getDb().collection("video_uploads").updateOne(
+      { uploadId, userId: req.userId },
+      { $set: { multipartUploadId, uploadMode: "MULTIPART", updatedAt: new Date() } }
+    );
+    res.status(201).json({ uploadId, multipartUploadId, partSizeBytes: 10 * 1024 * 1024 });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to start multipart upload" });
+  }
+});
+
+videoRouter.post("/uploads/:uploadId/multipart/part-url", requireUser, async (req, res) => {
+  try {
+    const upload = await getDb().collection("video_uploads").findOne({ uploadId: req.params.uploadId, userId: req.userId });
+    if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
+    const partNumber = Number(req.body?.partNumber);
+    res.json(await createPresignedUploadPart({
+      objectKey: upload.objectKey,
+      uploadId: upload.multipartUploadId,
+      partNumber
+    }));
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign multipart part" });
+  }
+});
+
+videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const upload = await db.collection("video_uploads").findOne({ uploadId: req.params.uploadId, userId: req.userId });
+    if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
+    const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({
+      partNumber: Number(part.partNumber),
+      etag: String(part.etag)
+    })) : [];
+    if (!parts.length) return res.status(400).json({ error: "parts are required" });
+    const result = await completeMultipartUpload({
+      objectKey: upload.objectKey,
+      uploadId: upload.multipartUploadId,
+      parts
+    });
+    await db.collection("video_uploads").updateOne(
+      { uploadId: req.params.uploadId, userId: req.userId },
+      { $set: { multipartCompletedAt: new Date(), updatedAt: new Date(), etag: result.etag } }
+    );
+    res.json({ uploadId: req.params.uploadId, completed: true, etag: result.etag });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete multipart upload" });
   }
 });
 
