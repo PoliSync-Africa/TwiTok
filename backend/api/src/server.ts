@@ -13,7 +13,7 @@ import { initializeMonetizationIndexes } from "./monetization/programs.js";
 import { ensureUserIndexes } from "./auth/user.js";
 import { ensureFollowIndexes } from "./social/follows.js";
 import { initializeVideoIndexes } from "./video/service.js";
-import { initializeFeedIndexes } from "./feed/service.js";
+import { initializeFeedIndexes } from "./feed/service.js";\nimport { initializeVideoProcessingIndexes } from "./video/processing.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -40,7 +40,7 @@ async function start() {
     await initializeMonetizationIndexes(db);
     await ensureUserIndexes(db);
     await ensureFollowIndexes(db);
-    await initializeVideoIndexes(db);
+    await initializeVideoIndexes(db);\n    await initializeVideoProcessingIndexes(db);
     await initializeFeedIndexes(db);
   } else {
     console.warn("MONGODB_URI is not configured. Database features are disabled.");
