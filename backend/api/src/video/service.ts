@@ -68,7 +68,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -89,7 +89,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     allowStitch: input.allowStitch !== false,
     coverTimeMs: Number.isFinite(Number(input.coverTimeMs)) ? Math.max(0, Number(input.coverTimeMs)) : 0,
     trimStartMs: Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0,
-    trimEndMs: Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > 0 ? Number(input.trimEndMs) : null,
+    trimEndMs: Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > 0 ? Number(input.trimEndMs) : null,\n    speed: [0.5, 0.75, 1, 1.5, 2].includes(Number(input.speed)) ? Number(input.speed) : 1,
     status: safety.decision === "RESTRICT" ? "BLOCKED" : (upload.status === "READY" ? "READY" : "PROCESSING"),
     sourceObjectKey: upload.objectKey,
     playback: null,
