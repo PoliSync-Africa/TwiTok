@@ -29,6 +29,8 @@ export default function CreatePage() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [effect, setEffect] = useState("NONE");
+  const [stickers, setStickers] = useState<any[]>([]);
+  const [stickerPicker, setStickerPicker] = useState<any[]>([]);
   const [soundQuery, setSoundQuery] = useState("");
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
@@ -215,6 +217,20 @@ export default function CreatePage() {
     });
   }
 
+  async function loadStickers() {
+    if (stickerPicker.length) { setStickerPicker([]); return; }
+    try {
+      const token = window.localStorage.getItem("twitok_user_token");
+      const response = await fetch(`${api}/video/stickers`, { headers: token ? { Authorization: "Bearer " + token } : {} });
+      if (response.ok) setStickerPicker((await response.json()).stickers ?? []);
+    } catch {}
+  }
+
+  function addSticker(sticker: any) {
+    if (stickers.length >= 20) return;
+    setStickers(items => [...items, { stickerId: sticker.id, emoji: sticker.emoji, startMs: 0, endMs: Math.max(1000, durationMs || 5000), x: 0.5, y: 0.5, size: 72, rotation: 0 }]);
+  }
+
   function addTextOverlay() {
     const text = overlayText.trim();
     if (!text) return setMessage("Enter text before adding an overlay.");
@@ -361,6 +377,8 @@ export default function CreatePage() {
             {step === "READY" && autoCaptions && <div className="caption-review"><b>Review automatic captions</b>{captionsLoading ? <small>Loading generated captions…</small> : generatedCaptions.length === 0 ? <small>No speech captions were generated for this video.</small> : <div className="caption-list">{generatedCaptions.map((item, index) => <div className="caption-row" key={index}><span>{(item.startMs / 1000).toFixed(1)}–{(item.endMs / 1000).toFixed(1)}s</span><input value={item.text} onChange={e => setGeneratedCaptions(items => items.map((x, i) => i === index ? { ...x, text: e.target.value } : x))} /><button type="button" onClick={() => setGeneratedCaptions(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>} {generatedCaptions.length > 0 && <button type="button" className="secondary-action" onClick={saveGeneratedCaptions} disabled={captionsSaving}>{captionsSaving ? "Saving…" : "Save caption edits"}</button>}</div>}
 
             <div className="text-overlay-editor"><b>Text overlay</b><div className="overlay-style-row"><label>Color<input type="color" value={overlayColor ?? "#ffffff"} onChange={e => setOverlayColor(e.target.value)} /></label><label>Size<input type="number" min="16" max="96" value={overlayFontSize ?? 42} onChange={e => setOverlayFontSize(Number(e.target.value))} /></label><label>Align<select value={overlayAlign ?? "center"} onChange={e => setOverlayAlign(e.target.value)}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label></div><input maxLength={200} value={overlayText} onChange={e => setOverlayText(e.target.value)} placeholder="Add text to your video…" /><div className="overlay-time"><label>Start (s)<input type="number" min="0" step="0.1" value={overlayStartMs / 1000} onChange={e => setOverlayStartMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label><label>End (s)<input type="number" min="0.1" step="0.1" value={overlayEndMs / 1000} onChange={e => setOverlayEndMs(Math.max(500, Number(e.target.value) * 1000 || 500))} /></label></div><button type="button" className="secondary-action" onClick={addTextOverlay}>＋ Add text</button>{textOverlays.length > 0 && <div className="overlay-list">{textOverlays.map((item, index) => <div key={index}><span>{item.text}</span><small>{(item.startMs/1000).toFixed(1)}–{(item.endMs/1000).toFixed(1)}s</small><button type="button" onClick={() => setTextOverlays(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>}</div>
+
+            <div className="sticker-editor"><b>Stickers & Emoji</b><button type="button" className="secondary-action" onClick={loadStickers}>{stickerPicker.length ? "Hide stickers" : "＋ Add sticker"}</button>{stickerPicker.length > 0 && <div className="sticker-grid">{stickerPicker.map((sticker:any) => <button type="button" key={sticker.id} onClick={() => addSticker(sticker)} title={sticker.name}><span>{sticker.emoji}</span><small>{sticker.name}</small></button>)}</div>}{stickers.length > 0 && <div className="overlay-list">{stickers.map((item:any,index:number) => <div key={index}><span>{item.emoji}</span><small>{(item.startMs/1000).toFixed(1)}–{(item.endMs/1000).toFixed(1)}s</small><button type="button" onClick={() => setStickers(items => items.filter((_,i) => i !== index))}>Remove</button></div>)}</div>}</div>
 
             <div className="option-grid">
               <label>Visibility<select value={visibility} onChange={e => setVisibility(e.target.value as typeof visibility)}><option value="PUBLIC">Everyone</option><option value="FOLLOWERS">Followers</option><option value="PRIVATE">Only me</option></select></label>
