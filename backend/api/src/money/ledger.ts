@@ -1,4 +1,5 @@
 import { Db } from "mongodb";
+import { MongoClient, Db } from "mongodb";
 import { PLATFORM_CURRENCY, splitRevenue } from "./policy.js";
 
 export async function initializeMoneyIndexes(db: Db) {
@@ -21,8 +22,11 @@ export async function allocateQualifyingRevenue(
   const existing = await db.collection("financial_ledger").findOne({ transactionId: input.transactionId });
   if (existing) return existing;
 
-  const session = db.client?.startSession();
-  if (!session) throw new Error("MongoDB session unavailable");
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error("MONGODB_URI is not configured");
+  const client = new MongoClient(uri);
+  await client.connect();
+  const session = client.startSession();
 
   try {
     let result;
@@ -55,5 +59,6 @@ export async function allocateQualifyingRevenue(
     return result;
   } finally {
     await session.endSession();
+    await client.close();
   }
 }
