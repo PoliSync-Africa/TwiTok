@@ -56,6 +56,14 @@ export async function verifySourceAndQueue(db: Db, userId: ObjectId, uploadId: s
   return { queued: true, jobCreated: result.upsertedCount === 1 };
 }
 
+export async function recoverExpiredVideoJobs(db: Db) {
+  const now = new Date();
+  await db.collection("video_processing_jobs").updateMany(
+    { status: "RUNNING", leaseExpiresAt: { $lt: now } },
+    { $set: { status: "QUEUED", nextAttemptAt: now, updatedAt: now }, $unset: { workerId: "", leaseExpiresAt: "" } }
+  );
+}
+
 export async function claimNextVideoJob(db: Db, workerId: string) {
   const now = new Date();
   const leaseExpiresAt = new Date(now.getTime() + 2 * 60 * 1000);
