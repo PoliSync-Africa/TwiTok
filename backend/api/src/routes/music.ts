@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { attachSound, searchSounds, getSoundPage } from "../music/service";
+import { attachSound, searchSounds, getSoundPage } from "../music/service.js";
 
 const router = Router();
 
