@@ -14,6 +14,8 @@ type FeedVideo = {
   country?: string;
   autoCaptionsUrl?: string;
   autoCaptionsStatus?: string;
+  autoCaptionLanguage?: string;
+  captionTracks?: Record<string, { language: string; label: string; url: string; sourceLanguage?: string }>;
 };
 
 const demoVideos: FeedVideo[] = [
@@ -35,6 +37,8 @@ export default function Home() {
   const api = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
   const activeRef = useRef<string | null>(null);
   const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
+  const [captionLanguage, setCaptionLanguage] = useState<Record<string, string>>({});
+  const [translationBusy, setTranslationBusy] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +139,7 @@ export default function Home() {
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
                 <h2>{v.caption ?? ""}</h2>
                 <p>{(v.hashtags ?? []).map(tag => `#${tag}`).join(" ")}</p>
-                {soundMap[v.id] && <Link className="video-sound" href={`/sound/${soundMap[v.id]._id}`}>♪ {soundMap[v.id].title} — {soundMap[v.id].artist}</Link>}
+                  <div className="caption-language"><select value={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} onChange={e => { const lang = e.target.value; if (lang === "__translate__") return; setCaptionLanguage(prev => ({ ...prev, [v.id]: lang })); }}><option value={v.autoCaptionLanguage ?? ""}>Original captions</option>{Object.values(v.captionTracks ?? {}).map(track => <option key={track.language} value={track.language}>{track.label}</option>)}<option value="__translate__" disabled={translationBusy[v.id]}>Translate captions…</option></select><div className="caption-translate-buttons">{["en","fr","tw","ha","yo","ig","sw","ar"].filter(lang => lang !== (v.autoCaptionLanguage ?? "") && !v.captionTracks?.[lang]).map(lang => <button key={lang} type="button" disabled={translationBusy[v.id]} onClick={() => requestTranslation(v.id, lang)}>{translationBusy[v.id] ? "Translating…" : `+${lang.toUpperCase()}`}</button>)}</div></div>\n                {soundMap[v.id] && <Link className="video-sound" href={`/sound/${soundMap[v.id]._id}`}>♪ {soundMap[v.id].title} — {soundMap[v.id].artist}</Link>}
               </div>
             </div>
             <div className="actions">
