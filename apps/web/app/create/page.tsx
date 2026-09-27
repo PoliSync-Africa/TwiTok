@@ -10,6 +10,7 @@ type Sound = { _id: string; title: string; artist: string; durationMs: number; c
 
 export default function CreatePage() {
   const [file, setFile] = useState<File | null>(null);
+  const [clipFiles, setClipFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState("");
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
@@ -173,6 +174,16 @@ export default function CreatePage() {
     }
   }
 
+  function chooseFiles(nextFiles: FileList | null) {
+    const next = Array.from(nextFiles ?? []).filter(f => f.type.startsWith("video/") && f.size <= 500 * 1024 * 1024).slice(0, 20);
+    if (!next.length) return setMessage("Please choose one or more video files under 500 MB each.");
+    setClipFiles(next); chooseFile(next[0]); setMessage(next.length > 1 ? `${next.length} clips selected. Reorder them before posting.` : "");
+  }
+
+  function moveClip(index: number, direction: -1 | 1) {
+    setClipFiles(items => { const next = [...items]; const target = index + direction; if (target < 0 || target >= next.length) return next; [next[index], next[target]] = [next[target], next[index]]; if (next[0]) { setFile(next[0]); if (preview) URL.revokeObjectURL(preview); setPreview(URL.createObjectURL(next[0])); } return next; });
+  }
+
   function chooseFile(next: File | null) {
     if (!next) return;
     if (!next.type.startsWith("video/")) return setMessage("Please choose a video file.");
@@ -221,7 +232,7 @@ export default function CreatePage() {
     if (stickerPicker.length) { setStickerPicker([]); return; }
     try {
       const token = window.localStorage.getItem("twitok_user_token");
-      const response = await fetch(`${api}/video/stickers`, { headers: token ? { Authorization: "Bearer " + token } : {} });
+      const response = await fetch(`${API}/video/stickers`, { headers: token ? { Authorization: "Bearer " + token } : {} });
       if (response.ok) setStickerPicker((await response.json()).stickers ?? []);
     } catch {}
   }
@@ -255,22 +266,30 @@ export default function CreatePage() {
       const session = await create.json();
       if (!create.ok || !session.uploadUrl) throw new Error(session.error ?? "Media storage is not configured.");
 
-      setUploadProgress(0);
-      await uploadWithProgress(session.uploadUrl, file, setUploadProgress);
-
-      const complete = await fetch(API + "/video/uploads/" + session.uploadId + "/complete", {
-        method: "POST", headers: { Authorization: "Bearer " + token }
-      });
-      const completed = await complete.json();
-      if (!complete.ok) throw new Error(completed.error ?? "Unable to finalize upload.");
+      const selectedClips = clipFiles.length ? clipFiles : [file];
+      const uploadIds: string[] = [];
+      for (let clipIndex = 0; clipIndex < selectedClips.length; clipIndex += 1) {
+        const clip = selectedClips[clipIndex];
+        const uploadResponse = clipIndex === 0 ? create : await fetch(API + "/video/uploads", {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ mimeType: clip.type, sizeBytes: clip.size })
+        });
+        const uploadSession = clipIndex === 0 ? session : await uploadResponse.json();
+        if (clipIndex > 0 && (!uploadResponse.ok || !uploadSession.uploadUrl)) throw new Error(uploadSession.error ?? "Unable to prepare clip upload.");
+        await uploadWithProgress(uploadSession.uploadUrl, clip, value => setUploadProgress(Math.round(((clipIndex + value / 100) / selectedClips.length) * 100)));
+        const completeResponse = await fetch(API + "/video/uploads/" + uploadSession.uploadId + "/complete", { method: "POST", headers: { Authorization: "Bearer " + token } });
+        const completed = await completeResponse.json();
+        if (!completeResponse.ok) throw new Error(completed.error ?? "Unable to finalize clip upload.");
+        uploadIds.push(uploadSession.uploadId);
+      }
 
       const tags = hashtags.split(/[ ,#]+/).map(v => v.trim()).filter(Boolean).slice(0, 30);
       const draft = await fetch(API + "/video/drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
-          uploadId: session.uploadId, caption, hashtags: tags, visibility,
-          allowComments, allowDuet, allowStitch, coverTimeMs, trimStartMs, trimEndMs, speed, soundId: selectedSound?._id, originalVolume, addedSoundVolume, textOverlays, autoCaptions, captionLanguage
+          uploadId: session.uploadId, clipUploadIds: uploadIds, caption, hashtags: tags, visibility,
+          allowComments, allowDuet, allowStitch, coverTimeMs, trimStartMs, trimEndMs, speed, soundId: selectedSound?._id, originalVolume, addedSoundVolume, textOverlays, stickers, autoCaptions, captionLanguage, effect
         })
       });
       const draftData = await draft.json();
@@ -304,12 +323,13 @@ export default function CreatePage() {
           ) : (
             <label className="dropzone">
               <span className="plus">＋</span><b>Upload a video</b><small>MP4, MOV or WebM · up to 500 MB</small>
-              <input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={e => chooseFile(e.target.files?.[0] ?? null)} />
+              <input type="file" multiple accept="video/mp4,video/quicktime,video/webm" onChange={e => chooseFiles(e.target.files)} />
             </label>
           )}
         </div>
 
         <div className="composer-panel">
+          {clipFiles.length > 1 && <div className="clip-list"><b>Clips</b>{clipFiles.map((clip,index) => <div key={clip.name + index}><span>{index + 1}. {clip.name}</span><button type="button" onClick={() => moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>)}</div>}
           <div className="composer-title">
             <div><span>VIDEO POST</span><h1>Create</h1></div>
             {file && <label className="secondary">Replace<input type="file" accept="video/*" onChange={e => chooseFile(e.target.files?.[0] ?? null)} /></label>}
