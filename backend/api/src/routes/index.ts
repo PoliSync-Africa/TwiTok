@@ -10,6 +10,7 @@ import { profileRouter } from "./profile.js";
 import { videoRouter } from "./video.js";
 import { feedRouter } from "./feed.js";
 import { mediaRouter } from "./media.js";
+import musicRouter from "./music.js";
 
 export const apiRouter = Router();
 
@@ -18,6 +19,7 @@ apiRouter.use("/profile", profileRouter);
 apiRouter.use("/video", videoRouter);
 apiRouter.use("/feed", feedRouter);
 apiRouter.use("/media", mediaRouter);
+apiRouter.use("/music", musicRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/money", moneyRouter);
 apiRouter.use("/creator", creatorRouter);
