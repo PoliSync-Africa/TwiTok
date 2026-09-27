@@ -103,6 +103,7 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
     res.status(201).json(await createVideoDraft(await getDb(), req.userId!, {
       uploadId: String(req.body?.uploadId ?? ""),
       clipUploadIds: req.body?.clipUploadIds,
+      clipTrimRanges: req.body?.clipTrimRanges,
       caption: req.body?.caption,
       hashtags: req.body?.hashtags,
       visibility: req.body?.visibility,
