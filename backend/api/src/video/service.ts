@@ -1,5 +1,6 @@
 import { Db, ObjectId } from "mongodb";
 import crypto from "node:crypto";
+import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
 import { getSticker } from "./stickers.js";
 import { createPresignedUpload, mediaConfigured } from "../media/storage.js";
