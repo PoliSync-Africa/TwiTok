@@ -46,7 +46,7 @@ export async function createWithdrawal(
         type: input.type,
         amountUsd: input.amountUsd,
         sourceCurrency: PLATFORM_CURRENCY,
-        exchangeRate,
+        exchangeRate: input.exchangeRate,
         payoutCurrency,
         payoutAmount: localAmount,
         destination: input.destination,
