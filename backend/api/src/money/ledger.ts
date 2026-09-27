@@ -1,4 +1,4 @@
-import { MongoClient, Db } from "mongodb";
+import { MongoClient, type Db } from "mongodb";
 import { PLATFORM_CURRENCY, splitRevenue } from "./policy.js";
 
 export async function initializeMoneyIndexes(db: Db) {
