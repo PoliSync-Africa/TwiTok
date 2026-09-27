@@ -1,0 +1,68 @@
+import { Db } from "mongodb";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+const USER_SECRET = () => process.env.TWITOK_USER_SESSION_SECRET ?? process.env.OWNER_SESSION_SECRET ?? "change-me";
+
+export type UserToken = { sub: string; role: "USER"; username: string };
+
+export function issueUserToken(user: { _id: string; username: string }) {
+  return jwt.sign({ sub: user._id, role: "USER", username: user.username }, USER_SECRET(), { expiresIn: "30d", issuer: "twitok" });
+}
+
+export function verifyUserToken(token: string): UserToken {
+  const decoded = jwt.verify(token, USER_SECRET(), { issuer: "twitok" }) as UserToken;
+  if (decoded.role !== "USER" || !decoded.sub) throw new Error("Invalid user token");
+  return decoded;
+}
+
+export async function ensureUserIndexes(db: Db) {
+  await Promise.all([
+    db.collection("users").createIndex({ email: 1 }, { unique: true, sparse: true }),
+    db.collection("users").createIndex({ phone: 1 }, { unique: true, sparse: true }),
+    db.collection("users").createIndex({ username: 1 }, { unique: true }),
+    db.collection("users").createIndex({ createdAt: -1 })
+  ]);
+}
+
+export async function createUser(db: Db, input: { username: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
+  const username = input.username.trim().toLowerCase();
+  if (!/^[a-z0-9._]{3,24}$/.test(username)) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
+  if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
+  const dob = new Date(input.dateOfBirth);
+  if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
+  if (!input.email && !input.phone) throw new Error("Email or phone is required");
+
+  const now = new Date();
+  const user = {
+    username,
+    nickname: username,
+    email: input.email?.trim().toLowerCase(),
+    phone: input.phone?.trim(),
+    dateOfBirth: dob,
+    countryCode: input.countryCode.trim().toUpperCase(),
+    accountType: "PERSONAL",
+    isPrivate: false,
+    status: "ACTIVE",
+    emailVerified: false,
+    phoneVerified: false,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  const result = await db.collection("users").insertOne({
+    ...user,
+    passwordHash: await bcrypt.hash(input.password, 12)
+  });
+  return { ...user, _id: result.insertedId.toHexString() };
+}
+
+export async function authenticateUser(db: Db, identifier: string, password: string) {
+  const normalized = identifier.trim().toLowerCase();
+  const user = await db.collection("users").findOne({
+    $or: [{ email: normalized }, { username: normalized }, { phone: identifier.trim() }]
+  });
+  if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
+  if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid login credentials");
+  return { _id: user._id.toHexString(), username: user.username, nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, isPrivate: user.isPrivate };
+}
