@@ -31,10 +31,10 @@ export default function CreatePage() {
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
   const [soundOpen, setSoundOpen] = useState(false);
   const [soundLoading, setSoundLoading] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);\n  const soundAudioRef = useRef<HTMLAudioElement | null>(null);\n  const [soundPlaying, setSoundPlaying] = useState(false);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
+  useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);\n\n  useEffect(() => () => { soundAudioRef.current?.pause(); }, []);\n\n  async function toggleSoundPreview(sound: Sound) {\n    if (!sound.audioUrl) return setMessage("This sound does not have a preview available yet.");\n    if (!soundAudioRef.current) soundAudioRef.current = new Audio();\n    const audio = soundAudioRef.current;\n    if (selectedSound?._id === sound._id && soundPlaying) { audio.pause(); setSoundPlaying(false); return; }\n    audio.src = sound.audioUrl;\n    audio.currentTime = 0;\n    audio.onended = () => setSoundPlaying(false);\n    await audio.play();\n    setSoundPlaying(true);\n  }
 
   const sizeText = useMemo(() => file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "", [file]);
 
