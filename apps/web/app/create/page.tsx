@@ -31,10 +31,40 @@ export default function CreatePage() {
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
   const [soundOpen, setSoundOpen] = useState(false);
   const [soundLoading, setSoundLoading] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);\n  const soundAudioRef = useRef<HTMLAudioElement | null>(null);\n  const [soundPlaying, setSoundPlaying] = useState(false);\n  const [soundInitialized, setSoundInitialized] = useState(false);\n  const [originalVolume, setOriginalVolume] = useState(1);\n  const [addedSoundVolume, setAddedSoundVolume] = useState(1);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const soundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [soundPlaying, setSoundPlaying] = useState(false);
+  const [soundInitialized, setSoundInitialized] = useState(false);
+  const [originalVolume, setOriginalVolume] = useState(1);
+  const [addedSoundVolume, setAddedSoundVolume] = useState(1);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);\n\n  useEffect(() => () => { soundAudioRef.current?.pause(); }, []);\n\n  useEffect(() => {\n    const params = new URLSearchParams(window.location.search);\n    const soundId = params.get("soundId");\n    if (!soundId) return;\n    const token = window.localStorage.getItem("twitok_user_token");\n    if (!token) return;\n    fetch(API + "/music/sounds/" + encodeURIComponent(soundId), { headers: { Authorization: "Bearer " + token } })\n      .then(async response => { const data = await response.json(); if (response.ok && data.sound) { setSelectedSound(data.sound); setSoundInitialized(true); } })\n      .catch(() => undefined);\n  }, []);\n\n  async function toggleSoundPreview(sound: Sound) {\n    if (!sound.audioUrl) return setMessage("This sound does not have a preview available yet.");\n    if (!soundAudioRef.current) soundAudioRef.current = new Audio();\n    const audio = soundAudioRef.current;\n    if (selectedSound?._id === sound._id && soundPlaying) { audio.pause(); setSoundPlaying(false); return; }\n    audio.src = sound.audioUrl;\n    audio.currentTime = 0;\n    audio.onended = () => setSoundPlaying(false);\n    await audio.play();\n    setSoundPlaying(true);\n  }
+  useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
+
+  useEffect(() => () => { soundAudioRef.current?.pause(); }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const soundId = params.get("soundId");
+    if (!soundId) return;
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    fetch(API + "/music/sounds/" + encodeURIComponent(soundId), { headers: { Authorization: "Bearer " + token } })
+      .then(async response => { const data = await response.json(); if (response.ok && data.sound) { setSelectedSound(data.sound); setSoundInitialized(true); } })
+      .catch(() => undefined);
+  }, []);
+
+  async function toggleSoundPreview(sound: Sound) {
+    if (!sound.audioUrl) return setMessage("This sound does not have a preview available yet.");
+    if (!soundAudioRef.current) soundAudioRef.current = new Audio();
+    const audio = soundAudioRef.current;
+    if (selectedSound?._id === sound._id && soundPlaying) { audio.pause(); setSoundPlaying(false); return; }
+    audio.src = sound.audioUrl;
+    audio.currentTime = 0;
+    audio.onended = () => setSoundPlaying(false);
+    await audio.play();
+    setSoundPlaying(true);
+  }
 
   const sizeText = useMemo(() => file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "", [file]);
 
@@ -174,7 +204,13 @@ export default function CreatePage() {
               </div>
             </div>}
 
-            {selectedSound && <div className="sound-mixer">\n              <b>Sound mix</b>\n              <label>Original video sound: {Math.round(originalVolume * 100)}%<input type="range" min="0" max="1" step="0.05" value={originalVolume} onChange={e => setOriginalVolume(Number(e.target.value))} /></label>\n              <label>Added sound: {Math.round(addedSoundVolume * 100)}%<input type="range" min="0" max="1" step="0.05" value={addedSoundVolume} onChange={e => setAddedSoundVolume(Number(e.target.value))} /></label>\n            </div>}\n\n            <label>Caption
+            {selectedSound && <div className="sound-mixer">
+              <b>Sound mix</b>
+              <label>Original video sound: {Math.round(originalVolume * 100)}%<input type="range" min="0" max="1" step="0.05" value={originalVolume} onChange={e => setOriginalVolume(Number(e.target.value))} /></label>
+              <label>Added sound: {Math.round(addedSoundVolume * 100)}%<input type="range" min="0" max="1" step="0.05" value={addedSoundVolume} onChange={e => setAddedSoundVolume(Number(e.target.value))} /></label>
+            </div>}
+
+            <label>Caption
               <textarea maxLength={2200} value={caption} onChange={e => setCaption(e.target.value)} placeholder="Tell Africa what this video is about…" />
               <small>{caption.length}/2200</small>
             </label>
