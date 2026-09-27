@@ -1,4 +1,4 @@
-import { Db } from "mongodb";
+import type { Db } from "mongodb";
 
 export async function initializeCreatorIndexes(db: Db) {
   await Promise.all([
