@@ -19,7 +19,7 @@ router.get("/sounds", requireUser, async (req, res) => {
 router.post("/videos/:videoId/sound", requireUser, async (req, res) => {
   try {
     const soundId = String(req.body?.soundId || "");
-    const sound = await attachSound(getDb(), req.params.videoId, soundId);
+    const sound = await attachSound(getDb(), req.userId!, req.params.videoId, soundId);
     res.json({ sound });
   } catch (error: any) {
     res.status(400).json({ error: error?.message || "Unable to attach sound" });
