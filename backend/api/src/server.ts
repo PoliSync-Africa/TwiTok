@@ -4,6 +4,8 @@ import helmet from "helmet";
 import { getDb } from "./db/mongo.js";
 import { apiRouter } from "./routes/index.js";
 import { ensureOwnerAccount } from "./auth/owner.js";
+import { initializeMoneyIndexes } from "./money/ledger.js";
+import { initializeWithdrawalIndexes } from "./money/withdrawal.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -20,7 +22,7 @@ app.get("/health", (_req, res) => {
     service: "twitok-api",
     status: "ok",
     platform: "TwiTok",
-    version: "0.1.0"
+    version: "0.2.0"
   });
 });
 
@@ -30,6 +32,8 @@ async function start() {
   if (process.env.MONGODB_URI) {
     const db = await getDb();
     await ensureOwnerAccount(db);
+    await initializeMoneyIndexes(db);
+    await initializeWithdrawalIndexes(db);
   } else {
     console.warn("MONGODB_URI is not configured. Database features are disabled.");
   }
