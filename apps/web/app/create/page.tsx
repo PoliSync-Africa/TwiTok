@@ -190,7 +190,7 @@ export default function CreatePage() {
   function setTransition(index: number, type: string) { setClipTransitions(items => items.map((x,i) => i === index ? {...x, type} : x)); }
 
   function moveClip(index: number, direction: -1 | 1) {
-    setClipFiles(items => { const next = [...items]; const target = index + direction; if (target < 0 || target >= next.length) return next; [next[index], next[target]] = [next[target], next[index]]; if (next[0]) { setFile(next[0]); if (preview) URL.revokeObjectURL(preview); setPreview(URL.createObjectURL(next[0])); } return next; });
+    setClipFiles(items => { const next = [...items]; const target = index + direction; if (target < 0 || target >= next.length) return next; [next[index], next[target]] = [next[target], next[index]]; setClipTransitions(ts => { const normalized = [...ts]; while (normalized.length < next.length - 1) normalized.push({type:"NONE",durationMs:500}); return normalized.slice(0,next.length-1); }); if (next[0]) { setFile(next[0]); if (preview) URL.revokeObjectURL(preview); setPreview(URL.createObjectURL(next[0])); } return next; });
   }
 
   function chooseFile(next: File | null) {
