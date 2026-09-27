@@ -69,7 +69,7 @@ async function hasAudio(input: string) {
   }
 }
 
-async function runFfmpeg(input: string, outputDir: string, audio: boolean, trimStartMs = 0, trimEndMs: number | null = null) {
+async function runFfmpeg(input: string, outputDir: string, audio: boolean, trimStartMs = 0, trimEndMs: number | null = null, speed = 1) {
   const args = [
     "-hide_banner", "-loglevel", "error", "-y", ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []), ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []), "-i", input,
     "-filter_complex",
@@ -77,7 +77,7 @@ async function runFfmpeg(input: string, outputDir: string, audio: boolean, trimS
     "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
     "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
     "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
-    ...(audio ? ["-map", "0:a?", "-map", "0:a?", "-map", "0:a?", "-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
+    ...(audio ? ["-map", "0:a?", "-map", "0:a?", "-map", "0:a?", "-filter:a", `atempo=${speed}`, "-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
     "-force_key_frames", "expr:gte(t,n_forced*2)",
     "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
     "-f", "hls", "-hls_time", "2", "-hls_playlist_type", "vod",
