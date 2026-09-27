@@ -45,6 +45,9 @@ export default function CreatePage() {
   const [textOverlays, setTextOverlays] = useState<Array<{text:string;startMs:number;endMs:number;x:number;y:number;fontSize:number}>>([]);
   const [autoCaptions, setAutoCaptions] = useState(true);
   const [captionLanguage, setCaptionLanguage] = useState("auto");
+  const [generatedCaptions, setGeneratedCaptions] = useState<Array<{text:string;startMs:number;endMs:number}>>([]);
+  const [captionsLoading, setCaptionsLoading] = useState(false);
+  const [captionsSaving, setCaptionsSaving] = useState(false);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
@@ -66,6 +69,7 @@ export default function CreatePage() {
         setProcessingStatus(data.status ?? "PROCESSING");
         if (data.status === "READY") {
           setStep("READY");
+          await loadGeneratedCaptions(videoId);
           setMessage("Your video is ready. Review the result and publish it.");
           return;
         }
@@ -82,6 +86,35 @@ export default function CreatePage() {
     poll();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [step, videoId]);
+
+  async function loadGeneratedCaptions(id: string) {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    setCaptionsLoading(true);
+    try {
+      const response = await fetch(API + "/video/" + encodeURIComponent(id) + "/captions", { headers: { Authorization: "Bearer " + token } });
+      const data = await response.json();
+      if (response.ok && Array.isArray(data.captions)) setGeneratedCaptions(data.captions.map((x: any) => ({ text: String(x.text ?? ""), startMs: Number(x.startMs ?? 0), endMs: Number(x.endMs ?? 1000) })));
+    } finally { setCaptionsLoading(false); }
+  }
+
+  async function saveGeneratedCaptions() {
+    if (!videoId) return;
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    setCaptionsSaving(true);
+    try {
+      const response = await fetch(API + "/video/" + encodeURIComponent(videoId) + "/captions", {
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ captions: generatedCaptions })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to save captions.");
+      setGeneratedCaptions(data.captions ?? generatedCaptions);
+      setMessage("Captions saved and the caption track was updated.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to save captions."); }
+    finally { setCaptionsSaving(false); }
+  }
 
   async function publishReadyVideo() {
     if (!videoId) return;
@@ -315,7 +348,9 @@ export default function CreatePage() {
               <small>Select the start and end of the clip.</small>
             </div>
 
-            <div className="caption-editor"><b>Accessibility captions</b><label><input type="checkbox" checked={autoCaptions} onChange={e => setAutoCaptions(e.target.checked)} /> Generate automatic captions from speech</label>{autoCaptions && <label>Video language<select value={captionLanguage} onChange={e => setCaptionLanguage(e.target.value)}><option value="auto">Detect automatically</option><option value="en">English</option><option value="fr">French</option><option value="ar">Arabic</option><option value="sw">Swahili</option><option value="tw">Twi</option><option value="ha">Hausa</option><option value="yo">Yoruba</option><option value="ig">Igbo</option><option value="zu">Zulu</option><option value="xh">Xhosa</option><option value="am">Amharic</option><option value="pt">Portuguese</option></select></label>}<small>Captions are generated after upload and can be reviewed before wider accessibility support is enabled.</small></div>\n\n            <div className="text-overlay-editor"><b>Text overlay</b><input maxLength={200} value={overlayText} onChange={e => setOverlayText(e.target.value)} placeholder="Add text to your video…" /><div className="overlay-time"><label>Start (s)<input type="number" min="0" step="0.1" value={overlayStartMs / 1000} onChange={e => setOverlayStartMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label><label>End (s)<input type="number" min="0.1" step="0.1" value={overlayEndMs / 1000} onChange={e => setOverlayEndMs(Math.max(500, Number(e.target.value) * 1000 || 500))} /></label></div><button type="button" className="secondary-action" onClick={addTextOverlay}>＋ Add text</button>{textOverlays.length > 0 && <div className="overlay-list">{textOverlays.map((item, index) => <div key={index}><span>{item.text}</span><small>{(item.startMs/1000).toFixed(1)}–{(item.endMs/1000).toFixed(1)}s</small><button type="button" onClick={() => setTextOverlays(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>}</div>
+            <div className="caption-editor"><b>Accessibility captions</b><label><input type="checkbox" checked={autoCaptions} onChange={e => setAutoCaptions(e.target.checked)} /> Generate automatic captions from speech</label>{autoCaptions && <label>Video language<select value={captionLanguage} onChange={e => setCaptionLanguage(e.target.value)}><option value="auto">Detect automatically</option><option value="en">English</option><option value="fr">French</option><option value="ar">Arabic</option><option value="sw">Swahili</option><option value="tw">Twi</option><option value="ha">Hausa</option><option value="yo">Yoruba</option><option value="ig">Igbo</option><option value="zu">Zulu</option><option value="xh">Xhosa</option><option value="am">Amharic</option><option value="pt">Portuguese</option></select></label>}<small>Captions are generated after upload and can be reviewed before wider accessibility support is enabled.</small></div>\n\n            {step === "READY" && autoCaptions && <div className="caption-review"><b>Review automatic captions</b>{captionsLoading ? <small>Loading generated captions…</small> : generatedCaptions.length === 0 ? <small>No speech captions were generated for this video.</small> : <div className="caption-list">{generatedCaptions.map((item, index) => <div className="caption-row" key={index}><span>{(item.startMs / 1000).toFixed(1)}–{(item.endMs / 1000).toFixed(1)}s</span><input value={item.text} onChange={e => setGeneratedCaptions(items => items.map((x, i) => i === index ? { ...x, text: e.target.value } : x))} /><button type="button" onClick={() => setGeneratedCaptions(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>} {generatedCaptions.length > 0 && <button type="button" className="secondary-action" onClick={saveGeneratedCaptions} disabled={captionsSaving}>{captionsSaving ? "Saving…" : "Save caption edits"}</button>}</div>}
+
+            <div className="text-overlay-editor"><b>Text overlay</b><input maxLength={200} value={overlayText} onChange={e => setOverlayText(e.target.value)} placeholder="Add text to your video…" /><div className="overlay-time"><label>Start (s)<input type="number" min="0" step="0.1" value={overlayStartMs / 1000} onChange={e => setOverlayStartMs(Math.max(0, Number(e.target.value) * 1000 || 0))} /></label><label>End (s)<input type="number" min="0.1" step="0.1" value={overlayEndMs / 1000} onChange={e => setOverlayEndMs(Math.max(500, Number(e.target.value) * 1000 || 500))} /></label></div><button type="button" className="secondary-action" onClick={addTextOverlay}>＋ Add text</button>{textOverlays.length > 0 && <div className="overlay-list">{textOverlays.map((item, index) => <div key={index}><span>{item.text}</span><small>{(item.startMs/1000).toFixed(1)}–{(item.endMs/1000).toFixed(1)}s</small><button type="button" onClick={() => setTextOverlays(items => items.filter((_, i) => i !== index))}>Remove</button></div>)}</div>}</div>
 
             <div className="option-grid">
               <label>Visibility<select value={visibility} onChange={e => setVisibility(e.target.value as typeof visibility)}><option value="PUBLIC">Everyone</option><option value="FOLLOWERS">Followers</option><option value="PRIVATE">Only me</option></select></label>
