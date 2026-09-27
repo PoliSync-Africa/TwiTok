@@ -27,6 +27,8 @@ export default function CreatePage() {
   const [coverTimeMs, setCoverTimeMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
   const [trimStartMs, setTrimStartMs] = useState(0);
+  const [timelineStartMs, setTimelineStartMs] = useState<Record<number, number>>({});
+  const [timelineEndMs, setTimelineEndMs] = useState<Record<number, number>>({});
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [effect, setEffect] = useState("NONE");
@@ -180,6 +182,10 @@ export default function CreatePage() {
     setClipFiles(next); chooseFile(next[0]); setMessage(next.length > 1 ? `${next.length} clips selected. Reorder them before posting.` : "");
   }
 
+  function updateClipTrim(index: number, start: number, end: number) { setTimelineStartMs(v => ({...v, [index]: Math.max(0, start)})); setTimelineEndMs(v => ({...v, [index]: Math.max(start + 100, end)})); }
+
+  function updateClipSpeed(index: number, value: number) { setClipFiles(items => items.map((f,i) => i === index ? f : f)); }
+
   function moveClip(index: number, direction: -1 | 1) {
     setClipFiles(items => { const next = [...items]; const target = index + direction; if (target < 0 || target >= next.length) return next; [next[index], next[target]] = [next[target], next[index]]; if (next[0]) { setFile(next[0]); if (preview) URL.revokeObjectURL(preview); setPreview(URL.createObjectURL(next[0])); } return next; });
   }
@@ -329,7 +335,7 @@ export default function CreatePage() {
         </div>
 
         <div className="composer-panel">
-          {clipFiles.length > 1 && <div className="clip-list"><b>Clips</b>{clipFiles.map((clip,index) => <div key={clip.name + index}><span>{index + 1}. {clip.name}</span><button type="button" onClick={() => moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>)}</div>}
+          {clipFiles.length > 1 && <div className="clip-list"><b>Timeline</b><div className="timeline-track">{clipFiles.map((clip,index) => { const start=timelineStartMs[index] ?? 0; const end=timelineEndMs[index] ?? 10000; return <div className="timeline-clip" key={clip.name + index}><div><strong>{index+1}</strong><span>{clip.name}</span></div><small>{((end-start)/1000).toFixed(1)}s</small><label>Start <input type="range" min="0" max={Math.max(1000,end-100)} value={start} onChange={e=>updateClipTrim(index,Number(e.target.value),end)} /></label><label>End <input type="range" min={Math.min(1000,start+100)} max={Math.max(1000,end)} value={end} onChange={e=>updateClipTrim(index,start,Number(e.target.value))} /></label><button type="button" onClick={()=>moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={()=>moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>})}</div></div><b>Clips</b>{clipFiles.map((clip,index) => <div key={clip.name + index}><span>{index + 1}. {clip.name}</span><button type="button" onClick={() => moveClip(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => moveClip(index,1)} disabled={index===clipFiles.length-1}>↓</button></div>)}</div>}
           <div className="composer-title">
             <div><span>VIDEO POST</span><h1>Create</h1></div>
             {file && <label className="secondary">Replace<input type="file" accept="video/*" onChange={e => chooseFile(e.target.files?.[0] ?? null)} /></label>}
