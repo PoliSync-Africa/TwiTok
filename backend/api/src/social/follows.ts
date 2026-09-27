@@ -1,4 +1,4 @@
-import { Db, ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 export type FollowState = "FOLLOWING" | "PENDING";
 
