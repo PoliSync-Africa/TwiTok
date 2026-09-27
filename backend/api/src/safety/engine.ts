@@ -18,7 +18,7 @@ export async function initializeSafetyIndexes(db: Db) {
   ]);
 }
 
-export async function evaluateText(db: Db, input: { userId:string; contentId:string; text:string; actionType:string }) {
+export async function evaluateText(db: Db, input: { userId:string; contentId:string; text:string; actionType:string }): Promise<{ decision: SafetyDecision; risk: SafetyRisk; confidence: number; policyId: string; reviewStatus: string; userId: string; contentId: string; text: string; actionType: string; createdAt: Date }> {
   const text = String(input.text ?? "");
   const severe = blockedPatterns.some((pattern) => pattern.test(text));
   const decision: SafetyDecision = severe ? "BLOCK" : "ALLOW";
