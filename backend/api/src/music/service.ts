@@ -50,6 +50,37 @@ export async function attachSound(db: Db, userId: ObjectId, videoId: string, sou
 }
 
 
+export async function createOriginalSound(db: Db, videoId: ObjectId, audioUrl: string, durationMs: number) {
+  const video = await db.collection("videos").findOne({ _id: videoId });
+  if (!video) throw new Error("Video not found");
+  const owner = await db.collection("users").findOne({ _id: video.ownerId }, { projection: { username: 1 } });
+  const username = owner?.username ? String(owner.username) : "creator";
+  const now = new Date();
+  const existing = await db.collection<Sound>("sounds").findOne({ type: "ORIGINAL", "sourceVideoId": videoId });
+  if (existing) return existing;
+  const sound: Sound & { sourceVideoId: ObjectId } = {
+    _id: new ObjectId(),
+    title: `Original sound - ${username}`,
+    artist: username,
+    type: "ORIGINAL",
+    countryCodes: ["GLOBAL"],
+    audioUrl,
+    durationMs,
+    usageCount: 0,
+    status: "ACTIVE",
+    sourceVideoId: videoId,
+    createdAt: now,
+    updatedAt: now
+  };
+  await db.collection("sounds").insertOne(sound);
+  await db.collection("video_sounds").updateOne(
+    { videoId },
+    { $set: { videoId, soundId: sound._id, updatedAt: now }, $setOnInsert: { createdAt: now } },
+    { upsert: true }
+  );
+  return sound;
+}
+
 export async function getSoundPage(db: Db, soundId: string, limit = 20) {
   if (!ObjectId.isValid(soundId)) throw new Error("Invalid sound id");
   const _id = new ObjectId(soundId);
