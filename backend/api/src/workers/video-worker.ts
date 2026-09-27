@@ -111,16 +111,16 @@ async function runFfmpeg(
 
   if (soundFile) {
     const soundInput = 1;
-    const soundFilter = `[${soundInput}:a]atrim=duration=${Math.max(0.1, outputDurationSec.toFixed(3))},asetpts=N/SR/TB,volume=${addedSoundVolume}[added]`;
+    const soundFilter = `[${soundInput}:a]atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB,volume=${addedSoundVolume}[added]`;
     filters.push(soundFilter);
     if (hasOriginalAudio && originalVolume > 0) {
-      filters.push(`[0:a]atempo=${speed},volume=${originalVolume},atrim=duration=${Math.max(0.1, outputDurationSec.toFixed(3))},asetpts=N/SR/TB[original]`);
+      filters.push(`[0:a]atempo=${speed},volume=${originalVolume},atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB[original]`);
       filters.push("[original][added]amix=inputs=2:duration=first:dropout_transition=0:normalize=1[mixed]");
     } else {
       filters.push("[added]anull[mixed]");
     }
   } else if (hasOriginalAudio) {
-    filters.push(`[0:a]atempo=${speed},volume=1,atrim=duration=${Math.max(0.1, outputDurationSec.toFixed(3))},asetpts=N/SR/TB[audio]`);
+    filters.push(`[0:a]atempo=${speed},volume=1,atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB[audio]`);
   }
 
   const audioMap = soundFile ? ["-map", "[mixed]"] : hasOriginalAudio ? ["-map", "[audio]"] : [];
