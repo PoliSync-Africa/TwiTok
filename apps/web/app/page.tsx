@@ -128,6 +128,27 @@ export default function Home() {
   useEffect(() => {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token) return;
+    let cancelled = false;
+    Promise.all([
+      fetch(api + "/wallet/catalog", { cache: "no-store" }),
+      fetch(api + "/wallet/me", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
+    ]).then(async ([catalogResponse, walletResponse]) => {
+      if (cancelled) return;
+      if (catalogResponse.ok) {
+        const data = await catalogResponse.json();
+        setGiftCatalog(Array.isArray(data.gifts) ? data.gifts : []);
+      }
+      if (walletResponse.ok) {
+        const data = await walletResponse.json();
+        setCoinBalance(Math.floor(Number(data.coinBalance ?? 0)));
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [api]);
+
+  useEffect(() => {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
     const realtimeBase = api.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
     const socket = new WebSocket(realtimeBase.replace(/\/api\/v1\/?$/, "") + "/realtime");
     socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "auth", token })));
