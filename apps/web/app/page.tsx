@@ -47,6 +47,8 @@ export default function Home() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Array<{ id: string; type: string; read: boolean; createdAt: string; videoId: string | null; actor: { username?: string; nickname?: string } | null }>>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [stories, setStories] = useState<Array<{id:string;username:string;nickname:string;playback?:{mp4Url?:string;hlsUrl?:string}|null;thumbnail?:string|null;caption:string;viewed:boolean}>>([]);
+  const [storyOpen, setStoryOpen] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,6 +254,12 @@ export default function Home() {
         <div className="top-actions"><button className="notification-button" onClick={openNotifications} aria-label="Notifications">♧{unreadNotifications > 0 ? <span>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</button><button className="sound-toggle" onClick={() => setMuted(v => !v)}>{muted ? "🔇" : "🔊"}</button></div>
       </header>
 
+      {stories.length > 0 && <div className="story-tray" aria-label="Stories">
+        {stories.map(story => <button className={"story-bubble " + (story.viewed ? "viewed" : "")} key={story.id} onClick={() => openStory(story.id)}>
+          <span>{story.thumbnail ? <img src={story.thumbnail} alt="" /> : "▶"}</span><small>@{story.username || "creator"}</small>
+        </button>)}
+      </div>}
+
       <div className="vertical-feed">
         {videos.map((v, i) => {
           const playback = v.playback?.mp4Url ?? v.playback?.hlsUrl;
@@ -281,6 +289,10 @@ export default function Home() {
         })}
       </div>
     </section>
+    {storyOpen && (() => { const story = stories.find(item => item.id === storyOpen); const src = story?.playback?.mp4Url ?? story?.playback?.hlsUrl; return <div className="story-viewer" role="dialog" aria-modal="true" onClick={() => setStoryOpen(null)}>
+      <button className="story-close" onClick={() => setStoryOpen(null)} aria-label="Close story">×</button>
+      {story && <div className="story-card" onClick={e => e.stopPropagation()}>{src ? <video src={src} poster={story.thumbnail ?? undefined} autoPlay playsInline controls={false} onEnded={() => setStoryOpen(null)} /> : <div className="story-placeholder">TwiTok</div>}<div className="story-copy"><strong>@{story.username}</strong><p>{story.caption}</p></div></div>}
+    </div>; })()}
     {notificationsOpen && <div className="comments-backdrop" role="presentation" onClick={() => setNotificationsOpen(false)}>
       <section className="comments-sheet notification-sheet" role="dialog" aria-modal="true" aria-label="Notifications" onClick={event => event.stopPropagation()}>
         <header className="comments-header"><strong>Notifications</strong><button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></header>
