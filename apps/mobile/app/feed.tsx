@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
 import { router } from "expo-router";
@@ -11,6 +11,9 @@ type Video = {
   owner?: { username?: string; nickname?: string; countryCode?: string } | null;
   playback?: { mp4Url?: string; hlsUrl?: string } | null;
   thumbnail?: string | null;
+  mediaType?: "VIDEO"|"PHOTO"|"TEXT";
+  photos?: string[];
+  textBody?: string;
 };
 
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
@@ -76,6 +79,14 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
       player.pause();
     }
   }, [active, player, source]);
+
+  if (item.mediaType === "PHOTO") {
+    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
+  }
+
+  if (item.mediaType === "TEXT") {
+    return <View style={styles.textPost}><Text style={styles.textBody}>{item.textBody || item.caption}</Text><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
+  }
 
   if (!source) {
     return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} onNotInterested={onNotInterested} /></View>;
@@ -170,6 +181,7 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   video: { height, width, backgroundColor: "#050505", justifyContent: "flex-end" },
+  photoStrip:{position:"absolute",top:70,left:12,right:12,flexDirection:"row",gap:6},photoThumb:{width:48,height:64,borderRadius:6},textPost:{height,width,backgroundColor:"#171717",justifyContent:"center",alignItems:"center",padding:40},textBody:{color:"#fff",fontSize:28,lineHeight:36,textAlign:"center",fontWeight:"700"} ,
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
   rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
   action: { alignItems: "center", minWidth: 52 },
