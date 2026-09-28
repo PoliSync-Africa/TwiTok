@@ -11,6 +11,11 @@ export default function HomeScreen() {
       <Pressable style={styles.button} onPress={() => router.push("/login")}>
         <Text style={styles.buttonText}>Open For You</Text>
       </Pressable>
+      <Link href="/register" asChild>
+        <Pressable style={styles.secondary}>
+          <Text style={styles.secondaryText}>Create account</Text>
+        </Pressable>
+      </Link>
       <Link href="/feed" asChild>
         <Pressable style={styles.secondary}>
           <Text style={styles.secondaryText}>Continue to feed</Text>
