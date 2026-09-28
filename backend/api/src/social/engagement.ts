@@ -80,6 +80,13 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
   if (video.allowComments === false) throw new Error("Comments are disabled for this video");
   const body = String(text ?? "").trim();
   if (!body && !attachments.length) throw new Error("Comment cannot be empty");
+  const commenter = await db.collection("users").findOne({ _id: userId }, { projection: { commentSettings: 1 } });
+  const settings = commenter?.commentSettings ?? { allowComments: true, filterAll: false, filterSpam: true, filterKeywords: [] };
+  if (settings.allowComments === false) throw new Error("Comments are disabled for your account");
+  const lowered = body.toLowerCase();
+  const keywordHit = (settings.filterKeywords ?? []).some((keyword: string) => keyword && lowered.includes(keyword));
+  const spamHit = settings.filterSpam && /(https?:\\/\\/|www\\.|buy now|free money|crypto giveaway)/i.test(body);
+  if (settings.filterAll || keywordHit || spamHit) throw new Error("Comment blocked by your comment filters");
   if (body.length > 500) throw new Error("Comment is limited to 500 characters");
   if (attachments.length > 4) throw new Error("A comment can contain up to 4 media attachments");
   for (const a of attachments) {
