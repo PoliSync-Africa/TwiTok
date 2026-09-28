@@ -54,9 +54,11 @@ messagesRouter.post("/conversations/:conversationId/delivered", requireUser, asy
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
-    await markMessagesDelivered(db, req.userId!, conversationId);
-    broadcastToUser(String(req.userId!), { type: "message:delivered", conversationId: conversationId.toHexString() });
-    res.json({ status: "DELIVERED" });
+    const update = await markMessagesDelivered(db, req.userId!, conversationId);
+    for (const senderId of update.senderIds) {
+      broadcastToUser(senderId, { type: "message:status", ...update });
+    }
+    res.json({ status: update.status, messageIds: update.messageIds, updatedAt: update.at });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update delivery status" }); }
 });
 
@@ -64,8 +66,10 @@ messagesRouter.post("/conversations/:conversationId/read", requireUser, async (r
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
-    await markMessagesRead(db, req.userId!, conversationId);
-    broadcastToUser(String(req.userId!), { type: "message:read", conversationId: conversationId.toHexString() });
-    res.json({ status: "READ" });
+    const update = await markMessagesRead(db, req.userId!, conversationId);
+    for (const senderId of update.senderIds) {
+      broadcastToUser(senderId, { type: "message:status", ...update });
+    }
+    res.json({ status: update.status, messageIds: update.messageIds, updatedAt: update.at });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update read status" }); }
 });
