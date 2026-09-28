@@ -124,7 +124,9 @@ export default function CreateScreen() {
   function moveClip(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= assets.length) return;
-    const nextAssets = [...assets]; [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];\n    if (selectedClip === index) setSelectedClip(target);\n    else if (selectedClip === target) setSelectedClip(index);
+    const nextAssets = [...assets]; [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];
+    if (selectedClip === index) setSelectedClip(target);
+    else if (selectedClip === target) setSelectedClip(index);
     const nextSettings = [...clipSettings]; [nextSettings[index], nextSettings[target]] = [nextSettings[target] ?? { ...DEFAULT_CLIP_SETTING }, nextSettings[index] ?? { ...DEFAULT_CLIP_SETTING }];
     const nextTrims = [...clipTrimRanges]; [nextTrims[index], nextTrims[target]] = [nextTrims[target] ?? { startMs: 0, endMs: nextAssets[target]?.duration ? Math.round(nextAssets[target].duration as number) : null }, nextTrims[index] ?? { startMs: 0, endMs: nextAssets[index]?.duration ? Math.round(nextAssets[index].duration as number) : null }];
     setAssets(nextAssets); setClipSettings(nextSettings); setClipTrimRanges(nextTrims);
