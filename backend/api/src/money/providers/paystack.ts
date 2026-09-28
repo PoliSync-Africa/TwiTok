@@ -72,3 +72,33 @@ export function verifyPaystackWebhookSignature(rawBody: string, signature: strin
   const digest = crypto.createHmac("sha512", key()).update(rawBody).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
 }
+
+
+export async function initializeCoinPurchase(input: {
+  email: string;
+  amountGhs: number;
+  reference: string;
+  userId: string;
+  sku: string;
+  coins: number;
+  callbackUrl?: string;
+}) {
+  return paystack<{ authorization_url: string; access_code: string; reference: string }>("/transaction/initialize", {
+    method: "POST",
+    body: JSON.stringify({
+      email: input.email,
+      amount: Math.round(input.amountGhs * 100),
+      currency: "GHS",
+      reference: input.reference,
+      channels: ["card", "bank", "mobile_money", "bank_transfer", "ussd"],
+      callback_url: input.callbackUrl,
+      metadata: { userId: input.userId, sku: input.sku, coins: input.coins, amountGhs: input.amountGhs, purpose: "TWITOK_COIN_PURCHASE" }
+    })
+  });
+}
+
+export async function verifyPaystackTransaction(reference: string) {
+  return paystack<{ reference: string; status: string; amount: number; currency: string; metadata?: Record<string, unknown> }>(
+    "/transaction/verify/" + encodeURIComponent(reference)
+  );
+}
