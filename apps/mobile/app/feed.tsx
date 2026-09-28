@@ -62,7 +62,7 @@ function Overlay({ item }: { item: Video }) {
         <Text style={styles.username}>@twitok</Text>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
       </View>
-      <View style={styles.bottomTabs}><Text style={styles.tabActive}>For You</Text><Text style={styles.tab}>Following</Text><Text style={styles.tab}>Africa</Text></View>
+      <View style={styles.bottomTabs}><Text style={styles.tabActive}>You</Text><Text style={styles.tab}>Following</Text><Text style={styles.tab}>Explore Africa</Text></View>
     </>
   );
 }
