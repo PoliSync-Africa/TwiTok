@@ -14,6 +14,7 @@ type Video = {
   mediaType?: "VIDEO"|"PHOTO"|"TEXT";
   photos?: string[];
   textBody?: string;
+  sound?: { id: string; title?: string; artist?: string; coverUrl?: string | null } | null;
 };
 
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
@@ -161,6 +162,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
       <View style={styles.meta}>
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
+        {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
       <View style={styles.bottomTabs}><Pressable style={styles.createButton} onPress={() => router.push("/create")}><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
     </>
@@ -267,6 +269,9 @@ const styles = StyleSheet.create({
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
   username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
   caption: { color: "#fff", fontSize: 15, lineHeight: 21 },
+  soundMeta: { flexDirection: "row", alignItems: "center", marginTop: 10, maxWidth: "88%" },
+  soundDisc: { color: "#fff", fontSize: 18, fontWeight: "800", marginRight: 7 },
+  soundText: { color: "#fff", fontSize: 13, fontWeight: "700", flexShrink: 1 },
   unavailable: { color: "#aaa", textAlign: "center", marginBottom: height * 0.45 },
   bottomTabs: { position: "absolute", bottom: 20, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 30 },
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
