@@ -31,9 +31,19 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle } = useLocalSearchParams<{ soundId?: string; soundTitle?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
+  useEffect(() => {
+    const uri = String(recordedUri ?? "");
+    if (!uri) return;
+    const duration = Number(recordedDuration ?? 0);
+    replaceAssets([{ uri, mimeType: "video/mp4", duration: duration > 0 ? duration : null }]);
+    setMode("VIDEO");
+    if (recordedEffect && ["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].includes(String(recordedEffect))) {
+      setEffect(String(recordedEffect));
+    }
+  }, [recordedUri, recordedDuration, recordedEffect]);
   const [overlayText, setOverlayText] = useState("");
   const [overlayStartMs, setOverlayStartMs] = useState(0);
   const [overlayEndMs, setOverlayEndMs] = useState(3000);
@@ -151,11 +161,8 @@ export default function CreateScreen() {
     if (!result.canceled) replaceAssets(result.assets.map(a => ({ uri: a.uri, mimeType: a.mimeType, duration: a.duration, fileSize: a.fileSize, fileName: a.fileName })));
   }
 
-  async function recordVideo() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) return Alert.alert("Camera permission", "Allow TwiTok to use your camera to record a video.");
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["videos"], videoMaxDuration: 600, quality: 1 });
-    if (!result.canceled) replaceAssets([...assets, ...result.assets.map(x => ({ uri: x.uri, mimeType: x.mimeType, duration: x.duration, fileSize: x.fileSize, fileName: x.fileName }))]);
+  function recordVideo() {
+    router.push("/camera");
   }
 
   async function publish(publishNow = true) {
