@@ -18,8 +18,8 @@ profileRouter.patch("/me", requireUser, async (req, res) => {
 
     const nameChanged = username !== current?.username || nickname !== current?.nickname;
     if (nameChanged && current?.nameLastChangedAt) {
-      const nextAllowed = new Date(new Date(current.nameLastChangedAt).getTime() + 60 * 24 * 60 * 60 * 1000);
-      if (new Date() < nextAllowed) return res.status(429).json({ error: "You can change your name again after 60 days", nextNameChangeAt: nextAllowed.toISOString() });
+      const nextAllowed = new Date(new Date(current.nameLastChangedAt).getTime() + 28 * 24 * 60 * 60 * 1000);
+      if (new Date() < nextAllowed) return res.status(429).json({ error: "You can change your name again after 28 days", nextNameChangeAt: nextAllowed.toISOString() });
     }
     if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Invalid username" });
     if (!nickname || nickname.length > 50) return res.status(400).json({ error: "Nickname is required and must be 1-50 characters" });
