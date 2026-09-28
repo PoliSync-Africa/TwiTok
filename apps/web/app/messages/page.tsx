@@ -101,13 +101,10 @@ export default function MessagesPage() {
         <section style={{ display: "flex", flexDirection: "column" }}>
           <header style={{ padding: 16, borderBottom: "1px solid #ddd" }}><b>{active?.otherUser?.nickname ?? active?.otherUser?.username ?? "Select a conversation"}</b></header>
           <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
-            {messages.map(m => {
-              const mine = m.senderId !== active?.otherUser;
-              return <div key={m._id} style={{ margin: "8px 0", textAlign: "left" }}>
-                <span style={{ display: "inline-block", padding: "10px 12px", borderRadius: 12, background: "#f1f1f1" }}>{m.text}</span>
-                <small style={{ marginLeft: 8 }}>{m.status}</small>
-              </div>;
-            })}
+            {messages.map(m => <div key={m._id} style={{ margin: "8px 0", textAlign: "left" }}>
+              <span style={{ display: "inline-block", padding: "10px 12px", borderRadius: 12, background: "#f1f1f1" }}>{m.text}</span>
+              <small style={{ marginLeft: 8 }}>{m.status}</small>
+            </div>)}
           </div>
           <form onSubmit={e => { e.preventDefault(); void sendMessage(); }} style={{ display: "flex", gap: 8, padding: 16, borderTop: "1px solid #ddd" }}>
             <input value={text} onChange={e => setText(e.target.value)} placeholder="Write a message…" disabled={!active} style={{ flex: 1 }} />
