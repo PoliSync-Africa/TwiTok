@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEvent } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -43,6 +43,9 @@ export default function CreateScreen() {
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
   const [clipTrimRanges, setClipTrimRanges] = useState<{startMs:number;endMs:number|null}[]>([]);
   const [clipTransitions, setClipTransitions] = useState<{type:string;durationMs:number}[]>([]);
+  const [transitioning, setTransitioning] = useState(false);
+  const transitionOpacity = useRef(new Animated.Value(0)).current;
+  const transitionTranslate = useRef(new Animated.Value(0)).current;
   const player = useVideoPlayer(assets[0]?.uri ?? null);
   player.timeUpdateEventInterval = 0.25;
   const { currentTime } = useEvent(player, "timeUpdate", { currentTime: player.currentTime });
@@ -68,10 +71,21 @@ export default function CreateScreen() {
       player.currentTime = Math.max(0, range?.startMs ?? 0) / 1000;
       if (advanceToNextClip.current) {
         advanceToNextClip.current = false;
+        const transition = clipTransitions[selectedClip - 1] ?? { type: "NONE", durationMs: 500 };
+        const duration = Math.max(120, Math.min(1500, transition.durationMs || 500));
+        if (transition.type !== "NONE") {
+          setTransitioning(true);
+          transitionOpacity.setValue(transition.type === "FADE" || transition.type === "DISSOLVE" ? 1 : 0);
+          transitionTranslate.setValue(transition.type === "SLIDELEFT" || transition.type === "WIPERIGHT" ? 320 : transition.type === "SLIDERIGHT" || transition.type === "WIPELEFT" ? -320 : 0);
+          Animated.parallel([
+            Animated.timing(transitionOpacity, { toValue: 0, duration, useNativeDriver: true }),
+            Animated.timing(transitionTranslate, { toValue: 0, duration, useNativeDriver: true })
+          ]).start(() => setTransitioning(false));
+        }
         player.play();
       }
     }).catch(() => undefined);
-  }, [selectedClip, assets, clipTrimRanges, activeClipSetting.speed, activeClipSetting.volume, activeClipSetting.muted, player]);
+  }, [selectedClip, assets, clipTrimRanges, clipTransitions, activeClipSetting.speed, activeClipSetting.volume, activeClipSetting.muted, player, transitionOpacity, transitionTranslate]);
   useEffect(() => {
     if (!assets.length || !player.duration) return;
     const start = selectedClipStartMs / 1000;
@@ -271,7 +285,10 @@ export default function CreateScreen() {
   </View>
 </Pressable>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
         {mode === "VIDEO" && assets.length ? <View style={styles.previewCard}>
-          <VideoView player={player} style={styles.previewVideo} nativeControls={false} contentFit="contain" />
+          <View style={styles.previewStage}>
+            <VideoView player={player} style={styles.previewVideo} nativeControls={false} contentFit="contain" />
+            {transitioning ? <Animated.View pointerEvents="none" style={[styles.transitionOverlay, { opacity: transitionOpacity, transform: [{ translateX: transitionTranslate }] }]} /> : null}
+          </View>
           <View style={styles.previewControls}>
             <Pressable style={styles.playButton} onPress={()=>player.playing ? player.pause() : player.play()}><Text style={styles.choiceText}>{player.playing ? "Pause" : "Play"}</Text></Pressable>
             <Text style={styles.timecode}>{(previewTimeMs/1000).toFixed(1)}s / {(previewDurationMs/1000).toFixed(1)}s</Text>
