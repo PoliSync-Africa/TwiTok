@@ -10,7 +10,15 @@ export const GIFT_CATALOG = [
   { giftId: "gold_drum", name: "Golden Drum", coins: 100, animation: "drum" },
   { giftId: "royal_crown", name: "Royal Crown", coins: 500, animation: "crown" },
   { giftId: "golden_lion", name: "Golden Lion", coins: 1000, animation: "lion" },
-  { giftId: "diamond_kingdom", name: "Diamond Kingdom", coins: 5000, animation: "diamond" }
+  { giftId: "diamond_kingdom", name: "Diamond Kingdom", coins: 5000, animation: "diamond" },
+  { giftId: "usa_flag", name: "USA Flag", coins: 5000, animation: "usa_flag" },
+  { giftId: "germany_flag", name: "Germany Flag", coins: 10000, animation: "germany_flag" },
+  { giftId: "canada_flag", name: "Canada Flag", coins: 15000, animation: "canada_flag" },
+  { giftId: "uk_flag", name: "UK Flag", coins: 20000, animation: "uk_flag" },
+  { giftId: "twitok_cap", name: "TwiTok Cap", coins: 25000, animation: "twitok_cap" },
+  { giftId: "money_gun", name: "Money Gun", coins: 50000, animation: "money_gun" },
+  { giftId: "wedding_rings", name: "Wedding Rings", coins: 75000, animation: "wedding_rings" },
+  { giftId: "flying_angels", name: "Flying Angels", coins: 100000, animation: "flying_angels" }
 ] as const;
 
 export async function initializeGiftIndexes(db: Db) {
