@@ -32,7 +32,7 @@ export async function sendGift(db: Db, input: {
   const idempotencyKey = String(input.idempotencyKey ?? "").trim();
   if (!idempotencyKey || idempotencyKey.length > 128) throw new Error("A valid Idempotency-Key is required");
   const existing = await db.collection("gift_transactions").findOne({ senderId: input.senderId, idempotencyKey });
-  if (existing) return { transactionId: existing.transactionId, duplicate: true, gift: GIFT_CATALOG.find((item) => item.giftId === existing.giftId), quantity: existing.quantity, coinsSpent: existing.coinsSpent, diamondsAwarded: existing.diamondsAwarded, creatorSharePercent: 30, platformSharePercent: 70 };
+  if (existing) return { transactionId: existing.transactionId, videoId: existing.videoId ?? null, duplicate: true, gift: GIFT_CATALOG.find((item) => item.giftId === existing.giftId), quantity: existing.quantity, coinsSpent: existing.coinsSpent, diamondsAwarded: existing.diamondsAwarded, creatorSharePercent: 30, platformSharePercent: 70 };
   const quantity = Math.max(1, Math.min(100, Math.floor(input.quantity ?? 1)));
   const coins = gift.coins * quantity;
   const diamonds = Number((coins * CREATOR_DIAMONDS_PER_COIN).toFixed(2));
@@ -74,5 +74,5 @@ export async function sendGift(db: Db, input: {
       ], { session });
     });
   } finally { await session.endSession(); }
-  return { transactionId, gift, quantity, coinsSpent: coins, diamondsAwarded: diamonds, creatorSharePercent: 30, platformSharePercent: 70 };
+  return { transactionId, videoId: input.videoId ?? null, gift, quantity, coinsSpent: coins, diamondsAwarded: diamonds, creatorSharePercent: 30, platformSharePercent: 70 };
 }
