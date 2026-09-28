@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEvent } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -15,6 +15,7 @@ const TRANSITIONS = ["NONE","FADE","DISSOLVE","WIPELEFT","WIPERIGHT","SLIDELEFT"
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedClip, setSelectedClip] = useState(0);
+  const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
@@ -58,6 +59,10 @@ export default function CreateScreen() {
     void player.replaceAsync(asset.uri).then(() => {
       const range = clipTrimRanges[selectedClip];
       player.currentTime = Math.max(0, range?.startMs ?? 0) / 1000;
+      if (advanceToNextClip.current) {
+        advanceToNextClip.current = false;
+        player.play();
+      }
     }).catch(() => undefined);
   }, [selectedClip, assets, clipTrimRanges, player]);
   useEffect(() => {
@@ -65,7 +70,15 @@ export default function CreateScreen() {
     const start = selectedClipStartMs / 1000;
     const end = selectedClipEndMs / 1000;
     if (currentTime < start) player.currentTime = start;
-    else if (currentTime >= end) player.pause();
+    else if (currentTime >= end) {
+      if (selectedClip < assets.length - 1) {
+        advanceToNextClip.current = true;
+        setSelectedClip((value) => Math.min(value + 1, assets.length - 1));
+      } else {
+        player.pause();
+        player.currentTime = start;
+      }
+    }
   }, [currentTime, selectedClipEndMs, selectedClipStartMs, assets.length, player]);
   function seekPreview(valueMs: number) {
     player.currentTime = Math.max(0, Math.min(previewDurationMs, valueMs)) / 1000;
@@ -239,7 +252,7 @@ export default function CreateScreen() {
       </View> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
-        {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><Pressable style={[styles.clip,index===selectedClip&&styles.clipSelected]} onPress={()=>setSelectedClip(index)}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
+        {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><Pressable style={[styles.clip,index===selectedClip&&styles.clipSelected]} onPress={()=>{ advanceToNextClip.current = false; setSelectedClip(index); }}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
   <Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
   <View style={styles.clipActions}>
     <Pressable onPress={()=>moveClip(index,-1)}><Text style={styles.action}>‹</Text></Pressable>
@@ -272,7 +285,7 @@ export default function CreateScreen() {
             <Pressable style={styles.small} onPress={()=>seekPreview(trimEndMs || previewDurationMs)}><Text style={styles.choiceText}>End</Text></Pressable>
           </View>
         </View> : null}
-        {mode === "VIDEO" && assets.length > 1 ? <View style={styles.timelineBox}><View style={styles.timelineHeader}><Text style={styles.helper}>Clip timeline</Text><Text style={styles.timelineMeta}>Editing Clip {selectedClip + 1}</Text></View><View style={styles.timelineRow}>{assets.map((asset,i)=>{const range=clipTrimRanges[i] ?? {startMs:0,endMs:asset.duration?Math.round(asset.duration):null};const d=Math.max(500,Math.round(asset.duration ?? durationMs/Math.max(1,assets.length) ?? 10000));const end=range.endMs ?? d;const span=Math.max(500,end-range.startMs);return <Pressable key={asset.uri+i} onPress={()=>{setSelectedClip(i);setTimeout(()=>seekPreview(range.startMs),50);}} style={[styles.timelineClip,{width:Math.max(64,Math.min(220,64+span/100))},i===selectedClip&&styles.timelineClipSelected]}><Text style={styles.timelineClipText}>Clip {i+1}</Text><View style={styles.timelineRange}><View style={[styles.timelinePlayhead,{left:`${i===selectedClip?Math.max(0,Math.min(100,((previewTimeMs-range.startMs)/span)*100)):0}%`}]}/></View></Pressable>})}</View><View style={styles.timelineControls}><Pressable style={styles.small} onPress={()=>seekPreview(selectedClipStartMs)}><Text style={styles.choiceText}>Clip start</Text></Pressable><Pressable style={styles.small} onPress={()=>seekPreview(Math.max(selectedClipStartMs,selectedClipEndMs-100))}><Text style={styles.choiceText}>Clip end</Text></Pressable><Text style={styles.timelineMeta}>{(selectedClipStartMs/1000).toFixed(1)}s → {(selectedClipEndMs/1000).toFixed(1)}s</Text></View></View> : null}
+        {mode === "VIDEO" && assets.length > 1 ? <View style={styles.timelineBox}><View style={styles.timelineHeader}><Text style={styles.helper}>Clip timeline</Text><Text style={styles.timelineMeta}>Editing Clip {selectedClip + 1}</Text></View><View style={styles.timelineRow}>{assets.map((asset,i)=>{const range=clipTrimRanges[i] ?? {startMs:0,endMs:asset.duration?Math.round(asset.duration):null};const d=Math.max(500,Math.round(asset.duration ?? durationMs/Math.max(1,assets.length) ?? 10000));const end=range.endMs ?? d;const span=Math.max(500,end-range.startMs);return <Pressable key={asset.uri+i} onPress={()=>{advanceToNextClip.current = false;setSelectedClip(i);setTimeout(()=>seekPreview(range.startMs),50);}} style={[styles.timelineClip,{width:Math.max(64,Math.min(220,64+span/100))},i===selectedClip&&styles.timelineClipSelected]}><Text style={styles.timelineClipText}>Clip {i+1}</Text><View style={styles.timelineRange}><View style={[styles.timelinePlayhead,{left:`${i===selectedClip?Math.max(0,Math.min(100,((previewTimeMs-range.startMs)/span)*100)):0}%`}]}/></View></Pressable>})}</View><View style={styles.timelineControls}><Pressable style={styles.small} onPress={()=>seekPreview(selectedClipStartMs)}><Text style={styles.choiceText}>Clip start</Text></Pressable><Pressable style={styles.small} onPress={()=>seekPreview(Math.max(selectedClipStartMs,selectedClipEndMs-100))}><Text style={styles.choiceText}>Clip end</Text></Pressable><Text style={styles.timelineMeta}>{(selectedClipStartMs/1000).toFixed(1)}s → {(selectedClipEndMs/1000).toFixed(1)}s</Text></View></View> : null}
         {marker}<Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text><View style={styles.row}><Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable><Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable></View></View> : null}
         {mode === "VIDEO" && assets.length ? <View style={styles.trimBox}>
           <Text style={styles.helper}>Trim clip • {(trimStartMs/1000).toFixed(1)}s — {(trimEndMs ? trimEndMs/1000 : previewDurationMs/1000).toFixed(1)}s</Text>
