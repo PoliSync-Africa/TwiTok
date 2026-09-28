@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { getAuthToken } from "../lib/auth";
 
 type Video = {
   id: string;
@@ -11,7 +12,6 @@ type Video = {
 };
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-const TOKEN = process.env.EXPO_PUBLIC_TWITOK_AUTH_TOKEN ?? "";
 const { height, width } = Dimensions.get("window");
 
 function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void }) {
@@ -75,25 +75,30 @@ export default function FeedScreen() {
 
   useEffect(() => {
     let active = true;
-    const headers: Record<string, string> = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
-    fetch(API + "/feed/FOR_YOU?limit=10", { headers })
-      .then(async r => {
+    (async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) throw new Error("Sign in to view your feed.");
+        const r = await fetch(API + "/feed/FOR_YOU?limit=10", { headers: { Authorization: `Bearer ${token}` } });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error ?? "Feed unavailable");
-        return data;
-      })
-      .then(data => { if (active) setVideos(data.videos ?? data.items ?? []); })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : "Feed unavailable"); })
-      .finally(() => { if (active) setLoading(false); });
+        if (active) setVideos(data.videos ?? data.items ?? []);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Feed unavailable");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
     return () => { active = false; };
   }, []);
 
   const recordEvent = async (videoId: string, type: string, watchMs?: number) => {
-    if (!TOKEN) return;
     try {
+      const token = await getAuthToken();
+      if (!token) return;
       await fetch(API + "/feed/events", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ videoId, type, watchMs, sessionId: `mobile-${Date.now()}` })
       });
     } catch {}
@@ -101,7 +106,7 @@ export default function FeedScreen() {
 
   if (loading) return <View style={styles.center}><ActivityIndicator color="#fff" /><Text style={styles.muted}>Loading For You…</Text></View>;
 
-  if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><Text style={styles.muted}>Set EXPO_PUBLIC_TWITOK_AUTH_TOKEN for an authenticated mobile session.</Text></View>;
+  if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><Text style={styles.muted}>Return to the home screen and sign in to continue.</Text></View>;
 
   return (
     <FlatList
