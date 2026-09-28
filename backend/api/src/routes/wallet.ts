@@ -37,6 +37,14 @@ walletRouter.get("/me/gifts", requireUser, async (req, res) => {
   } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Gift history lookup failed" }); }
 });
 
+walletRouter.get("/me/withdrawals", requireUser, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const rows = await (await getDb()).collection("withdrawals").find({ userId: req.userId!.toHexString() }).sort({ createdAt: -1 }).limit(limit).project({ destination: 0 }).toArray();
+    return res.json({ withdrawals: rows });
+  } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Withdrawal history lookup failed" }); }
+});
+
 walletRouter.get("/:userId", requireUser, async (req, res) => {
   try {
     const requested = String(req.params.userId);
