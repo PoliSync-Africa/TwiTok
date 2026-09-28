@@ -180,6 +180,11 @@ walletRouter.post("/withdrawals", requireUser, async (req, res) => {
   try {
     const { countryCode, type, amountUsd, destination } = req.body ?? {};
     const userId = req.userId!.toHexString();
+    const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
+    if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
+    const db = await getDb();
+    const existing = await db.collection("withdrawals").findOne({ userId, idempotencyKey });
+    if (existing) return res.status(200).json({ status: existing.status, withdrawalId: existing.withdrawalId, provider: existing.provider ?? "PAYSTACK", duplicate: true });
     if (!countryCode || !type || !destination) return res.status(400).json({ error: "countryCode, type and destination are required" });
     if (String(countryCode).toUpperCase() !== "GH") return res.status(400).json({ error: "Ghana payout provider is currently enabled for this rollout" });
     if (!["BANK", "MOBILE_MONEY"].includes(String(type))) return res.status(400).json({ error: "Invalid payout type" });
@@ -187,9 +192,9 @@ walletRouter.post("/withdrawals", requireUser, async (req, res) => {
     const exchangeRate = Number(process.env.TWITOK_USD_GHS_RATE);
     if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return res.status(503).json({ error: "GHS payout exchange rate is not configured" });
     const withdrawalId = randomUUID();
-    await createWithdrawal(await getDb(), { withdrawalId, userId, countryCode: "GH", type, amountUsd: Number(amountUsd), exchangeRate, destination });
+    await createWithdrawal(db, { withdrawalId, userId, countryCode: "GH", type, amountUsd: Number(amountUsd), exchangeRate, destination, idempotencyKey });
     let payout;
-    try { payout = await processGhanaWithdrawal(await getDb(), withdrawalId); }
+    try { payout = await processGhanaWithdrawal(db, withdrawalId); }
     catch (error) { return res.status(502).json({ status: "FAILED", withdrawalId, error: error instanceof Error ? error.message : "Payout provider failed" }); }
     return res.status(201).json({ status: payout?.status ?? "PROCESSING", withdrawalId, provider: "PAYSTACK" });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
