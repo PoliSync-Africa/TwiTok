@@ -28,6 +28,8 @@ export default function CreateScreen() {
   const [hashtags, setHashtags] = useState("");
   const [mentions, setMentions] = useState("");
   const [location, setLocation] = useState("");
+  const [autoCaptions, setAutoCaptions] = useState(true);
+  const [captionLanguage, setCaptionLanguage] = useState("auto");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [speed, setSpeed] = useState(1);
@@ -302,7 +304,8 @@ export default function CreateScreen() {
           clipTrimRanges,
           clipTransitions,
           clipSettings,
-          autoCaptions: true,
+          autoCaptions,
+          captionLanguage,
           textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
         })
       });
@@ -513,6 +516,8 @@ export default function CreateScreen() {
         <Text style={styles.section}>Cover</Text>
         <TextInput value={String(coverTimeMs)} onChangeText={v=>setCoverTimeMs(Math.max(0,Number(v)||0))} keyboardType="numeric" placeholder="Cover time in milliseconds" placeholderTextColor="#777" style={styles.input} />
         <Text style={styles.section}>Post settings</Text>
+        <View style={styles.row}>{[["auto","Auto"],["en","English"],["tw","Twi"],["fr","Français"],["ha","Hausa"],["yo","Yorùbá"],["sw","Kiswahili"],["ar","العربية"]].map(([code,label])=><Pressable key={code} style={[styles.choice,captionLanguage===code&&styles.selected]} onPress={()=>{setCaptionLanguage(code);setAutoCaptions(true);}}><Text style={styles.choiceText}>{label}</Text></Pressable>)}</View>
+        <Pressable style={[styles.choice,{marginHorizontal:16,marginTop:4},autoCaptions&&styles.selected]} onPress={()=>setAutoCaptions(v=>!v)}><Text style={styles.choiceText}>Auto captions: {autoCaptions?"On":"Off"}</Text></Pressable>
         <View style={styles.row}>{["PUBLIC","FOLLOWERS","PRIVATE"].map(v=><Pressable key={v} style={[styles.choice,visibility===v&&styles.selected]} onPress={()=>setVisibility(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
         <View style={styles.row}>{[[comments,"Comments"],[duet,"Duet"],[stitch,"Stitch"]].map(([on,label])=><Pressable key={String(label)} style={[styles.choice,on&&styles.selected]} onPress={()=>{ if(label==="Comments") setComments(!comments); else if(label==="Duet") setDuet(!duet); else setStitch(!stitch); }}><Text style={styles.choiceText}>{label}: {on?"On":"Off"}</Text></Pressable>)}</View>
         {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
