@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, publishVideo } from "../video/service.js";
+import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, publishVideo } from "../video/service.js";
 import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
@@ -116,6 +116,12 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
 videoRouter.get("/remixes/:remixId", requireUser, async (req, res) => {
   try { res.json({ remix: await getVideoRemix(await getDb(), req.userId!, String(req.params.remixId)) }); }
   catch (e) { res.status(404).json({ error: e instanceof Error ? e.message : "Unable to load remix draft" }); }
+});
+
+videoRouter.post("/remixes/:remixId/complete", requireUser, async (req, res) => {
+  try {
+    res.json({ remix: await completeVideoRemix(await getDb(), req.userId!, String(req.params.remixId), { mediaUrl: String(req.body?.mediaUrl ?? ""), caption: req.body?.caption }) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete remix" }); }
 });
 
 videoRouter.patch("/remixes/:remixId", requireUser, async (req, res) => {
