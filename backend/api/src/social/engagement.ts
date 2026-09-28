@@ -82,7 +82,7 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
   if (attachments.length > 4) throw new Error("A comment can contain up to 4 media attachments");
   for (const a of attachments) {
     if (!a.objectKey.startsWith("comment-media/" + userId.toHexString() + "/")) throw new Error("Invalid comment attachment");
-    if (!/^(image\\/(jpeg|png|webp|gif)|video\\/(mp4|quicktime|webm)|audio\\/(mpeg|mp4|x-m4a|wav|webm))$/i.test(a.mimeType)) throw new Error("Unsupported comment media type");
+    if (!/^(image/(jpeg|png|webp|gif)|video/(mp4|quicktime|webm)|audio/(mpeg|mp4|x-m4a|wav|webm))$/i.test(a.mimeType)) throw new Error("Unsupported comment media type");
   }
   const createdAt = new Date();
   const result = await db.collection("video_comments").insertOne({
