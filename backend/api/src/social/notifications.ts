@@ -1,6 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 
-export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT";
+export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT" | "REPOST";
 
 export async function initializeNotificationIndexes(db: Db) {
   await Promise.all([
