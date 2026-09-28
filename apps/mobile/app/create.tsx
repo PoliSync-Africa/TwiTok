@@ -233,7 +233,7 @@ export default function CreateScreen() {
       const token = await getAuthToken();
       if (!token) throw new Error("Sign in before posting.");
       if (mode === "TEXT") {
-        const response = await fetch(API + "/video/posts/text", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({text:caption,hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),visibility,allowComments:comments}) });
+        const response = await fetch(API + "/video/posts/text", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({text:caption,hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),visibility,allowComments:comments,allowDuet:duet,allowStitch:stitch}) });
         const data = await response.json().catch(()=>({})); if (!response.ok) throw new Error(data.error || "Unable to publish text post.");
         Alert.alert("Posted","Your TwiTok text post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
