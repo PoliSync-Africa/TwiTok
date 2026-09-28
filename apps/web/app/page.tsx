@@ -203,6 +203,23 @@ export default function Home() {
     } catch {}
   }
 
+  async function remixVideo(videoId: string, mode: "DUET" | "STITCH") {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token || videoId.startsWith("demo-")) return;
+    try {
+      const response = await fetch(api + "/video/" + encodeURIComponent(videoId) + "/remix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ mode })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to start remix");
+      window.alert(mode === "DUET" ? "Duet draft created." : "Stitch draft created.");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Unable to start remix");
+    }
+  }
+
   async function openComments(videoId: string) {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token || videoId.startsWith("demo-")) return;
@@ -335,7 +352,7 @@ export default function Home() {
               <button onClick={() => engage(v.id, "like")} aria-label="Like video">{v.engagement?.liked ? "♥" : "♡"}<small>{v.engagement?.likeCount ?? 0}</small></button>
               <button onClick={() => openComments(v.id)} aria-label="Open comments">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
               <button onClick={() => engage(v.id, "share")} aria-label="Share video">↗<small>{v.engagement?.shareCount ?? 0}</small></button>
-              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>\n              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
+              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>\n              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>\n              <button onClick={() => remixVideo(v.id, "DUET")} aria-label="Duet video">Duet</button>\n              <button onClick={() => remixVideo(v.id, "STITCH")} aria-label="Stitch video">Stitch</button>
             </div>
           </article>;
         })}
