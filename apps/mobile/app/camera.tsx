@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   recordingOuter:{borderColor:"#ff2d55"},
   recordingInner:{width:30,height:30,borderRadius:7,backgroundColor:"#ff2d55"},
   error:{color:"#ffb3c1",textAlign:"center",marginTop:8,paddingHorizontal:16},
-  hint:{color:"#fff",textAlign:"center",fontSize:12,fontWeight:"700",marginTop:8}
+  hint:{color:"#fff",textAlign:"center",fontSize:12,fontWeight:"700",marginTop:8},
   effectVibrant:{backgroundColor:"rgba(255,180,80,0.12)"},
   effectWarm:{backgroundColor:"rgba(255,140,40,0.18)"},
   effectCool:{backgroundColor:"rgba(60,150,255,0.16)"},
