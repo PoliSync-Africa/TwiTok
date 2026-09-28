@@ -107,7 +107,7 @@ export async function createVoiceMessage(
   input: { objectKey: string; mimeType: string; durationMs: number; sizeBytes: number }
 ) {
   const conversation = await getConversationForUser(db, userId, conversationId);
-  const recipientId = getRecipientId(conversation, userId);
+  const recipientId = getRecipientId(conversation as { memberIds?: ObjectId[] }, userId);
   const durationMs = Math.max(0, Math.min(Math.round(input.durationMs), 5 * 60 * 1000));
   if (!durationMs) throw new Error("Voice message duration is required");
   if (!input.objectKey || !input.mimeType.startsWith("audio/")) throw new Error("Invalid voice media");
