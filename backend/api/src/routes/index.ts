@@ -11,6 +11,7 @@ import { videoRouter } from "./video.js";
 import { feedRouter } from "./feed.js";
 import { mediaRouter } from "./media.js";
 import musicRouter from "./music.js";
+import { messagesRouter } from "./messages.js";
 
 export const apiRouter = Router();
 
@@ -26,3 +27,4 @@ apiRouter.use("/creator", creatorRouter);
 apiRouter.use("/live", liveRouter);
 apiRouter.use("/safety", safetyRouter);
 apiRouter.use("/monetization", monetizationRouter);
+apiRouter.use("/messages", messagesRouter);
