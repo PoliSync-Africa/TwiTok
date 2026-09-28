@@ -64,7 +64,7 @@ export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: st
   return { uploadId, status: "READY" };
 }
 
-export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean }) {
+export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean }) {
   const uploadIds = Array.isArray(input.uploadIds) ? [...new Set(input.uploadIds.map(String).filter(Boolean))].slice(0, 35) : [];
   if (!uploadIds.length) throw new Error("At least one photo is required");
   const uploads = await db.collection("photo_uploads").find({ uploadId: { $in: uploadIds }, userId, status: "READY" }).toArray();
@@ -77,7 +77,7 @@ export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadI
   await db.collection("videos").insertOne({
     _id: postId, ownerId: userId, mediaType: "PHOTO", photoObjectKeys: uploads.map(x => x.objectKey),
     photoMimeTypes: uploads.map(x => x.mimeType), caption, hashtags: normalizeHashtags(input.hashtags), mentions: normalizeMentions(input.mentions), location: String(input.location ?? "").trim().slice(0, 120) || null,
-    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: false, allowStitch: false,
+    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
     status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
   });
   return { postId: postId.toHexString(), status: "PUBLISHED", mediaType: "PHOTO", photoCount: uploads.length };
