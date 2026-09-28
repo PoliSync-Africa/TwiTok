@@ -531,7 +531,7 @@ const styles=StyleSheet.create({
   trimTrackBase:{position:"absolute",left:0,right:0,top:18,height:8,backgroundColor:"#333"},
   trimSelected:{position:"absolute",top:14,bottom:14,backgroundColor:"rgba(255,45,85,.25)",borderLeftWidth:2,borderRightWidth:2,borderColor:"#ff2d55"},
   trimHandle:{position:"absolute",top:8,width:8,height:28,borderRadius:4,backgroundColor:"#fff",marginLeft:-4},
-  overlayInput:{flex:1,minWidth:130,marginHorizontal:0},
+  overlayInput:{flex:1,minWidth:130,marginHorizontal:0},emojiInputRow:{flexDirection:"row",gap:8,paddingHorizontal:16,marginBottom:6},emojiInput:{flex:1,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",borderRadius:10,color:"#fff",paddingHorizontal:12,height:42},stickerRow:{gap:8,paddingHorizontal:16,paddingVertical:6},stickerChoice:{width:62,height:62,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",alignItems:"center",justifyContent:"center"},stickerEmoji:{fontSize:28},stickerName:{color:"#aaa",fontSize:9,fontWeight:"700"},
   clipTrimSection:{marginTop:8,paddingBottom:8},
   clipTrimRow:{marginHorizontal:16,marginBottom:8,padding:10,borderRadius:10,backgroundColor:"#0d0d0d"},
 });
