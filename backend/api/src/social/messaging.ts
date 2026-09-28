@@ -77,7 +77,7 @@ export async function createTextMessage(db: Db, userId: ObjectId, conversationId
   if (!clean) throw new Error("Message cannot be empty");
 
   const conversation = await getConversationForUser(db, userId, conversationId);
-  const recipientId = getRecipientId(conversation, userId);
+  const recipientId = getRecipientId(conversation as { memberIds?: ObjectId[] }, userId);
   const now = new Date();
   const result = await db.collection("messages").insertOne({
     conversationId,
