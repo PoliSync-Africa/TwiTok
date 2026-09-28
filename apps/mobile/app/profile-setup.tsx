@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -12,6 +13,28 @@ export default function ProfileSetupScreen() {
   const [isPrivate,setIsPrivate]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
+  const [photoUri,setPhotoUri]=useState<string | null>(null);
+  const [photoMime,setPhotoMime]=useState<string>("image/jpeg");
+
+  async function pickPhoto(){
+    try {
+      const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsEditing:true,aspect:[1,1],quality:0.9});
+      if(result.canceled) return;
+      const asset=result.assets[0];
+      setPhotoUri(asset.uri);
+      setPhotoMime(asset.mimeType ?? "image/jpeg");
+    } catch(e){ setError(e instanceof Error ? e.message : "Unable to select profile photo"); }
+  }
+
+  async function uploadPhoto(token:string){
+    if(!photoUri) return;
+    const sign=await fetch(API+"/profile/me/photo-upload-url",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({mimeType:photoMime})});
+    const sd=await sign.json().catch(()=>({}));
+    if(!sign.ok) throw new Error(sd.error??"Unable to prepare profile photo upload");
+    const blob=await (await fetch(photoUri)).blob();
+    const put=await fetch(sd.uploadUrl,{method:"PUT",headers:{"Content-Type":photoMime},body:blob});
+    if(!put.ok) throw new Error("Profile photo upload failed");
+  }
 
   async function complete(){
     const normalized=username.trim().toLowerCase();
@@ -25,6 +48,7 @@ export default function ProfileSetupScreen() {
       const r=await fetch(API+"/auth/profile-setup",{method:"PATCH",headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({username:normalized,nickname:displayName,bio:bio.trim(),isPrivate})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Unable to complete profile");
+      if(photoUri) await uploadPhoto(token!);
       router.replace("/feed");
     }catch(e){setError(e instanceof Error?e.message:"Unable to complete profile");}finally{setBusy(false);}
   }
@@ -33,8 +57,8 @@ export default function ProfileSetupScreen() {
     <Text style={styles.logo}>TwiTok</Text>
     <Text style={styles.title}>Set up your profile</Text>
     <Text style={styles.subtitle}>Choose the profile details people will see on TwiTok.</Text>
-    <View style={styles.avatar}><Text style={styles.avatarText}>+</Text></View>
-    <Text style={styles.photoHint}>Profile photo</Text>
+    <Pressable style={styles.avatar} onPress={pickPhoto}>{photoUri?<Image source={{uri:photoUri}} style={styles.avatarImage}/>:<Text style={styles.avatarText}>+</Text>}</Pressable>
+    <Pressable onPress={pickPhoto}><Text style={styles.photoHint}>{photoUri?"Change profile photo":"Add profile photo"}</Text></Pressable>
     <TextInput style={styles.input} value={nickname} onChangeText={setNickname} placeholder="Nickname" placeholderTextColor="#777" maxLength={50}/>
     <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="@username" placeholderTextColor="#777" autoCapitalize="none" autoCorrect={false}/>
     <TextInput style={[styles.input,styles.bio]} value={bio} onChangeText={setBio} placeholder="Bio" placeholderTextColor="#777" maxLength={80} multiline/>
@@ -50,6 +74,7 @@ const styles=StyleSheet.create({
  subtitle:{color:"#aaa",fontSize:14,textAlign:"center",lineHeight:21,marginBottom:20},
  avatar:{width:88,height:88,borderRadius:44,backgroundColor:"#222",alignSelf:"center",alignItems:"center",justifyContent:"center",marginBottom:6},
  avatarText:{color:"#fff",fontSize:34,fontWeight:"300"},
+ avatarImage:{width:88,height:88,borderRadius:44},
  photoHint:{color:"#aaa",textAlign:"center",marginBottom:18},
  input:{backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d",borderRadius:12,color:"#fff",paddingHorizontal:16,paddingVertical:14,marginBottom:12,fontSize:16},
  bio:{minHeight:80,textAlignVertical:"top"},
