@@ -170,6 +170,29 @@ export default function Home() {
     return () => socket.close();
   }, []);
 
+  async function sendGift(giftId: string) {
+    const token = window.localStorage.getItem("twitok_user_token");
+    const video = videos.find(item => item.id === giftVideoId);
+    const gift = giftCatalog.find(item => item.giftId === giftId);
+    if (!token || !video?.ownerId || !gift) { setGiftMessage("Sign in and select a creator video."); return; }
+    const totalCoins = gift.coins * giftQuantity;
+    if (coinBalance < totalCoins) { setGiftMessage("Not enough Coins. Buy more Coins to continue."); return; }
+    setGiftBusy(true);
+    setGiftMessage("");
+    try {
+      const response = await fetch(api + "/wallet/gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ receiverId: video.ownerId, giftId, quantity: giftQuantity, context: "VIDEO" })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { setGiftMessage(data.error ?? "Gift could not be sent."); return; }
+      setCoinBalance(balance => Math.max(0, balance - Number(data.coinsSpent ?? totalCoins)));
+      setGiftMessage(gift.name + " × " + Number(data.quantity ?? giftQuantity) + " sent!");
+    } catch { setGiftMessage("Network error. Please try again."); }
+    finally { setGiftBusy(false); }
+  }
+
   async function openStory(storyId: string) {
     setStoryOpen(storyId);
     const token = window.localStorage.getItem("twitok_user_token");
