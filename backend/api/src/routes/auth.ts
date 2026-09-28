@@ -1,13 +1,15 @@
 import { Router } from "express";
+import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
-import { authenticateUser, createUser, ensureUserIndexes, issueUserToken, verifyUserToken } from "../auth/user.js";
+import { authenticateUser, createUser, issueUserToken, verifyUserToken } from "../auth/user.js";
+import { requireUser } from "../auth/middleware.js;
 
 export const authRouter = Router();
 
 authRouter.post("/register", async (req, res) => {
   try {
     const { username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
-    if (!username || !password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "username, password, dateOfBirth and countryCode are required" });
+    if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
     const db = await getDb();
     const user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
     const token = issueUserToken(user);
@@ -41,5 +43,25 @@ authRouter.get("/me", async (req, res) => {
     res.json({ user });
   } catch {
     res.status(401).json({ error: "Invalid or expired session" });
+  }
+});
+
+
+authRouter.patch("/profile-setup", requireUser, async (req, res) => {
+  try {
+    const username = String(req.body?.username ?? "").trim().toLowerCase();
+    const nickname = String(req.body?.nickname ?? "").trim();
+    if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Username must be 3-24 characters, use letters, numbers, dots or underscores, and not end with a dot" });
+    if (!nickname || nickname.length > 50) return res.status(400).json({ error: "Nickname is required and must be 1-50 characters" });
+    const db = await getDb();
+    const existing = await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } });
+    if (existing) return res.status(409).json({ error: "That username is already taken" });
+    await db.collection("users").updateOne({ _id: req.userId! }, { $set: { username, nickname, profileSetupComplete: true, updatedAt: new Date() } });
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    res.json({ user });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to complete profile setup";
+    res.status(/duplicate|E11000/i.test(message) ? 409 : 400).json({ error: message });
   }
 });
