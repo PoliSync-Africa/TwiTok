@@ -214,7 +214,7 @@ export default function Home() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to start remix");
-      window.alert(mode === "DUET" ? "Duet draft created." : "Stitch draft created.");
+      if (data.remix?.remixId) window.location.href = "/remix/" + encodeURIComponent(data.remix.remixId);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Unable to start remix");
     }
