@@ -9,7 +9,7 @@ import { getAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 type Attachment = { objectKey:string; mimeType:string; url?:string };
-type Comment = { id:string; userId:string; text:string; createdAt:string; attachments?:Attachment[] };
+type Comment = { id:string; userId:string; text:string; createdAt:string; parentId?:string|null; likeCount?:number; liked?:boolean; replyCount?:number; attachments?:Attachment[] };
 
 function AudioAttachment({ url }: { url:string }) {
   const player = useAudioPlayer(url);
@@ -27,6 +27,7 @@ export default function CommentsScreen() {
   const [pending,setPending]=useState<Attachment[]>([]);
   const [loading,setLoading]=useState(true);
   const [posting,setPosting]=useState(false);
+  const [replyTo,setReplyTo]=useState<Comment|null>(null);
   const [error,setError]=useState("");
   const recorder=useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState=useAudioRecorderState(recorder);
@@ -91,17 +92,19 @@ export default function CommentsScreen() {
     } catch(e) { Alert.alert("Voice comment",e instanceof Error?e.message:"Unable to record audio"); }
   }
 
+  async function likeComment(commentId:string) { try { const token=await getAuthToken(); const r=await fetch(API+"/engagement/comments/"+commentId+"/like",{method:"POST",headers:{Authorization:"Bearer "+(token??"")}}); const d=await r.json(); if(r.ok) setComments(v=>v.map(c=>c.id===commentId?{...c,liked:d.liked,likeCount:Math.max(0,(c.likeCount??0)+(d.liked?1:-1))}:c)); } catch {} }
+
   async function post() {
     const body=text.trim();
     if((!body && !pending.length) || posting || !videoId) return;
     setPosting(true); setError("");
     try {
       const token=await getAuthToken();
-      const r=await fetch(API+"/engagement/"+videoId+"/comments",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+(token??"")},body:JSON.stringify({text:body,attachments:pending.map(({objectKey,mimeType})=>({objectKey,mimeType}))})});
+      const r=await fetch(API+"/engagement/"+videoId+"/comments",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+(token??"")},body:JSON.stringify({text:body,parentId:replyTo?.id,attachments:pending.map(({objectKey,mimeType})=>({objectKey,mimeType}))})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Unable to post comment");
       if(d.comment) setComments(current=>[d.comment,...current]);
-      setText(""); setPending([]);
+      setText(""); setPending([]); setReplyTo(null);
     } catch(e) { setError(e instanceof Error?e.message:"Unable to post comment"); }
     finally { setPosting(false); }
   }
@@ -115,10 +118,12 @@ export default function CommentsScreen() {
         {comments.map(c=><View key={c.id} style={styles.comment}>
           <View style={styles.avatar}><Text style={styles.avatarText}>@</Text></View>
           <View style={styles.commentBody}><Text style={styles.user}>@{c.userId.slice(-8)}</Text><Text style={styles.commentText}>{c.text}</Text>
+            {<View style={styles.commentActions}><Pressable onPress={()=>likeComment(c.id)}><Text style={styles.actionText}>{c.liked?"♥":"♡"} {c.likeCount??0}</Text></Pressable><Pressable onPress={()=>setReplyTo(c)}><Text style={styles.actionText}>Reply {c.replyCount?`(${c.replyCount})`:""}</Text></Pressable></View>}
             {(c.attachments??[]).map((a,i)=>a.mimeType.startsWith("image/")&&a.url?<Image key={i} source={{uri:a.url}} style={styles.mediaImage}/>:a.mimeType.startsWith("video/")&&a.url?<VideoAttachment key={i} url={a.url}/>:a.mimeType.startsWith("audio/")&&a.url?<AudioAttachment key={i} url={a.url}/>:null)}
           </View>
         </View>)}
       </ScrollView>}
+    {replyTo&&<View style={styles.replyBar}><Text style={styles.replyText}>Replying to @{replyTo.userId.slice(-8)}</Text><Pressable onPress={()=>setReplyTo(null)}><Text style={styles.remove}>×</Text></Pressable></View>}
     {!!pending.length&&<ScrollView horizontal style={styles.pending} contentContainerStyle={styles.pendingContent}>{pending.map((a,i)=><View key={i} style={styles.pendingChip}><Text style={styles.pendingText}>{a.mimeType.split("/")[0]} ✓</Text><Pressable onPress={()=>setPending(v=>v.filter((_,n)=>n!==i))}><Text style={styles.remove}>×</Text></Pressable></View>)}</ScrollView>}
     <View style={styles.composer}>
       <Pressable style={styles.tool} onPress={()=>pickMedia(false)}><Text style={styles.toolText}>＋</Text></Pressable>
@@ -134,7 +139,7 @@ const styles=StyleSheet.create({
  screen:{flex:1,backgroundColor:"#000"}, header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"#222"},
  back:{color:"#fff",fontSize:40,fontWeight:"300",lineHeight:40}, title:{color:"#fff",fontSize:18,fontWeight:"800"}, list:{flex:1}, content:{padding:16,paddingBottom:24},
  center:{flex:1,alignItems:"center",justifyContent:"center"}, comment:{flexDirection:"row",gap:10,marginBottom:20}, avatar:{width:38,height:38,borderRadius:19,backgroundColor:"#222",alignItems:"center",justifyContent:"center"}, avatarText:{color:"#aaa",fontWeight:"800"},
- commentBody:{flex:1}, user:{color:"#aaa",fontSize:12,fontWeight:"700",marginBottom:3}, commentText:{color:"#fff",fontSize:15,lineHeight:21}, empty:{color:"#888",textAlign:"center",marginTop:60,lineHeight:22}, error:{color:"#ff7188",marginBottom:14,textAlign:"center"},
+ commentBody:{flex:1}, commentActions:{flexDirection:"row",gap:18,marginTop:8}, actionText:{color:"#999",fontSize:12,fontWeight:"700"}, replyBar:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,paddingVertical:8,backgroundColor:"#171717"}, replyText:{color:"#bbb",fontSize:12}, user:{color:"#aaa",fontSize:12,fontWeight:"700",marginBottom:3}, commentText:{color:"#fff",fontSize:15,lineHeight:21}, empty:{color:"#888",textAlign:"center",marginTop:60,lineHeight:22}, error:{color:"#ff7188",marginBottom:14,textAlign:"center"},
  mediaImage:{width:220,height:220,borderRadius:12,marginTop:8}, mediaVideo:{width:240,height:150,borderRadius:12,marginTop:8}, audio:{flexDirection:"row",alignItems:"center",gap:10,backgroundColor:"#202020",padding:12,borderRadius:20,marginTop:8}, audioIcon:{color:"#fff",fontSize:15}, audioText:{color:"#fff",fontWeight:"700"},
  pending:{maxHeight:42,borderTopWidth:1,borderTopColor:"#222"}, pendingContent:{paddingHorizontal:10,paddingVertical:6,gap:6}, pendingChip:{flexDirection:"row",alignItems:"center",backgroundColor:"#202020",borderRadius:16,paddingHorizontal:10}, pendingText:{color:"#ddd",fontSize:12}, remove:{color:"#ff6b81",fontSize:18,marginLeft:5},
  composer:{flexDirection:"row",alignItems:"flex-end",gap:5,padding:8,borderTopWidth:1,borderTopColor:"#222",backgroundColor:"#0a0a0a"}, tool:{width:32,height:44,alignItems:"center",justifyContent:"center"}, toolText:{color:"#fff",fontSize:20}, recording:{backgroundColor:"#ff2d55",borderRadius:16}, input:{flex:1,maxHeight:100,minHeight:44,borderRadius:22,backgroundColor:"#1b1b1b",color:"#fff",paddingHorizontal:14,paddingVertical:10,fontSize:15}, postButton:{height:44,minWidth:58,borderRadius:22,backgroundColor:"#ff2d55",alignItems:"center",justifyContent:"center"}, disabled:{opacity:.45}, postText:{color:"#fff",fontWeight:"800"}
