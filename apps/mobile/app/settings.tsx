@@ -28,7 +28,7 @@ export default function SettingsScreen(){
     <Text style={styles.title}>Settings</Text>
     <Text style={styles.section}>Comments</Text>
     <View style={styles.row}><View style={styles.copy}><Text style={styles.label}>Allow comments</Text><Text style={styles.hint}>Control comments on your content.</Text></View><Switch value={allowComments} onValueChange={setAllowComments}/></View>
-    <View style={styles.row}><View style={styles.copy}><Text style={styles.label}>Filter all comments</Text><Text style={styles.hint}>Hold comments for filtering instead of showing them immediately.</Text></View><Switch value={filterAll} onValueChange={setFilterAll}/></View>
+    <View style={styles.row}><View style={styles.copy}><Text style={styles.label}>Filter all comments</Text><Text style={styles.hint}>Block comments that match your moderation settings.</Text></View><Switch value={filterAll} onValueChange={setFilterAll}/></View>
     <View style={styles.row}><View style={styles.copy}><Text style={styles.label}>Filter spam</Text><Text style={styles.hint}>Block common spam patterns.</Text></View><Switch value={filterSpam} onValueChange={setFilterSpam}/></View>
     <Text style={styles.label}>Keyword filters</Text>
     <TextInput value={keywords} onChangeText={setKeywords} placeholder="word1, word2, word3" placeholderTextColor="#666" style={styles.input}/>
