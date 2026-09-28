@@ -31,7 +31,7 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   useEffect(() => {
@@ -40,6 +40,8 @@ export default function CreateScreen() {
     const duration = Number(recordedDuration ?? 0);
     replaceAssets([{ uri, mimeType: "video/mp4", duration: duration > 0 ? duration : null }]);
     setMode("VIDEO");
+    const nextSpeed = Number(recordedSpeed ?? 1);
+    if ([0.5, 1, 1.5, 2].includes(nextSpeed)) setSpeed(nextSpeed);
     if (recordedEffect && ["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].includes(String(recordedEffect))) {
       setEffect(String(recordedEffect));
     }
