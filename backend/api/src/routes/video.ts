@@ -2,13 +2,40 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, createVideoRemixUpload, getVideoRemixPlayback, publishVideo } from "../video/service.js";
+import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, createVideoRemixUpload, getVideoRemixPlayback, publishVideo, createPhotoUploadSession, completePhotoUpload, createPhotoPost, createTextPost } from "../video/service.js";
 import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
 import { listStickers } from "../video/stickers.js";
 
 export const videoRouter = Router();
+
+videoRouter.post("/photos/uploads", requireUser, async (req, res) => {
+  try {
+    res.status(201).json(await createPhotoUploadSession(await getDb(), req.userId!, {
+      mimeType: String(req.body?.mimeType ?? ""), sizeBytes: Number(req.body?.sizeBytes)
+    }));
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo upload" }); }
+});
+
+videoRouter.post("/photos/uploads/:uploadId/complete", requireUser, async (req, res) => {
+  try { res.json(await completePhotoUpload(await getDb(), req.userId!, String(req.params.uploadId))); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete photo upload" }); }
+});
+
+videoRouter.post("/posts/photos", requireUser, async (req, res) => {
+  try { res.status(201).json(await createPhotoPost(await getDb(), req.userId!, {
+    uploadIds: req.body?.uploadIds, caption: req.body?.caption, visibility: req.body?.visibility, allowComments: req.body?.allowComments
+  })); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo post" }); }
+});
+
+videoRouter.post("/posts/text", requireUser, async (req, res) => {
+  try { res.status(201).json(await createTextPost(await getDb(), req.userId!, {
+    text: req.body?.text, visibility: req.body?.visibility, allowComments: req.body?.allowComments
+  })); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create text post" }); }
+});
 
 videoRouter.post("/uploads", requireUser, async (req, res) => {
   try {
