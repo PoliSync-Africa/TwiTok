@@ -27,6 +27,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   const [heartBurst, setHeartBurst] = useState(false);
   const lastTap = useRef(0);
   const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [speedHold, setSpeedHold] = useState(false);
   const source = item.playback?.hlsUrl || item.playback?.mp4Url || null;
   const startedAt = useRef<number | null>(null);
   const player = useVideoPlayer(source, p => {
@@ -47,6 +48,22 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
     })();
     return () => { alive = false; };
   }, [item.id]);
+
+  function handleLongPress() {
+    if (!source) return;
+    if (singleTapTimer.current) {
+      clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = null;
+    }
+    player.playbackRate = 2;
+    setSpeedHold(true);
+  }
+
+  function handleRelease() {
+    if (!source) return;
+    player.playbackRate = 1;
+    setSpeedHold(false);
+  }
 
   function handleTap() {
     const now = Date.now();
@@ -109,7 +126,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   }, [active, player, source]);
 
   if (item.mediaType === "PHOTO") {
-    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} accessibilityLabel="Double tap to like"><View pointerEvents="none" style={StyleSheet.absoluteFillObject} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
+    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFillObject} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
   }
 
   if (item.mediaType === "TEXT") {
@@ -213,6 +230,8 @@ const styles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
   doubleTapZone: { position: "absolute", left: 0, right: 82, top: 45, bottom: 125, alignItems: "center", justifyContent: "center", zIndex: 5 },
   heartBurst: { color: "#fff", fontSize: 92, fontWeight: "900", textShadowColor: "#ff2d55", textShadowRadius: 16, opacity: 0.95 },
+  speedBadge: { backgroundColor: "rgba(0,0,0,0.68)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22 },
+  speedBadgeText: { color: "#fff", fontSize: 18, fontWeight: "900" },
   rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
   action: { alignItems: "center", minWidth: 52 },
   actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
