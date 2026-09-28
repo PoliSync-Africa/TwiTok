@@ -6,6 +6,7 @@ export async function initializeWithdrawalIndexes(db: Db) {
   await db.collection("withdrawal_methods").createIndex({ userId: 1, type: 1 }, { unique: true });
   await db.collection("payout_webhook_events").createIndex({ eventId: 1 }, { unique: true });
   await db.collection("withdrawals").createIndex({ providerReference: 1 }, { unique: true, sparse: true });
+  await db.collection("withdrawals").createIndex({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 }
 
 export function validateWithdrawalMethod(countryCode: string, type: string) {
@@ -15,9 +16,10 @@ export function validateWithdrawalMethod(countryCode: string, type: string) {
 
 export async function createWithdrawal(
   db: Db,
-  input: { withdrawalId: string; userId: string; countryCode: string; type: "BANK" | "MOBILE_MONEY"; amountUsd: number; exchangeRate: number; destination: Record<string, unknown> }
+  input: { withdrawalId: string; userId: string; countryCode: string; type: "BANK" | "MOBILE_MONEY"; amountUsd: number; exchangeRate: number; destination: Record<string, unknown>; idempotencyKey: string }
 ) {
   validateWithdrawalMethod(input.countryCode, input.type);
+  if (!input.idempotencyKey || input.idempotencyKey.length > 128) throw new Error("A valid Idempotency-Key is required");
   if (!Number.isFinite(input.amountUsd) || input.amountUsd <= 0) throw new Error("Withdrawal amount must be positive");
   if (!Number.isFinite(input.exchangeRate) || input.exchangeRate <= 0) throw new Error("Exchange rate must be positive");
 
@@ -43,6 +45,7 @@ export async function createWithdrawal(
 
       await db.collection("withdrawals").insertOne({
         withdrawalId: input.withdrawalId,
+        idempotencyKey: input.idempotencyKey,
         userId: input.userId,
         countryCode: input.countryCode.toUpperCase(),
         type: input.type,
