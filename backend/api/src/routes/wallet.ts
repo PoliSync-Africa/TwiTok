@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
 import { GIFT_CATALOG, sendGift } from "../money/gifts.js";
-import { createWithdrawal } from "../money/withdrawal.js";
+import { createWithdrawal, processGhanaWithdrawal } from "../money/withdrawal.js";
+import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
 import { requireUser } from "../auth/middleware.js";
 
 export const walletRouter = Router();
@@ -70,13 +71,28 @@ walletRouter.post("/gifts", requireUser, async (req, res) => {
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Gift failed" }); }
 });
 
+walletRouter.get("/payout/ghana/options", requireUser, async (req, res) => {
+  try {
+    const type = String(req.query.type ?? "bank") === "mobile_money" ? "mobile_money" : "bank";
+    return res.json({ countryCode: "GH", type, providers: await listGhanaPayoutBanks(type) });
+  } catch (error) { return res.status(503).json({ error: error instanceof Error ? error.message : "Payout provider unavailable" }); }
+});
+
 walletRouter.post("/withdrawals", requireUser, async (req, res) => {
   try {
-    const { countryCode, type, amountUsd, exchangeRate, destination } = req.body ?? {};
+    const { countryCode, type, amountUsd, destination } = req.body ?? {};
     const userId = req.userId!.toHexString();
     if (!countryCode || !type || !destination) return res.status(400).json({ error: "countryCode, type and destination are required" });
+    if (String(countryCode).toUpperCase() !== "GH") return res.status(400).json({ error: "Ghana payout provider is currently enabled for this rollout" });
+    if (!["BANK", "MOBILE_MONEY"].includes(String(type))) return res.status(400).json({ error: "Invalid payout type" });
     if (Number(amountUsd) < MIN_WITHDRAWAL_USD) return res.status(400).json({ error: "Minimum withdrawal is $" + MIN_WITHDRAWAL_USD });
-    await createWithdrawal(await getDb(), { withdrawalId: randomUUID(), userId, countryCode, type, amountUsd: Number(amountUsd), exchangeRate: Number(exchangeRate), destination });
-    return res.status(201).json({ status: "PENDING" });
+    const exchangeRate = Number(process.env.TWITOK_USD_GHS_RATE);
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return res.status(503).json({ error: "GHS payout exchange rate is not configured" });
+    const withdrawalId = randomUUID();
+    await createWithdrawal(await getDb(), { withdrawalId, userId, countryCode: "GH", type, amountUsd: Number(amountUsd), exchangeRate, destination });
+    let payout;
+    try { payout = await processGhanaWithdrawal(await getDb(), withdrawalId); }
+    catch (error) { return res.status(502).json({ status: "FAILED", withdrawalId, error: error instanceof Error ? error.message : "Payout provider failed" }); }
+    return res.status(201).json({ status: payout?.status ?? "PROCESSING", withdrawalId, provider: "PAYSTACK" });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
 });
