@@ -53,13 +53,15 @@ export async function addVideoToPlaylist(db: Db, userId: ObjectId, playlistId: s
 
 export async function removeVideoFromPlaylist(db: Db, userId: ObjectId, playlistId: string, videoId: string) {
   if (!ObjectId.isValid(playlistId) || !ObjectId.isValid(videoId)) throw new Error("Invalid playlist or video id");
-  const result = await db.collection("playlists").findOneAndUpdate(
-    { _id: new ObjectId(playlistId), ownerId: userId },
-    { $pull: { videoIds: new ObjectId(videoId) }, $set: { updatedAt: new Date() } },
-    { returnDocument: "after" }
+  const playlistObjectId = new ObjectId(playlistId);
+  const result = await db.collection("playlists").updateOne(
+    { _id: playlistObjectId, ownerId: userId },
+    { $pull: { videoIds: new ObjectId(videoId) } as any, $set: { updatedAt: new Date() } }
   );
-  if (!result) throw new Error("Playlist not found");
-  return toPlaylist(result);
+  if (!result.matchedCount) throw new Error("Playlist not found");
+  const updated = await db.collection("playlists").findOne({ _id: playlistObjectId, ownerId: userId });
+  if (!updated) throw new Error("Playlist not found");
+  return toPlaylist(updated);
 }
 
 export async function getPlaylist(db: Db, playlistId: ObjectId, viewerId?: ObjectId) {
@@ -69,10 +71,10 @@ export async function getPlaylist(db: Db, playlistId: ObjectId, viewerId?: Objec
   });
   if (!playlist) throw new Error("Playlist not found");
   const videos = await db.collection("videos").find({ _id: { $in: playlist.videoIds }, status: "PUBLISHED", visibility: "PUBLIC" }).toArray();
-  const byId = new Map(videos.map(v => [v._id.toHexString(), v]));
-  const orderedVideos = playlist.videoIds.map(id => byId.get(id.toHexString())).filter(Boolean).map(v => ({
-    id: v!._id.toHexString(), ownerId: v!.ownerId?.toHexString?.() ?? String(v!.ownerId),
-    caption: v!.caption ?? "", hashtags: v!.hashtags ?? [], playback: v!.playback ?? null, thumbnail: v!.thumbnail ?? null, publishedAt: v!.publishedAt ?? null
+  const byId = new Map<any, any>(videos.map((v: any) => [v._id.toHexString(), v]));
+  const orderedVideos = playlist.videoIds.map((id: ObjectId) => byId.get(id.toHexString())).filter(Boolean).map((v: any) => ({
+    id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId),
+    caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, publishedAt: v.publishedAt ?? null
   }));
   return { ...toPlaylist(playlist), videos: orderedVideos };
 }
