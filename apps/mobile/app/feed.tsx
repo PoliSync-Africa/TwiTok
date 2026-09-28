@@ -95,7 +95,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   return (
     <View style={styles.video}>
       <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
-      <Overlay item={item} engagement={engagement} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} />
+      <Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} onNotInterested={onNotInterested} />
     </View>
   );
 }
