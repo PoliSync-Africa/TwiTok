@@ -52,7 +52,7 @@ export default function Home() {
         });
         if (!response.ok) return;
         const data = await response.json();
-        if (!cancelled && Array.isArray(data.items) && data.items.length) setVideos(data.items);
+        const items = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];\n        if (!cancelled && items.length) setVideos(items);
       } catch {}
     }
     load();
