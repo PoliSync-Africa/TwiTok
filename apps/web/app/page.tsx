@@ -8,6 +8,9 @@ type FeedVideo = {
   owner?: { username?: string };
   ownerUsername?: string;
   caption?: string;
+  mediaType?: "VIDEO"|"PHOTO"|"TEXT";
+  photos?: string[];
+  textBody?: string;
   hashtags?: string[];
   playback?: { hlsUrl?: string; mp4Url?: string };
   thumbnail?: string | null;
@@ -334,11 +337,15 @@ export default function Home() {
           const playback = v.playback?.mp4Url ?? v.playback?.hlsUrl;
           return <article className="video-card" data-video-id={v.id} key={v.id}>
             <div className="video-stage">
-              {playback
-                ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
-                    {v.autoCaptionsUrl ? <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" /> : null}{Object.values(v.captionTracks ?? {}).map(captionTrack => <track key={captionTrack.language} kind="captions" src={captionTrack.url} srcLang={captionTrack.language} label={captionTrack.label} />)}
-                  </video>
-                : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
+              {v.mediaType === "TEXT"
+                ? <div className="video-art demo-art-0" style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"36px"}}><div className="demo-mark" style={{fontSize:"28px",lineHeight:1.35}}>{v.textBody || v.caption}</div></div>
+                : v.mediaType === "PHOTO"
+                  ? <div className="video-art" style={{display:"flex",gap:"8px",overflow:"auto",padding:"18px",alignItems:"center"}}>{(v.photos ?? []).map((photo,j)=><img key={photo+j} src={photo} alt="" style={{maxWidth:"88%",maxHeight:"82%",objectFit:"contain",borderRadius:"12px"}} />)}</div>
+                  : playback
+                    ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
+                        {v.autoCaptionsUrl ? <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" /> : null}{Object.values(v.captionTracks ?? {}).map(captionTrack => <track key={captionTrack.language} kind="captions" src={captionTrack.url} srcLang={captionTrack.language} label={captionTrack.label} />)}
+                      </video>
+                    : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>
               <div className="gradient"/>
               <div className="video-copy">
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
@@ -352,7 +359,8 @@ export default function Home() {
               <button onClick={() => engage(v.id, "like")} aria-label="Like video">{v.engagement?.liked ? "♥" : "♡"}<small>{v.engagement?.likeCount ?? 0}</small></button>
               <button onClick={() => openComments(v.id)} aria-label="Open comments">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
               <button onClick={() => engage(v.id, "share")} aria-label="Share video">↗<small>{v.engagement?.shareCount ?? 0}</small></button>
-              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>\n              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
+              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>
+              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
               <button onClick={() => remixVideo(v.id, "DUET")} aria-label="Duet video">Duet</button>
               <button onClick={() => remixVideo(v.id, "STITCH")} aria-label="Stitch video">Stitch</button>
             </div>
