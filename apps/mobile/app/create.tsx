@@ -119,11 +119,18 @@ export default function CreateScreen() {
           uploadId: uploads[0],
           clipUploadIds: uploads,
           caption,
-          visibility: "PUBLIC",
-          allowComments: true,
-          allowDuet: true,
-          allowStitch: true,
-          autoCaptions: true
+          visibility,
+          allowComments: comments,
+          allowDuet: duet,
+          allowStitch: stitch,
+          speed,
+          effect,
+          soundId: soundId || undefined,
+          originalVolume,
+          addedSoundVolume,
+          coverTimeMs,
+          autoCaptions: true,
+          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: 0, endMs: Math.max(3000, durationMs || 3000), x: 0.5, y: 0.8, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
