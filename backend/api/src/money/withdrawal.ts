@@ -31,11 +31,11 @@ export async function createWithdrawal(
   try {
     await session.withTransaction(async () => {
       const wallet = await db.collection("wallets").findOne({ userId: input.userId }, { session });
-      if (!wallet || (wallet.balanceUsd ?? 0) < input.amountUsd) throw new Error("Insufficient USD wallet balance");
+      if (!wallet || (wallet.cashBalanceUsd ?? 0) < input.amountUsd) throw new Error("Insufficient USD wallet balance");
 
       await db.collection("wallets").updateOne(
         { userId: input.userId },
-        { $inc: { balanceUsd: -input.amountUsd }, $set: { updatedAt: now } },
+        { $inc: { cashBalanceUsd: -input.amountUsd }, $set: { updatedAt: now } },
         { session }
       );
 
