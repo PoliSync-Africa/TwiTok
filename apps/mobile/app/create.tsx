@@ -248,6 +248,32 @@ export default function CreateScreen() {
           </View>
         </View> : null}
         {mode === "VIDEO" && assets.length ? <View style={styles.coverBox}><Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text><View style={styles.row}><Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable><Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable></View></View> : null}
+        {mode === "VIDEO" && assets.length ? <View style={styles.trimBox}>
+          <Text style={styles.helper}>Trim clip • {(trimStartMs/1000).toFixed(1)}s — {(trimEndMs ? trimEndMs/1000 : previewDurationMs/1000).toFixed(1)}s</Text>
+          <View style={styles.trimTrack}
+            onStartShouldSetResponder={()=>true}
+            onMoveShouldSetResponder={()=>true}
+            onResponderMove={(e)=>{
+              const x=Math.max(0,Math.min(1,e.nativeEvent.locationX/Math.max(1,320)));
+              const t=Math.round(x*previewDurationMs);
+              if (Math.abs(t-trimStartMs) <= Math.abs(t-(trimEndMs || previewDurationMs))) {
+                setTrimStartMs(Math.min(t,Math.max(0,(trimEndMs || previewDurationMs)-500)));
+              } else {
+                setTrimEndMs(Math.max(t,trimStartMs+500));
+              }
+              setCoverTimeMs(v=>Math.max(trimStartMs,Math.min(v,trimEndMs || previewDurationMs)));
+            }}>
+            <View style={styles.trimTrackBase}/>
+            <View style={[styles.trimSelected,{left:`${(trimStartMs/previewDurationMs)*100}%`,right:`${100-((trimEndMs||previewDurationMs)/previewDurationMs)*100}%`}]} />
+            <View style={[styles.trimHandle,{left:`${Math.max(0,Math.min(100,(trimStartMs/previewDurationMs)*100))}%`}]} />
+            <View style={[styles.trimHandle,{left:`${Math.max(0,Math.min(100,((trimEndMs||previewDurationMs)/previewDurationMs)*100))}%`}]} />
+          </View>
+          <View style={styles.row}>
+            <Pressable style={styles.small} onPress={()=>{setTrimStartMs(Math.max(0,trimStartMs-500));seekPreview(Math.max(0,trimStartMs-500));}}><Text style={styles.choiceText}>Start −0.5s</Text></Pressable>
+            <Pressable style={styles.small} onPress={()=>{const e=Math.max(trimStartMs+500,(trimEndMs||previewDurationMs)-500);setTrimEndMs(e);seekPreview(e);}}><Text style={styles.choiceText}>End −0.5s</Text></Pressable>
+            <Pressable style={styles.small} onPress={()=>{setTrimStartMs(0);setTrimEndMs(0);}}><Text style={styles.choiceText}>Full clip</Text></Pressable>
+          </View>
+        </View> : null}
         <Text style={styles.section}>Edit timeline</Text>
         {mode === "VIDEO" ? <>
           <Text style={styles.helper}>Trim start / end (milliseconds)</Text>
