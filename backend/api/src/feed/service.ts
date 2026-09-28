@@ -55,8 +55,24 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
+    { $lookup: { from: "video_likes", localField: "_id", foreignField: "videoId", as: "_likes" } },
+    { $lookup: { from: "video_comments", localField: "_id", foreignField: "videoId", as: "_comments" } },
+    { $lookup: { from: "video_shares", localField: "_id", foreignField: "videoId", as: "_shares" } },
+    { $lookup: { from: "video_saves", localField: "_id", foreignField: "videoId", as: "_saves" } },
+    { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
+    { $addFields: {
+      engagement: {
+        likeCount: { $size: "$_likes" },
+        commentCount: { $size: { $filter: { input: "$_comments", as: "comment", cond: { $ne: ["$comment.status", "DELETED"] } } } },
+        shareCount: { $size: "$_shares" },
+        saveCount: { $size: "$_saves" },
+        liked: { $in: [userId, "$_likes.userId"] },
+        saved: { $in: [userId, "$_saves.userId"] }
+      },
+      owner: { $arrayElemAt: ["$_owner", 0] }
+    } },
     { $sort: { _engagement: -1, _freshness: 1, publishedAt: -1, _id: -1 } },
     { $limit: safeLimit }
   ]).toArray();
-  return videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null }));
+  return videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, liked: false, saved: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null }));
 }
