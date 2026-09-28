@@ -11,6 +11,7 @@ export const COIN_PACKAGES = [
 
 export const CREATOR_DIAMONDS_PER_COIN = 0.30;
 export const MIN_WITHDRAWAL_USD = 10;
+export const DIAMOND_CASH_VALUE_USD = 0.003;
 
 export async function initializeWalletIndexes(db: Db) {
   await Promise.all([
