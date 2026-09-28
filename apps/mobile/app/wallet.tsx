@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 import { configureRevenueCat, getCoinPackages, purchaseCoinPackage } from "../lib/revenuecat";
+import type { PurchasesPackage } from "react-native-purchases";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
@@ -24,6 +25,8 @@ export default function WalletScreen() {
   const [busy,setBusy]=useState(false);
   const [coinPackages,setCoinPackages]=useState<CoinPackage[]>([]);
   const [purchasing,setPurchasing]=useState(false);
+  const [rcPackages,setRcPackages]=useState<PurchasesPackage[]>([]);
+  const [showCoinPicker,setShowCoinPicker]=useState(false);
 
   async function load(){
     setLoading(true);
@@ -53,14 +56,30 @@ export default function WalletScreen() {
   async function buyCoins(){
     try{
       const packages=await getCoinPackages();
-      if(!packages.length){ Alert.alert("Coin purchases","RevenueCat is not configured for this build yet. Use the web wallet or install the configured App Store/Google Play build."); return; }
-      const selected=packages[0];
-      const match=coinPackages.find(p=>selected.identifier.includes(p.sku)||p.sku.includes(selected.identifier));
-      Alert.alert("Buy Coins", match ? `${match.coins.toLocaleString()} Coins · ${match.priceUsd.toFixed(2)}` : selected.product.title, [
-        {text:"Cancel",style:"cancel"},
-        {text:"Purchase",onPress:async()=>{setPurchasing(true);try{await purchaseCoinPackage(selected);Alert.alert("Purchase complete","Your verified Coins will appear in your TwiTok wallet.");await load();}catch(e){Alert.alert("Purchase",e instanceof Error?e.message:"Purchase was cancelled or failed");}finally{setPurchasing(false);}}}
-      ]);
-    }catch(e){Alert.alert("Coin purchases",e instanceof Error?e.message:"Unable to load Coin packages");}
+      const matched=packages.filter(pkg=>coinPackages.some(p=>p.sku===pkg.identifier || pkg.identifier.includes(p.sku) || p.sku.includes(pkg.identifier)));
+      if(!matched.length){
+        Alert.alert("Coin purchases","RevenueCat has no configured TwiTok Coin products for this build yet. Configure the five approved SKUs in RevenueCat/App Store/Google Play first.");
+        return;
+      }
+      setRcPackages(matched);
+      setShowCoinPicker(true);
+    }catch(e){
+      Alert.alert("Coin purchases",e instanceof Error?e.message:"Unable to load Coin packages");
+    }
+  }
+
+  async function purchaseSelectedCoinPackage(pkg: PurchasesPackage){
+    setPurchasing(true);
+    try{
+      await purchaseCoinPackage(pkg);
+      setShowCoinPicker(false);
+      Alert.alert("Purchase complete","Your verified Coins will appear in your TwiTok wallet.");
+      await load();
+    }catch(e){
+      Alert.alert("Purchase",e instanceof Error?e.message:"Purchase was cancelled or failed");
+    }finally{
+      setPurchasing(false);
+    }
   }
 
   async function withdraw(){
@@ -79,8 +98,28 @@ export default function WalletScreen() {
   }
 
   if(loading) return <View style={styles.center}><ActivityIndicator color="#fff"/></View>;
+
+  const coinPicker = <Modal visible={showCoinPicker} transparent animationType="slide" onRequestClose={()=>!purchasing&&setShowCoinPicker(false)}>
+    <View style={styles.modalBackdrop}>
+      <View style={styles.coinSheet}>
+        <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Buy TwiTok Coins</Text><Pressable disabled={purchasing} onPress={()=>setShowCoinPicker(false)}><Text style={styles.close}>×</Text></Pressable></View>
+        <Text style={styles.sheetHint}>Choose a Coin package. Payment is processed by the App Store or Google Play.</Text>
+        {rcPackages.map(pkg=>{
+          const match=coinPackages.find(p=>p.sku===pkg.identifier || pkg.identifier.includes(p.sku) || p.sku.includes(pkg.identifier));
+          if(!match) return null;
+          return <Pressable key={pkg.identifier} disabled={purchasing} style={styles.coinOption} onPress={()=>void purchaseSelectedCoinPackage(pkg)}>
+            <View><Text style={styles.coinAmount}>{match.coins.toLocaleString()} Coins</Text><Text style={styles.coinSku}>{match.sku}</Text></View>
+            <Text style={styles.coinPrice}>{pkg.product.priceString || "$"+match.priceUsd.toFixed(2)}</Text>
+          </Pressable>;
+        })}
+        {purchasing&&<View style={styles.processing}><ActivityIndicator color="#fff"/><Text style={styles.processingText}>Processing purchase…</Text></View>}
+      </View>
+    </View>
+  </Modal>;
+
+
   const cash=Number(wallet.cashBalanceUsd??0);
-  return <View style={styles.screen}>
+  return <View style={styles.screen}>\n    {coinPicker}
     <View style={styles.header}><Pressable onPress={()=>router.back()}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>Wallet & Earnings</Text><Pressable onPress={()=>void load()}><Text style={styles.refresh}>↻</Text></Pressable></View>
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.hero}><Text style={styles.heroLabel}>AVAILABLE EARNINGS</Text><Text style={styles.heroCash}>{"$"+cash.toFixed(2)}</Text><Text style={styles.heroHint}>Minimum cashout: $10.00</Text></View>
