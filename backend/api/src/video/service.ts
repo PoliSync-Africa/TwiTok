@@ -226,3 +226,29 @@ export async function createVideoRemix(db: Db, userId: ObjectId, sourceVideoId: 
     sourceThumbnail: source.thumbnail ?? null
   };
 }
+
+
+export async function getVideoRemix(db: Db, userId: ObjectId, remixId: string) {
+  if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
+  const remix = await db.collection("video_remixes").findOne({ _id: new ObjectId(remixId), creatorId: userId });
+  if (!remix) throw new Error("Remix draft not found");
+  return {
+    id: remix._id.toHexString(), mode: remix.mode, status: remix.status,
+    sourceVideoId: remix.sourceVideoId?.toHexString?.() ?? String(remix.sourceVideoId),
+    sourceCaption: remix.sourceCaption ?? "", sourcePlayback: remix.sourcePlayback ?? null,
+    sourceThumbnail: remix.sourceThumbnail ?? null, caption: remix.caption ?? "",
+    createdAt: remix.createdAt, updatedAt: remix.updatedAt
+  };
+}
+
+export async function updateVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { caption?: string }) {
+  if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
+  const caption = String(input.caption ?? "").trim().slice(0, 2200);
+  const result = await db.collection("video_remixes").findOneAndUpdate(
+    { _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT" },
+    { $set: { caption, updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  if (!result) throw new Error("Remix draft not found");
+  return getVideoRemix(db, userId, remixId);
+}
