@@ -1,7 +1,7 @@
 import { ObjectId, type Db } from "mongodb";
 import { broadcastToUser } from "../realtime/ws.js";
 
-export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT" | "REPOST";
+export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT" | "REPOST" | "MENTION";
 
 export async function initializeNotificationIndexes(db: Db) {
   await Promise.all([
