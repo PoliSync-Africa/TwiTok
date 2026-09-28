@@ -7,7 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 type Wallet = { coinBalance?: number; diamondBalance?: number; cashBalanceUsd?: number };
 type Catalog = { coinPackages: Array<{ sku: string; coins: number; priceUsd: number }>; gifts: Array<{ giftId: string; name: string; coins: number; animation: string }>; creatorSharePercent: number; platformSharePercent: number; diamondCashValueUsd: number; minWithdrawalUsd: number };
 type LedgerRow = { type: string; coinsDelta?: number; diamondsDelta?: number; cashDeltaUsd?: number; createdAt?: string };
-type GiftRow = { giftName: string; quantity: number; coinsSpent: number; diamondsAwarded: number; createdAt?: string };\ntype Withdrawal = { withdrawalId: string; amountUsd: number; payoutAmount: number; payoutCurrency: string; type: string; status: string; createdAt?: string };
+type GiftRow = { giftName: string; quantity: number; coinsSpent: number; diamondsAwarded: number; createdAt?: string };
+type Withdrawal = { withdrawalId: string; amountUsd: number; payoutAmount: number; payoutCurrency: string; type: string; status: string; createdAt?: string };
 
 const money = (n: number) => "$" + n.toFixed(2);
 
@@ -16,7 +17,12 @@ export default function WalletPage() {
   const [wallet, setWallet] = useState<Wallet>({});
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
-  const [gifts, setGifts] = useState<GiftRow[]>([]);\n  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);\n  const [withdrawAmount, setWithdrawAmount] = useState("");\n  const [payoutType, setPayoutType] = useState<"BANK" | "MOBILE_MONEY">("MOBILE_MONEY");\n  const [destination, setDestination] = useState({ name: "", accountNumber: "", bankCode: "" });\n  const [payoutMessage, setPayoutMessage] = useState("");
+  const [gifts, setGifts] = useState<GiftRow[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [payoutType, setPayoutType] = useState<"BANK" | "MOBILE_MONEY">("MOBILE_MONEY");
+  const [destination, setDestination] = useState({ name: "", accountNumber: "", bankCode: "" });
+  const [payoutMessage, setPayoutMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -35,7 +41,9 @@ export default function WalletPage() {
       setWallet(await w.json());
       if (c.ok) setCatalog(await c.json());
       if (l.ok) setLedger((await l.json()).transactions ?? []);
-      if (g.ok) setGifts((await g.json()).gifts ?? []);\n      const wd = await fetch(api + "/wallet/me/withdrawals?limit=20", { headers, cache: "no-store" });\n      if (wd.ok) setWithdrawals((await wd.json()).withdrawals ?? []);
+      if (g.ok) setGifts((await g.json()).gifts ?? []);
+      const wd = await fetch(api + "/wallet/me/withdrawals?limit=20", { headers, cache: "no-store" });
+      if (wd.ok) setWithdrawals((await wd.json()).withdrawals ?? []);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load wallet"); }
     finally { setLoading(false); }
   }
@@ -139,6 +147,8 @@ const styles: Record<string, CSSProperties> = {
   row:{display:"flex",justifyContent:"space-between",gap:16,padding:"12px 0",borderTop:"1px solid #222"},
   rowSmall:{},
   empty:{color:"#777"},
-  formGrid:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10},\n  input:{width:"100%",boxSizing:"border-box",padding:13,borderRadius:10,border:"1px solid #333",background:"#181818",color:"#fff"},\n  withdraw:{marginTop:12,width:"100%",padding:14,borderRadius:10,border:0,background:"#fff",color:"#000",fontWeight:800},
+  formGrid:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10},
+  input:{width:"100%",boxSizing:"border-box",padding:13,borderRadius:10,border:"1px solid #333",background:"#181818",color:"#fff"},
+  withdraw:{marginTop:12,width:"100%",padding:14,borderRadius:10,border:0,background:"#fff",color:"#000",fontWeight:800},
 };
 
