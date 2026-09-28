@@ -11,6 +11,10 @@ import { broadcastToUser } from "../realtime/ws.js";
 
 export const walletRouter = Router();
 
+walletRouter.get("/revenuecat/config", requireUser, async (req, res) => {
+  return res.json({ appUserId: req.userId!.toHexString() });
+});
+
 walletRouter.get("/catalog", (_req, res) => res.json({
   coinPackages: COIN_PACKAGES, gifts: GIFT_CATALOG,
   creatorSharePercent: 30, platformSharePercent: 70,
