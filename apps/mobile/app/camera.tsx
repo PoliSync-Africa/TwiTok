@@ -22,9 +22,25 @@ export default function CameraStudioScreen() {
   const [speed, setSpeed] = useState<0.5 | 1 | 1.5 | 2>(1);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const recordingStartedAt = useRef<number | null>(null);
   const [effect, setEffect] = useState<Effect>("NONE");
   const [grid, setGrid] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!recording) {
+      setElapsedMs(0);
+      recordingStartedAt.current = null;
+      return;
+    }
+    recordingStartedAt.current = Date.now();
+    const interval = setInterval(() => {
+      const started = recordingStartedAt.current;
+      if (started) setElapsedMs(Math.min(durationLimit * 1000, Date.now() - started));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [recording, durationLimit]);
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted) requestCameraPermission();
@@ -47,6 +63,7 @@ export default function CameraStudioScreen() {
     }
 
     if (!cameraRef.current) return;
+    setElapsedMs(0);
     setRecording(true);
     recordingRef.current = cameraRef.current.recordAsync({ maxDuration: durationLimit });
     try {
@@ -56,7 +73,7 @@ export default function CameraStudioScreen() {
         pathname: "/create",
         params: {
           recordedUri: result.uri,
-          recordedDuration: "0",
+          recordedDuration: String(Math.max(1, Math.round(elapsedMs || durationLimit * 1000))),
           recordedEffect: effect,
           recordedSpeed: String(speed)
         }
@@ -146,6 +163,8 @@ export default function CameraStudioScreen() {
         </Pressable>
       </View>
 
+      {recording ? <View pointerEvents="none" style={styles.recordingProgress}><View style={[styles.recordingProgressFill,{width:`${Math.min(100,(elapsedMs/(durationLimit*1000))*100)}%`}]}/></View> : null}
+      {recording ? <View style={styles.recordingTime}><Text style={styles.recordingTimeText}>{Math.floor(elapsedMs/60000)}:{String(Math.floor((elapsedMs%60000)/1000)).padStart(2,"0")}</Text></View> : null}
       {countdown !== null ? (
         <View style={styles.countdown}>
           <Text style={styles.countdownText}>{countdown}</Text>
@@ -225,7 +244,7 @@ const styles = StyleSheet.create({
   tool:{alignItems:"center",gap:3},
   toolIcon:{color:"#fff",fontSize:23,fontWeight:"800"},
   toolText:{color:"#fff",fontSize:11,fontWeight:"800"},
-  countdown:{position:"absolute",top:"38%",left:0,right:0,alignItems:"center"},
+  recordingProgress:{position:"absolute",top:0,left:0,right:0,height:4,backgroundColor:"rgba(255,255,255,.2)"},recordingProgressFill:{height:"100%",backgroundColor:"#ff2d55"},recordingTime:{position:"absolute",top:64,left:0,right:0,alignItems:"center"},recordingTimeText:{color:"#fff",fontSize:13,fontWeight:"900",backgroundColor:"rgba(0,0,0,.45)",paddingHorizontal:9,paddingVertical:4,borderRadius:10},countdown:{position:"absolute",top:"38%",left:0,right:0,alignItems:"center"},
   countdownText:{color:"#fff",fontSize:96,fontWeight:"900",textShadowColor:"#000",textShadowRadius:10},
   bottom:{position:"absolute",left:0,right:0,bottom:0,paddingBottom:26,paddingTop:14,backgroundColor:"rgba(0,0,0,.38)"},
   effectsRow:{flexDirection:"row",gap:7,paddingHorizontal:12,marginBottom:12},
