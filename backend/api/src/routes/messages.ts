@@ -14,8 +14,18 @@ messagesRouter.get("/conversations", requireUser, async (req, res) => {
 
 messagesRouter.post("/conversations/direct", requireUser, async (req, res) => {
   try {
-    const otherUserId = new ObjectId(String(req.body?.userId));
-    const conversation = await getOrCreateDirectConversation(await getDb(), req.userId!, otherUserId);
+    const db = await getDb();
+    let otherUserId: ObjectId;
+    if (req.body?.userId && ObjectId.isValid(String(req.body.userId))) {
+      otherUserId = new ObjectId(String(req.body.userId));
+    } else if (req.body?.username) {
+      const other = await db.collection("users").findOne({ username: String(req.body.username).trim().toLowerCase(), status: "ACTIVE" }, { projection: { _id: 1 } });
+      if (!other) return res.status(404).json({ error: "User not found" });
+      otherUserId = other._id;
+    } else {
+      return res.status(400).json({ error: "userId or username is required" });
+    }
+    const conversation = await getOrCreateDirectConversation(db, req.userId!, otherUserId);
     res.status(201).json({ conversation });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create conversation" }); }
 });
