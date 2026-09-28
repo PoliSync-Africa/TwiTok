@@ -39,6 +39,7 @@ export default function CreateScreen() {
   const [overlayY, setOverlayY] = useState(0.8);
   const durationMs = assets.reduce((sum, asset) => sum + (asset.duration ?? 0), 0);
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
+  const [clipTrimRanges, setClipTrimRanges] = useState<{startMs:number;endMs:number|null}[]>([]);
   const [clipTransitions, setClipTransitions] = useState<{type:string;durationMs:number}[]>([]);
   const player = useVideoPlayer(assets[0]?.uri ?? null);
   player.timeUpdateEventInterval = 0.25;
@@ -52,6 +53,7 @@ export default function CreateScreen() {
   function replaceAssets(next: Asset[]) {
     setAssets(next);
     setClipSettings(next.map((_, i) => clipSettings[i] ?? { ...DEFAULT_CLIP_SETTING }));
+    setClipTrimRanges(next.map((asset, i) => clipTrimRanges[i] ?? { startMs: 0, endMs: asset.duration ? Math.round(asset.duration) : null }));
     setClipTransitions(next.slice(0, Math.max(0, next.length - 1)).map((_, i) => clipTransitions[i] ?? ({ type: "NONE", durationMs: 500 })));
   }
   function moveClip(index: number, direction: -1 | 1) {
@@ -59,7 +61,8 @@ export default function CreateScreen() {
     if (target < 0 || target >= assets.length) return;
     const nextAssets = [...assets]; [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];
     const nextSettings = [...clipSettings]; [nextSettings[index], nextSettings[target]] = [nextSettings[target] ?? { ...DEFAULT_CLIP_SETTING }, nextSettings[index] ?? { ...DEFAULT_CLIP_SETTING }];
-    setAssets(nextAssets); setClipSettings(nextSettings);
+    const nextTrims = [...clipTrimRanges]; [nextTrims[index], nextTrims[target]] = [nextTrims[target] ?? { startMs: 0, endMs: nextAssets[target]?.duration ? Math.round(nextAssets[target].duration as number) : null }, nextTrims[index] ?? { startMs: 0, endMs: nextAssets[index]?.duration ? Math.round(nextAssets[index].duration as number) : null }];
+    setAssets(nextAssets); setClipSettings(nextSettings); setClipTrimRanges(nextTrims);
   }
   function setTransition(index: number, type: string) {
     setClipTransitions(prev => prev.map((x, i) => i === index ? { ...x, type } : x));
@@ -169,6 +172,7 @@ export default function CreateScreen() {
           coverTimeMs,
           trimStartMs,
           trimEndMs: trimEndMs || undefined,
+          clipTrimRanges,
           clipTransitions,
           clipSettings,
           autoCaptions: true,
@@ -295,6 +299,25 @@ export default function CreateScreen() {
             {[0.2,0.5,0.8].map(v=><Pressable key={v} style={[styles.choice,overlayX===v&&styles.selected]} onPress={()=>setOverlayX(v)}><Text style={styles.choiceText}>X {v}</Text></Pressable>)}
             {[0.2,0.5,0.8].map(v=><Pressable key={"y"+v} style={[styles.choice,overlayY===v&&styles.selected]} onPress={()=>setOverlayY(v)}><Text style={styles.choiceText}>Y {v}</Text></Pressable>)}
           </View>
+        </View> : null}
+        {mode === "VIDEO" && assets.length ? <View style={styles.clipTrimSection}>
+          <Text style={styles.helper}>Per-clip trim</Text>
+          {assets.map((asset, i) => {
+            const range = clipTrimRanges[i] ?? { startMs: 0, endMs: asset.duration ? Math.round(asset.duration) : null };
+            const duration = Math.max(1000, Math.round(asset.duration ?? durationMs / Math.max(1, assets.length) ?? 10000));
+            const end = range.endMs ?? duration;
+            const updateRange = (startMs:number, endMs:number) => setClipTrimRanges(prev => prev.map((x,j)=>j===i ? { startMs:Math.max(0,Math.min(startMs,endMs-500)), endMs:Math.max(startMs+500,Math.min(endMs,duration)) } : x));
+            return <View key={asset.uri+i} style={styles.clipTrimRow}>
+              <Text style={styles.label}>Clip {i+1}: {(range.startMs/1000).toFixed(1)}s → {(end/1000).toFixed(1)}s</Text>
+              <View style={styles.row}>
+                <Pressable style={styles.small} onPress={()=>updateRange(range.startMs-500,end)}><Text style={styles.choiceText}>Start −0.5s</Text></Pressable>
+                <Pressable style={styles.small} onPress={()=>updateRange(range.startMs+500,end)}><Text style={styles.choiceText}>Start +0.5s</Text></Pressable>
+                <Pressable style={styles.small} onPress={()=>updateRange(range.startMs,end-500)}><Text style={styles.choiceText}>End −0.5s</Text></Pressable>
+                <Pressable style={styles.small} onPress={()=>updateRange(range.startMs,end+500)}><Text style={styles.choiceText}>End +0.5s</Text></Pressable>
+                <Pressable style={styles.small} onPress={()=>updateRange(0,duration)}><Text style={styles.choiceText}>Full</Text></Pressable>
+              </View>
+            </View>;
+          })}
         </View> : null}
         {mode === "VIDEO" && assets.length > 1 ? <View>
           <Text style={styles.helper}>Transitions between clips</Text>
