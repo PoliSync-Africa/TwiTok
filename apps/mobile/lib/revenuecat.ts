@@ -1,4 +1,4 @@
-import Purchases, { type CustomerInfo, type PurchasesPackage } from "@revenuecat/purchases-react-native";
+import Purchases, { type CustomerInfo, type PurchasesPackage } from "react-native-purchases";
 import { Platform } from "react-native";
 
 let configured = false;
