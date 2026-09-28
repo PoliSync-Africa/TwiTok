@@ -23,22 +23,26 @@ export async function initializeEngagementIndexes(db: Db) {
     db.collection("video_saves").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ videoId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ userId: 1, createdAt: -1 }),
-    db.collection("video_shares").createIndex({ videoId: 1, createdAt: -1 })
+    db.collection("video_shares").createIndex({ videoId: 1, createdAt: -1 }),
+    db.collection("video_reposts").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    db.collection("video_reposts").createIndex({ videoId: 1, createdAt: -1 })
   ]);
 }
 
 export async function getEngagement(db: Db, userId: ObjectId, videoIdString: string) {
   const videoId = videoObjectId(videoIdString);
   await getPublicVideo(db, videoId);
-  const [likes, comments, shares, saves, liked, saved] = await Promise.all([
+  const [likes, comments, shares, saves, reposts, liked, saved, reposted] = await Promise.all([
     db.collection("video_likes").countDocuments({ videoId }),
     db.collection("video_comments").countDocuments({ videoId, status: { $ne: "DELETED" } }),
     db.collection("video_shares").countDocuments({ videoId }),
     db.collection("video_saves").countDocuments({ videoId }),
+    db.collection("video_reposts").countDocuments({ videoId }),
     db.collection("video_likes").findOne({ videoId, userId }, { projection: { _id: 1 } }),
-    db.collection("video_saves").findOne({ videoId, userId }, { projection: { _id: 1 } })
+    db.collection("video_saves").findOne({ videoId, userId }, { projection: { _id: 1 } }),
+    db.collection("video_reposts").findOne({ videoId, userId }, { projection: { _id: 1 } })
   ]);
-  return { likeCount: likes, commentCount: comments, shareCount: shares, saveCount: saves, liked: Boolean(liked), saved: Boolean(saved) };
+  return { likeCount: likes, commentCount: comments, shareCount: shares, saveCount: saves, repostCount: reposts, liked: Boolean(liked), saved: Boolean(saved), reposted: Boolean(reposted) };
 }
 
 export async function toggleLike(db: Db, userId: ObjectId, videoIdString: string) {
@@ -100,4 +104,17 @@ export async function recordShare(db: Db, userId: ObjectId, videoIdString: strin
   await getPublicVideo(db, videoId);
   await db.collection("video_shares").insertOne({ videoId, userId, createdAt: new Date() });
   return { shared: true };
+}
+
+export async function toggleRepost(db: Db, userId: ObjectId, videoIdString: string) {
+  const videoId = videoObjectId(videoIdString);
+  const video = await getPublicVideo(db, videoId);
+  const existing = await db.collection("video_reposts").findOne({ videoId, userId }, { projection: { _id: 1 } });
+  if (existing) {
+    await db.collection("video_reposts").deleteOne({ _id: existing._id });
+    return { reposted: false };
+  }
+  await db.collection("video_reposts").insertOne({ videoId, userId, createdAt: new Date() });
+  if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "REPOST", videoId });
+  return { reposted: true };
 }
