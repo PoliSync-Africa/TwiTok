@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
 import { getSticker } from "./stickers.js";
-import { createPresignedUpload, headMediaObject, mediaConfigured } from "../media/storage.js";
+import { createPresignedPlayback, createPresignedUpload, headMediaObject, mediaConfigured } from "../media/storage.js";
 import { verifySourceAndQueue } from "./processing.js";
 
 export type VideoVisibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
@@ -271,6 +271,20 @@ export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: stri
   );
   if (!result) throw new Error("Remix draft not found");
   return getVideoRemix(db, userId, remixId);
+}
+
+export async function getVideoRemixPlayback(db: Db, userId: ObjectId, remixId: string) {
+  if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
+  const remix = await db.collection("video_remixes").findOne({
+    _id: new ObjectId(remixId),
+    creatorId: userId,
+    status: "READY",
+    uploadStatus: "READY"
+  });
+  if (!remix?.objectKey) throw new Error("Remix playback is not available");
+  if (!mediaConfigured()) throw new Error("Media storage is not configured");
+  const signed = await createPresignedPlayback(remix.objectKey, 3600);
+  return { remixId: remix._id.toHexString(), playbackUrl: signed.url, expiresInSeconds: signed.expiresInSeconds };
 }
 
 export async function updateVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { caption?: string }) {
