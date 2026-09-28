@@ -157,7 +157,7 @@ export default function Home() {
         const data = JSON.parse(event.data);
         if (data?.type === "notification:new") setUnreadNotifications(count => count + 1);
         if (data?.type === "gift.received" || data?.type === "gift.sent") {
-          const emoji = data.animation === "rose" ? "🌹" : data.animation === "heart" ? "❤️" : data.animation === "clap" ? "👏" : data.animation === "kente" ? "🟩" : data.animation === "drum" ? "🥁" : data.animation === "crown" ? "👑" : data.animation === "lion" ? "🦁" : "💎";
+          const emoji = giftEmoji(data.animation);
           const videoId = String(data.videoId ?? "");
           if (videoId) {
             const burst = { id: String(data.transactionId ?? crypto.randomUUID()), videoId, emoji, label: data.type === "gift.received" ? "Gift received" : "Gift sent", quantity: Number(data.quantity ?? 1) };
@@ -454,7 +454,7 @@ export default function Home() {
         <div style={giftStyles.header}><div><strong>Send a Gift</strong><small style={giftStyles.balance}>🪙 {coinBalance.toLocaleString()} Coins</small></div><button type="button" onClick={() => setGiftVideoId(null)} style={giftStyles.close}>×</button></div>
         <div style={giftStyles.grid}>
           {giftCatalog.map(gift => <button key={gift.giftId} disabled={giftBusy} onClick={() => void sendGift(gift.giftId)} style={giftStyles.gift}>
-            <span style={giftStyles.emoji}>{gift.animation === "rose" ? "🌹" : gift.animation === "heart" ? "❤️" : gift.animation === "clap" ? "👏" : gift.animation === "kente" ? "🟩" : gift.animation === "drum" ? "🥁" : gift.animation === "crown" ? "👑" : gift.animation === "lion" ? "🦁" : "💎"}</span>
+            <span style={giftStyles.emoji}>{giftEmoji(gift.animation)}</span>
             <b>{gift.name}</b><small>{gift.coins.toLocaleString()} Coins</small>
           </button>)}
         </div>
@@ -481,13 +481,23 @@ export default function Home() {
 }
 
 
+function giftEmoji(animation: string) {
+  const icons: Record<string, string> = {
+    rose: "🌹", heart: "❤️", clap: "👏", kente: "🟩", drum: "🥁",
+    crown: "👑", lion: "🦁", diamond: "💎",
+    usa_flag: "🇺🇸", germany_flag: "🇩🇪", canada_flag: "🇨🇦", uk_flag: "🇬🇧",
+    twitok_cap: "🧢", money_gun: "💸🔫", wedding_rings: "💍", flying_angels: "👼✨"
+  };
+  return icons[animation] ?? "🎁";
+}
+
 const giftStyles: Record<string, CSSProperties> = {
   sheet:{position:"fixed",left:"50%",bottom:0,transform:"translateX(-50%)",width:"min(680px,100%)",background:"#111",border:"1px solid #333",borderRadius:"22px 22px 0 0",padding:18,zIndex:1000,boxSizing:"border-box",boxShadow:"0 -10px 40px rgba(0,0,0,.45)"},
   header:{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:18},
   balance:{display:"block",fontSize:13,color:"#aaa",marginTop:5},
   close:{background:"#222",color:"#fff",border:0,borderRadius:20,fontSize:24,width:40,height:40},
   grid:{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8,marginTop:16,maxHeight:260,overflowY:"auto"},
-  gift:{background:"#1b1b1b",color:"#fff",border:"1px solid #292929",borderRadius:14,padding:"12px 6px",display:"flex",flexDirection:"column",alignItems:"center",gap:5,cursor:"pointer"},
+  gift:{background:"linear-gradient(145deg,#1c1c1c,#101010)",color:"#fff",border:"1px solid #4a4a4a",borderRadius:14,padding:"12px 6px",display:"flex",flexDirection:"column",alignItems:"center",gap:5,cursor:"pointer",boxShadow:"0 4px 18px rgba(0,0,0,.28)"},
   emoji:{fontSize:30},
   emojiLarge:{fontSize:38},
   quantity:{display:"flex",alignItems:"center",gap:8,marginTop:14,color:"#aaa"},
