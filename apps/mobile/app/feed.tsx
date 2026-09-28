@@ -8,6 +8,7 @@ type Video = {
   id: string;
   caption: string;
   ownerId?: string;
+  owner?: { username?: string; nickname?: string; countryCode?: string } | null;
   playback?: { mp4Url?: string; hlsUrl?: string } | null;
   thumbnail?: string | null;
 };
@@ -100,7 +101,7 @@ function Overlay({ item, engagement, onAction, onComments }: { item: Video; enga
         <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
       </View>
       <View style={styles.meta}>
-        <Text style={styles.username}>@twitok</Text>
+        <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
       </View>
       <View style={styles.bottomTabs}><Text style={styles.tabActive}>You</Text><Text style={styles.tab}>Following</Text><Text style={styles.tab}>Explore Africa</Text></View>
