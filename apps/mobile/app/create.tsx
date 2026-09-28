@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useEvent } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -14,6 +14,7 @@ const TRANSITIONS = ["NONE","FADE","DISSOLVE","WIPELEFT","WIPERIGHT","SLIDELEFT"
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedClip, setSelectedClip] = useState(0);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,7 +46,27 @@ export default function CreateScreen() {
   player.timeUpdateEventInterval = 0.25;
   const { currentTime } = useEvent(player, "timeUpdate", { currentTime: player.currentTime });
   const previewDurationMs = Math.max(1, (player.duration || (assets[0]?.duration ?? durationMs / 1000) || 1) * 1000);
+  const selectedRange = clipTrimRanges[selectedClip] ?? { startMs: 0, endMs: assets[selectedClip]?.duration ? Math.round(assets[selectedClip].duration as number) : null };
+  const selectedClipDurationMs = Math.max(1000, Math.round(assets[selectedClip]?.duration ?? previewDurationMs));
+  const selectedClipEndMs = selectedRange.endMs ?? selectedClipDurationMs;
+  const selectedClipStartMs = Math.min(selectedRange.startMs, Math.max(0, selectedClipEndMs - 500));
   const previewTimeMs = Math.max(0, Math.min(previewDurationMs, currentTime * 1000));
+  useEffect(() => {
+    const asset = assets[selectedClip];
+    if (!asset?.uri) return;
+    player.pause();
+    void player.replaceAsync(asset.uri).then(() => {
+      const range = clipTrimRanges[selectedClip];
+      player.currentTime = Math.max(0, range?.startMs ?? 0) / 1000;
+    }).catch(() => undefined);
+  }, [selectedClip, assets, clipTrimRanges, player]);
+  useEffect(() => {
+    if (!assets.length || !player.duration) return;
+    const start = selectedClipStartMs / 1000;
+    const end = selectedClipEndMs / 1000;
+    if (currentTime < start) player.currentTime = start;
+    else if (currentTime >= end) player.pause();
+  }, [currentTime, selectedClipEndMs, selectedClipStartMs, assets.length, player]);
   function seekPreview(valueMs: number) {
     player.currentTime = Math.max(0, Math.min(previewDurationMs, valueMs)) / 1000;
   }
@@ -59,7 +80,7 @@ export default function CreateScreen() {
   function moveClip(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= assets.length) return;
-    const nextAssets = [...assets]; [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];
+    const nextAssets = [...assets]; [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];\n    if (selectedClip === index) setSelectedClip(target);\n    else if (selectedClip === target) setSelectedClip(index);
     const nextSettings = [...clipSettings]; [nextSettings[index], nextSettings[target]] = [nextSettings[target] ?? { ...DEFAULT_CLIP_SETTING }, nextSettings[index] ?? { ...DEFAULT_CLIP_SETTING }];
     const nextTrims = [...clipTrimRanges]; [nextTrims[index], nextTrims[target]] = [nextTrims[target] ?? { startMs: 0, endMs: nextAssets[target]?.duration ? Math.round(nextAssets[target].duration as number) : null }, nextTrims[index] ?? { startMs: 0, endMs: nextAssets[index]?.duration ? Math.round(nextAssets[index].duration as number) : null }];
     setAssets(nextAssets); setClipSettings(nextSettings); setClipTrimRanges(nextTrims);
@@ -218,14 +239,14 @@ export default function CreateScreen() {
       </View> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
-        {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><View style={styles.clip}>
+        {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><Pressable style={[styles.clip,index===selectedClip&&styles.clipSelected]} onPress={()=>setSelectedClip(index)}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
   <Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
   <View style={styles.clipActions}>
     <Pressable onPress={()=>moveClip(index,-1)}><Text style={styles.action}>‹</Text></Pressable>
     <Pressable onPress={()=>moveClip(index,1)}><Text style={styles.action}>›</Text></Pressable>
     <Pressable onPress={()=>{const next=assets.filter((_,i)=>i!==index);replaceAssets(next)}}><Text style={styles.remove}>×</Text></Pressable>
   </View>
-</View>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
+</Pressable>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
         {mode === "VIDEO" && assets.length ? <View style={styles.previewCard}>
           <VideoView player={player} style={styles.previewVideo} nativeControls={false} contentFit="contain" />
           <View style={styles.previewControls}>
@@ -251,7 +272,8 @@ export default function CreateScreen() {
             <Pressable style={styles.small} onPress={()=>seekPreview(trimEndMs || previewDurationMs)}><Text style={styles.choiceText}>End</Text></Pressable>
           </View>
         </View> : null}
-        {mode === "VIDEO" && assets.length ? <View style={styles.coverBox}><Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text><View style={styles.row}><Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable><Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable></View></View> : null}
+        {mode === "VIDEO" && assets.length > 1 ? <View style={styles.timelineBox}><View style={styles.timelineHeader}><Text style={styles.helper}>Clip timeline</Text><Text style={styles.timelineMeta}>Editing Clip {selectedClip + 1}</Text></View><View style={styles.timelineRow}>{assets.map((asset,i)=>{const range=clipTrimRanges[i] ?? {startMs:0,endMs:asset.duration?Math.round(asset.duration):null};const d=Math.max(500,Math.round(asset.duration ?? durationMs/Math.max(1,assets.length) ?? 10000));const end=range.endMs ?? d;const span=Math.max(500,end-range.startMs);return <Pressable key={asset.uri+i} onPress={()=>{setSelectedClip(i);setTimeout(()=>seekPreview(range.startMs),50);}} style={[styles.timelineClip,{width:Math.max(64,Math.min(220,64+span/100))},i===selectedClip&&styles.timelineClipSelected]}><Text style={styles.timelineClipText}>Clip {i+1}</Text><View style={styles.timelineRange}><View style={[styles.timelinePlayhead,{left:`${i===selectedClip?Math.max(0,Math.min(100,((previewTimeMs-range.startMs)/span)*100)):0}%`}]}/></View></Pressable>})}</View><View style={styles.timelineControls}><Pressable style={styles.small} onPress={()=>seekPreview(selectedClipStartMs)}><Text style={styles.choiceText}>Clip start</Text></Pressable><Pressable style={styles.small} onPress={()=>seekPreview(Math.max(selectedClipStartMs,selectedClipEndMs-100))}><Text style={styles.choiceText}>Clip end</Text></Pressable><Text style={styles.timelineMeta}>{(selectedClipStartMs/1000).toFixed(1)}s → {(selectedClipEndMs/1000).toFixed(1)}s</Text></View></View> : null}
+        {marker}<Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text><View style={styles.row}><Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable><Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable></View></View> : null}
         {mode === "VIDEO" && assets.length ? <View style={styles.trimBox}>
           <Text style={styles.helper}>Trim clip • {(trimStartMs/1000).toFixed(1)}s — {(trimEndMs ? trimEndMs/1000 : previewDurationMs/1000).toFixed(1)}s</Text>
           <View style={styles.trimTrack}
@@ -352,5 +374,5 @@ export default function CreateScreen() {
   );
 }
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:"#000",paddingTop:48},clipActions:{position:"absolute",bottom:4,left:8,right:8,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},action:{color:"#fff",fontSize:24,fontWeight:"900"},transitionRow:{paddingHorizontal:16,paddingVertical:4},transitionChoices:{gap:6},perClip:{paddingHorizontal:16,paddingVertical:4},helper:{color:"#777",fontSize:12,paddingHorizontal:16,paddingTop:4},trimInput:{flex:1,minWidth:130,marginHorizontal:0},draftButton:{marginHorizontal:16,marginTop:14,borderWidth:1,borderColor:"#444",borderRadius:12,padding:14,alignItems:"center"},draftText:{color:"#fff",fontWeight:"800"},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"},soundButton:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",padding:14},clearSound:{color:"#ff2d55",fontWeight:"800",marginHorizontal:16,marginTop:4}
+ screen:{flex:1,backgroundColor:"#000",paddingTop:48},clipActions:{position:"absolute",bottom:4,left:8,right:8,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},action:{color:"#fff",fontSize:24,fontWeight:"900"},transitionRow:{paddingHorizontal:16,paddingVertical:4},transitionChoices:{gap:6},perClip:{paddingHorizontal:16,paddingVertical:4},helper:{color:"#777",fontSize:12,paddingHorizontal:16,paddingTop:4},trimInput:{flex:1,minWidth:130,marginHorizontal:0},draftButton:{marginHorizontal:16,marginTop:14,borderWidth:1,borderColor:"#444",borderRadius:12,padding:14,alignItems:"center"},draftText:{color:"#fff",fontWeight:"800"},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipSelected:{borderWidth:2,borderColor:"#ff2d55"},timelineBox:{marginHorizontal:16,marginTop:8,borderRadius:14,backgroundColor:"#0d0d0d",paddingVertical:10},timelineHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},timelineMeta:{color:"#777",fontSize:12,paddingHorizontal:16},timelineRow:{flexDirection:"row",gap:6,paddingHorizontal:12,paddingVertical:10,alignItems:"center"},timelineClip:{height:48,borderRadius:8,backgroundColor:"#1b1b1b",padding:7,justifyContent:"space-between",borderWidth:1,borderColor:"#292929"},timelineClipSelected:{borderColor:"#ff2d55"},timelineClipText:{color:"#fff",fontSize:12,fontWeight:"800"},timelineRange:{height:5,borderRadius:3,backgroundColor:"#333",position:"relative",overflow:"hidden"},timelinePlayhead:{position:"absolute",top:0,bottom:0,width:3,backgroundColor:"#ff2d55"},timelineControls:{flexDirection:"row",alignItems:"center",gap:6,paddingHorizontal:12,paddingBottom:4},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"},soundButton:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",padding:14},clearSound:{color:"#ff2d55",fontWeight:"800",marginHorizontal:16,marginTop:4}
 });
