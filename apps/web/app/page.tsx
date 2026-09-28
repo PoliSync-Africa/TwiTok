@@ -34,6 +34,8 @@ const tabs = [
 export default function Home() {
   const [tab, setTab] = useState<(typeof tabs)[number]["surface"]>("FOR_YOU");
   const [videos, setVideos] = useState<FeedVideo[]>(demoVideos);
+  const [feedCursor, setFeedCursor] = useState<string | null>(null);
+  const [feedLoading, setFeedLoading] = useState(false);
   const [muted, setMuted] = useState(true);
   const api = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
   const activeRef = useRef<string | null>(null);
@@ -55,20 +57,42 @@ export default function Home() {
     async function load() {
       const token = typeof window !== "undefined" ? window.localStorage.getItem("twitok_user_token") : null;
       if (!token) return;
+      setFeedLoading(true);
       try {
-        const response = await fetch(`${api}/feed/${tab}?limit=10`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store"
-        });
+        const response = await fetch(api + "/feed/" + tab + "?limit=10", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         const items = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];
-        if (!cancelled && items.length) setVideos(items);
-      } catch {}
+        if (!cancelled) { setVideos(items.length ? items : demoVideos); setFeedCursor(data.nextCursor ?? null); }
+      } catch {} finally { if (!cancelled) setFeedLoading(false); }
     }
+    setFeedCursor(null);
     load();
     return () => { cancelled = true; };
   }, [api, tab]);
+
+  async function loadMoreFeed() {
+    if (feedLoading || !feedCursor) return;
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    setFeedLoading(true);
+    try {
+      const response = await fetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor), { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const items = Array.isArray(data.videos) ? data.videos : [];
+      setVideos(current => [...current, ...items]);
+      setFeedCursor(data.nextCursor ?? null);
+    } catch {} finally { setFeedLoading(false); }
+  }
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - window.innerHeight * 1.5) void loadMoreFeed();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [feedCursor, feedLoading, tab]);
 
   useEffect(() => {
     const token = window.localStorage.getItem("twitok_user_token");
