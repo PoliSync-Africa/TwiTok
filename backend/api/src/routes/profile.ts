@@ -15,7 +15,7 @@ profileRouter.patch("/me", requireUser, async (req, res) => {
     const nickname = String(req.body?.nickname ?? "").trim();
     const bio = String(req.body?.bio ?? "").trim();
     const isPrivate = Boolean(req.body?.isPrivate);
-    const current = await db.collection("users").findOne({ _id: req.userId! }, { projection: { username: 1, nickname: 1, nameLastChangedAt: 1 } });
+
     const nameChanged = username !== current?.username || nickname !== current?.nickname;
     if (nameChanged && current?.nameLastChangedAt) {
       const nextAllowed = new Date(new Date(current.nameLastChangedAt).getTime() + 60 * 24 * 60 * 60 * 1000);
