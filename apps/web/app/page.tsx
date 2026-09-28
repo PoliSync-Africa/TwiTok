@@ -44,6 +44,9 @@ export default function Home() {
   const [comments, setComments] = useState<Array<{ id: string; userId: string; text: string; createdAt: string }>>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [commentsBusy, setCommentsBusy] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{ id: string; type: string; read: boolean; createdAt: string; videoId: string | null; actor: { username?: string; nickname?: string } | null }>>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +67,36 @@ export default function Home() {
     load();
     return () => { cancelled = true; };
   }, [api, tab]);
+
+  useEffect(() => {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    let cancelled = false;
+    async function loadNotifications() {
+      try {
+        const [listResponse, countResponse] = await Promise.all([
+          fetch(api + "/notifications?limit=30", { headers: { Authorization: "Bearer " + token }, cache: "no-store" }),
+          fetch(api + "/notifications/unread-count", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
+        ]);
+        if (cancelled) return;
+        if (listResponse.ok) { const data = await listResponse.json(); setNotifications(Array.isArray(data.notifications) ? data.notifications : []); }
+        if (countResponse.ok) { const data = await countResponse.json(); setUnreadNotifications(Number(data.count ?? 0)); }
+      } catch {}
+    }
+    loadNotifications();
+    const timer = window.setInterval(loadNotifications, 30000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [api]);
+
+  async function openNotifications() {
+    setNotificationsOpen(true);
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    try {
+      const response = await fetch(api + "/notifications/read", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: "{}" });
+      if (response.ok) { setNotifications(items => items.map(item => ({ ...item, read: true }))); setUnreadNotifications(0); }
+    } catch {}
+  }
 
   useEffect(() => {
     const token = window.localStorage.getItem("twitok_user_token");
@@ -216,7 +249,7 @@ export default function Home() {
         <div className="tabs">{tabs.map(t =>
           <button key={t.surface} className={tab === t.surface ? "selected" : ""} onClick={() => setTab(t.surface)}>{t.label}</button>
         )}</div>
-        <button className="sound-toggle" onClick={() => setMuted(v => !v)}>{muted ? "🔇" : "🔊"}</button>
+        <div className="top-actions"><button className="notification-button" onClick={openNotifications} aria-label="Notifications">♧{unreadNotifications > 0 ? <span>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</button><button className="sound-toggle" onClick={() => setMuted(v => !v)}>{muted ? "🔇" : "🔊"}</button></div>
       </header>
 
       <div className="vertical-feed">
@@ -248,6 +281,20 @@ export default function Home() {
         })}
       </div>
     </section>
+    {notificationsOpen && <div className="comments-backdrop" role="presentation" onClick={() => setNotificationsOpen(false)}>
+      <section className="comments-sheet notification-sheet" role="dialog" aria-modal="true" aria-label="Notifications" onClick={event => event.stopPropagation()}>
+        <header className="comments-header"><strong>Notifications</strong><button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></header>
+        <div className="comments-list">
+          {notifications.length ? notifications.map(item => {
+            const actor = item.actor?.username ? "@" + item.actor.username : "Someone";
+            const text = item.type === "FOLLOW" ? "followed you" : item.type === "LIKE" ? "liked your video" : "commented on your video";
+            return <article className={"comment-item " + (item.read ? "" : "notification-unread")} key={item.id}>
+              <div className="comment-avatar">♥</div><div><strong>{actor}</strong><p>{text}</p><small>{new Date(item.createdAt).toLocaleString()}</small></div>
+            </article>;
+          }) : <p className="comments-empty">No notifications yet.</p>}
+        </div>
+      </section>
+    </div>}
     {commentsVideoId && <div className="comments-backdrop" role="presentation" onClick={() => setCommentsVideoId(null)}>
       <section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Comments" onClick={event => event.stopPropagation()}>
         <header className="comments-header"><strong>Comments</strong><button type="button" onClick={() => setCommentsVideoId(null)} aria-label="Close comments">×</button></header>
