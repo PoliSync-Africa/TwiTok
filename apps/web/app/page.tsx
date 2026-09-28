@@ -117,8 +117,8 @@ export default function Home() {
   useEffect(() => {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token) return;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(protocol + "//" + window.location.host + "/realtime");
+    const realtimeBase = api.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+    const socket = new WebSocket(realtimeBase.replace(/\/api\/v1\/?$/, "") + "/realtime");
     socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "auth", token })));
     socket.addEventListener("message", event => {
       try {
