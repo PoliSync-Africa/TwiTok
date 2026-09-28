@@ -14,6 +14,27 @@ walletRouter.get("/catalog", (_req, res) => res.json({
   diamondsPerCoin: 0.30, diamondCashValueUsd: 0.003, minWithdrawalUsd: MIN_WITHDRAWAL_USD
 }));
 
+walletRouter.get("/me", requireUser, async (req, res) => {
+  try { return res.json(await ensureWallet(await getDb(), req.userId!.toHexString())); }
+  catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Wallet lookup failed" }); }
+});
+
+walletRouter.get("/me/ledger", requireUser, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const rows = await (await getDb()).collection("wallet_ledger").find({ userId: req.userId!.toHexString() }).sort({ createdAt: -1 }).limit(limit).toArray();
+    return res.json({ transactions: rows });
+  } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Ledger lookup failed" }); }
+});
+
+walletRouter.get("/me/gifts", requireUser, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const rows = await (await getDb()).collection("gift_transactions").find({ receiverId: req.userId!.toHexString() }).sort({ createdAt: -1 }).limit(limit).toArray();
+    return res.json({ gifts: rows });
+  } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Gift history lookup failed" }); }
+});
+
 walletRouter.get("/:userId", requireUser, async (req, res) => {
   try {
     const requested = String(req.params.userId);
