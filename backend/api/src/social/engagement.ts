@@ -24,6 +24,8 @@ export async function initializeEngagementIndexes(db: Db) {
     db.collection("video_saves").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ videoId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ userId: 1, createdAt: -1 }),
+    db.collection("comment_likes").createIndex({ commentId: 1, userId: 1 }, { unique: true }),
+    db.collection("comment_likes").createIndex({ commentId: 1, createdAt: -1 }),
     db.collection("video_shares").createIndex({ videoId: 1, createdAt: -1 }),
     db.collection("video_reposts").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
     db.collection("video_reposts").createIndex({ videoId: 1, createdAt: -1 })
@@ -72,24 +74,31 @@ export async function toggleSave(db: Db, userId: ObjectId, videoIdString: string
   return { saved: true };
 }
 
-export async function addComment(db: Db, userId: ObjectId, videoIdString: string, text: string, attachments: Array<{objectKey:string;mimeType:string}> = []) {
+export async function addComment(db: Db, userId: ObjectId, videoIdString: string, text: string, attachments: Array<{objectKey:string;mimeType:string}> = [], parentId?: string) {
   const videoId = videoObjectId(videoIdString);
   const video = await getPublicVideo(db, videoId);
   if (video.allowComments === false) throw new Error("Comments are disabled for this video");
   const body = String(text ?? "").trim();
-  if (!body) throw new Error("Comment cannot be empty");
+  if (!body && !attachments.length) throw new Error("Comment cannot be empty");
   if (body.length > 500) throw new Error("Comment is limited to 500 characters");
   if (attachments.length > 4) throw new Error("A comment can contain up to 4 media attachments");
   for (const a of attachments) {
     if (!a.objectKey.startsWith("comment-media/" + userId.toHexString() + "/")) throw new Error("Invalid comment attachment");
     if (!new RegExp("^(image/(jpeg|png|webp|gif)|video/(mp4|quicktime|webm)|audio/(mpeg|mp4|x-m4a|wav|webm))$", "i").test(a.mimeType)) throw new Error("Unsupported comment media type");
   }
+  let parentObjectId: ObjectId | undefined;
+  if (parentId) {
+    if (!ObjectId.isValid(parentId)) throw new Error("Invalid parent comment");
+    const parent = await db.collection("video_comments").findOne({ _id: new ObjectId(parentId), videoId, status: "ACTIVE" }, { projection: { _id: 1 } });
+    if (!parent) throw new Error("Parent comment not found");
+    parentObjectId = new ObjectId(parentId);
+  }
   const createdAt = new Date();
   const result = await db.collection("video_comments").insertOne({
-    videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments
+    videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments, ...(parentObjectId ? { parentId: parentObjectId } : {})
   });
   if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "COMMENT", videoId, commentId: result.insertedId });
-  return { id: result.insertedId.toHexString(), userId: userId.toHexString(), text: body, createdAt, attachments: await Promise.all(attachments.map(async a => ({ ...a, url: (await createPresignedPlayback(a.objectKey, 900)).url }))) };
+  return { id: result.insertedId.toHexString(), userId: userId.toHexString(), text: body, createdAt, parentId: parentObjectId?.toHexString() ?? null, likeCount: 0, liked: false, replyCount: 0, attachments: await Promise.all(attachments.map(async a => ({ ...a, url: (await createPresignedPlayback(a.objectKey, 900)).url }))) };
 }
 
 export async function listComments(db: Db, videoIdString: string, limit = 30) {
@@ -98,7 +107,8 @@ export async function listComments(db: Db, videoIdString: string, limit = 30) {
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 30, 1), 100);
   const comments = await db.collection("video_comments").find({ videoId, status: { $ne: "DELETED" } }).sort({ createdAt: -1 }).limit(safeLimit).toArray();
   return Promise.all(comments.map(async comment => ({
-    id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt,
+    id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt, parentId: comment.parentId?.toHexString() ?? null,
+    likeCount: await db.collection("comment_likes").countDocuments({ commentId: comment._id }), liked: false, replyCount: await db.collection("video_comments").countDocuments({ parentId: comment._id, status: "ACTIVE" }),
     attachments: await Promise.all((comment.attachments ?? []).map(async (a: {objectKey:string;mimeType:string}) => ({ ...a, url: (await createPresignedPlayback(a.objectKey, 900)).url })))
   })));
 }
@@ -121,4 +131,27 @@ export async function toggleRepost(db: Db, userId: ObjectId, videoIdString: stri
   await db.collection("video_reposts").insertOne({ videoId, userId, createdAt: new Date() });
   if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "REPOST", videoId });
   return { reposted: true };
+}
+
+
+export async function toggleCommentLike(db: Db, userId: ObjectId, commentIdString: string) {
+  if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
+  const commentId = new ObjectId(commentIdString);
+  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { _id: 1 } });
+  if (!comment) throw new Error("Comment not found");
+  const existing = await db.collection("comment_likes").findOne({ commentId, userId }, { projection: { _id: 1 } });
+  if (existing) {
+    await db.collection("comment_likes").deleteOne({ _id: existing._id });
+    return { liked: false };
+  }
+  await db.collection("comment_likes").insertOne({ commentId, userId, createdAt: new Date() });
+  return { liked: true };
+}
+
+export async function listCommentReplies(db: Db, commentIdString: string, limit = 50) {
+  if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
+  const commentId = new ObjectId(commentIdString);
+  const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 100);
+  const rows = await db.collection("video_comments").find({ parentId: commentId, status: "ACTIVE" }).sort({ createdAt: 1 }).limit(safeLimit).toArray();
+  return rows.map(comment => ({ id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt, parentId: commentIdString, attachments: comment.attachments ?? [] }));
 }
