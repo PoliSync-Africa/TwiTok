@@ -374,7 +374,7 @@ export default function CreateScreen() {
               } else {
                 setTrimEndMs(Math.max(t,trimStartMs+500));
               }
-              setCoverTimeMs(v=>Math.max(trimStartMs,Math.min(v,trimEndMs || previewDurationMs)));
+              setCoverTimeMs(v=>Math.max(trimStartMs, Math.min(v, trimEndMs || previewDurationMs, t)));
             }}>
             <View style={styles.trimTrackBase}/>
             <View style={[styles.trimSelected,{left:`${(trimStartMs/previewDurationMs)*100}%`,right:`${100-((trimEndMs||previewDurationMs)/previewDurationMs)*100}%`}]} />
