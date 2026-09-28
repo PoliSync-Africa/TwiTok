@@ -16,6 +16,7 @@ type FeedVideo = {
   autoCaptionsStatus?: string;
   autoCaptionLanguage?: string;
   captionTracks?: Record<string, { language: string; label: string; url: string; sourceLanguage?: string }>;
+  engagement?: { likeCount: number; commentCount: number; shareCount: number; saveCount: number; liked: boolean; saved: boolean };
 };
 
 const demoVideos: FeedVideo[] = [
@@ -90,6 +91,47 @@ export default function Home() {
       });
     });
   }, [videos, captionLanguage]);
+
+  async function engage(videoId: string, action: "like" | "save" | "share") {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token || videoId.startsWith("demo-")) return;
+    try {
+      if (action === "share" && typeof navigator.share === "function") {
+        await navigator.share({ title: "TwiTok", text: "Watch this video on TwiTok", url: window.location.origin + "/video/" + videoId });
+      } else if (action === "share") {
+        await navigator.clipboard?.writeText(window.location.origin + "/video/" + videoId);
+      }
+      const response = await fetch(`${api}/engagement/${videoId}/${action}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.engagement) setVideos(items => items.map(item => item.id === videoId ? { ...item, engagement: data.engagement } : item));
+      track(videoId, action === "like" ? "LIKE" : action === "save" ? "SAVE" : "SHARE");
+    } catch {}
+  }
+
+  async function comment(videoId: string) {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token || videoId.startsWith("demo-")) return;
+    const text = window.prompt("Add a comment");
+    if (!text?.trim()) return;
+    try {
+      const response = await fetch(`${api}/engagement/${videoId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text })
+      });
+      if (!response.ok) return;
+      const engagementResponse = await fetch(`${api}/engagement/${videoId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (engagementResponse.ok) {
+        const data = await engagementResponse.json();
+        setVideos(items => items.map(item => item.id === videoId ? { ...item, engagement: data } : item));
+      }
+      track(videoId, "COMMENT");
+    } catch {}
+  }
 
   async function requestTranslation(videoId: string, language: string) {
     const token = window.localStorage.getItem("twitok_user_token");
@@ -186,10 +228,10 @@ export default function Home() {
               </div>
             </div>
             <div className="actions">
-              <button onClick={() => track(v.id, "LIKE")}>♡<small>Like</small></button>
-              <button onClick={() => track(v.id, "COMMENT")}>◌<small>Comment</small></button>
-              <button onClick={() => track(v.id, "SHARE")}>↗<small>Share</small></button>
-              <button onClick={() => track(v.id, "SAVE")}>▱<small>Save</small></button>
+              <button onClick={() => engage(v.id, "like")} aria-label="Like video">{v.engagement?.liked ? "♥" : "♡"}<small>{v.engagement?.likeCount ?? 0}</small></button>
+              <button onClick={() => comment(v.id)} aria-label="Comment on video">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
+              <button onClick={() => engage(v.id, "share")} aria-label="Share video">↗<small>{v.engagement?.shareCount ?? 0}</small></button>
+              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>
             </div>
           </article>;
         })}
