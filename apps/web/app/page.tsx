@@ -5,6 +5,7 @@ import Link from "next/link";
 
 type FeedVideo = {
   id: string;
+  ownerId?: string;
   owner?: { username?: string };
   ownerUsername?: string;
   caption?: string;
@@ -54,6 +55,13 @@ export default function Home() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [stories, setStories] = useState<Array<{id:string;username:string;nickname:string;playback?:{mp4Url?:string;hlsUrl?:string}|null;thumbnail?:string|null;caption:string;viewed:boolean}>>([]);
   const [storyOpen, setStoryOpen] = useState<string | null>(null);
+  const [giftCatalog, setGiftCatalog] = useState<Array<{ giftId: string; name: string; coins: number; animation: string }>>([]);
+  const [coinBalance, setCoinBalance] = useState(0);
+  const [giftVideoId, setGiftVideoId] = useState<string | null>(null);
+  const [giftQuantity, setGiftQuantity] = useState(1);
+  const [giftBusy, setGiftBusy] = useState(false);
+  const [giftMessage, setGiftMessage] = useState("");
+  const [giftBursts, setGiftBursts] = useState<Array<{ id: string; videoId: string; emoji: string; label: string; quantity: number }>>([]);
 
   useEffect(() => {
     let cancelled = false;
