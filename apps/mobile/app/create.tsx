@@ -31,6 +31,7 @@ export default function CreateScreen() {
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   const [overlayText, setOverlayText] = useState("");
+  const durationMs = assets.reduce((sum, asset) => sum + (asset.duration ?? 0), 0);
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
   const [clipTransitions, setClipTransitions] = useState<{type:string;durationMs:number}[]>([]);
 
