@@ -40,7 +40,7 @@ export async function getProfile(db: Db, username: string, viewerId?: ObjectId) 
 
   return {
     id: user._id.toHexString(), username: user.username, nickname: user.nickname,
-    countryCode: user.countryCode, accountType: user.accountType, isPrivate: Boolean(user.isPrivate),
+    countryCode: user.countryCode, bio: user.bio ?? "", accountType: user.accountType, isPrivate: Boolean(user.isPrivate),
     followers, following, isFollowing: Boolean(relationship), followPending: pending, createdAt: user.createdAt
   };
 }
