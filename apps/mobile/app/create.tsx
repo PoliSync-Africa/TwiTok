@@ -11,7 +11,18 @@ export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");\n  const [speed, setSpeed] = useState(1);\n  const [effect, setEffect] = useState("NONE");\n  const [visibility, setVisibility] = useState("PUBLIC");\n  const [comments, setComments] = useState(true);\n  const [duet, setDuet] = useState(true);\n  const [stitch, setStitch] = useState(true);\n  const [coverTimeMs, setCoverTimeMs] = useState(0);\n  const [originalVolume, setOriginalVolume] = useState(1);\n  const [addedSoundVolume, setAddedSoundVolume] = useState(1);\n  const [soundId, setSoundId] = useState("");\n  const [overlayText, setOverlayText] = useState("");
+  const [status, setStatus] = useState("");
+  const [speed, setSpeed] = useState(1);
+  const [effect, setEffect] = useState("NONE");
+  const [visibility, setVisibility] = useState("PUBLIC");
+  const [comments, setComments] = useState(true);
+  const [duet, setDuet] = useState(true);
+  const [stitch, setStitch] = useState(true);
+  const [coverTimeMs, setCoverTimeMs] = useState(0);
+  const [originalVolume, setOriginalVolume] = useState(1);
+  const [addedSoundVolume, setAddedSoundVolume] = useState(1);
+  const [soundId, setSoundId] = useState("");
+  const [overlayText, setOverlayText] = useState("");
 
   async function pickGallery() {
     const result = await ImagePicker.launchImageLibraryAsync({
