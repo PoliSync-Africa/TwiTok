@@ -116,6 +116,21 @@ export default function CreateScreen() {
     player.currentTime = Math.max(0, Math.min(previewDurationMs, valueMs)) / 1000;
   }
 
+  function getCoverTimelineMs(localMs: number) {
+    if (assets.length <= 1) return Math.max(trimStartMs, Math.min(localMs, trimEndMs || previewDurationMs));
+    let total = 0;
+    for (let i = 0; i < selectedClip; i += 1) {
+      const range = clipTrimRanges[i] ?? { startMs: 0, endMs: assets[i]?.duration ? Math.round(assets[i].duration as number) : null };
+      const rawDuration = Math.max(500, (range.endMs ?? Math.round(assets[i]?.duration ?? 0)) - range.startMs);
+      const clipSpeed = [0.5, 0.75, 1, 1.5, 2].includes(Number(clipSettings[i]?.speed)) ? Number(clipSettings[i]?.speed) : 1;
+      total += rawDuration / clipSpeed;
+      const transition = clipTransitions[i];
+      if (transition && transition.type !== "NONE") total -= Math.min(1500, Math.max(0, Number(transition.durationMs ?? 0)));
+    }
+    return Math.max(0, Math.round(total + Math.max(0, localMs - selectedClipStartMs) / (activeClipSetting.speed || 1)));
+  }
+
+
   function replaceAssets(next: Asset[]) {
     setAssets(next);
     setClipSettings(next.map((_, i) => clipSettings[i] ?? { ...DEFAULT_CLIP_SETTING }));
@@ -357,7 +372,7 @@ export default function CreateScreen() {
          {mode === "VIDEO" && assets.length ? <View style={styles.coverBox}>
            <Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text>
            <View style={styles.row}>
-             <Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable>
+             <Pressable style={styles.small} onPress={()=>setCoverTimeMs(getCoverTimelineMs(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable>
              <Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable>
            </View>
          </View> : null}
