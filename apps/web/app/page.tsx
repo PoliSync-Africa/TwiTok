@@ -352,7 +352,9 @@ export default function Home() {
               <button onClick={() => engage(v.id, "like")} aria-label="Like video">{v.engagement?.liked ? "♥" : "♡"}<small>{v.engagement?.likeCount ?? 0}</small></button>
               <button onClick={() => openComments(v.id)} aria-label="Open comments">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
               <button onClick={() => engage(v.id, "share")} aria-label="Share video">↗<small>{v.engagement?.shareCount ?? 0}</small></button>
-              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>\n              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>\n              <button onClick={() => remixVideo(v.id, "DUET")} aria-label="Duet video">Duet</button>\n              <button onClick={() => remixVideo(v.id, "STITCH")} aria-label="Stitch video">Stitch</button>
+              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>\n              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
+              <button onClick={() => remixVideo(v.id, "DUET")} aria-label="Duet video">Duet</button>
+              <button onClick={() => remixVideo(v.id, "STITCH")} aria-label="Stitch video">Stitch</button>
             </div>
           </article>;
         })}
