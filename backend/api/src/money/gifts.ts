@@ -24,7 +24,7 @@ export async function initializeGiftIndexes(db: Db) {
 
 export async function sendGift(db: Db, input: {
   senderId: string; receiverId: string; giftId: string; quantity?: number; idempotencyKey: string;
-  context: "LIVE"|"VIDEO"|"COMMENT";
+  context: "LIVE"|"VIDEO"|"COMMENT"; videoId?: string;
 }) {
   if (input.senderId === input.receiverId) throw new Error("You cannot gift yourself");
   const gift = GIFT_CATALOG.find((item) => item.giftId === input.giftId);
@@ -66,7 +66,7 @@ export async function sendGift(db: Db, input: {
         transactionId, senderId: input.senderId, receiverId: input.receiverId, idempotencyKey,
         giftId: gift.giftId, giftName: gift.name, quantity, coinsSpent: coins,
         diamondsAwarded: diamonds, platformSharePercent: 70, creatorSharePercent: 30,
-        context: input.context, createdAt: now
+        context: input.context, videoId: input.videoId ?? null, createdAt: now
       }, { session });
       await db.collection("wallet_ledger").insertMany([
         { transactionId: randomUUID(), userId: input.senderId, type: "GIFT_SENT", coinsDelta: -coins, diamondsDelta: 0, cashDeltaUsd: 0, referenceId: transactionId, createdAt: now },
