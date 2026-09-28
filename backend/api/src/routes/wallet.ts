@@ -7,6 +7,7 @@ import { createWithdrawal, processGhanaWithdrawal, reconcilePaystackTransfer } f
 import { verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
 import { requireUser } from "../auth/middleware.js";
+import { broadcastToUser } from "../realtime/ws.js";
 
 export const walletRouter = Router();
 
@@ -90,7 +91,28 @@ walletRouter.post("/gifts", requireUser, async (req, res) => {
     if (!receiverId || !giftId) return res.status(400).json({ error: "receiverId and giftId are required" });
     const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
     if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
-    return res.status(201).json(await sendGift(await getDb(), { senderId, receiverId: String(receiverId), giftId, quantity, context, idempotencyKey }));
+    const result = await sendGift(await getDb(), { senderId, receiverId: String(receiverId), giftId, quantity, context, idempotencyKey });
+    if (!result.duplicate) {
+      broadcastToUser(String(receiverId), {
+        type: "gift.received",
+        transactionId: result.transactionId,
+        giftId,
+        quantity: result.quantity,
+        coinsSpent: result.coinsSpent,
+        diamondsAwarded: result.diamondsAwarded,
+        animation: result.gift?.animation ?? giftId
+      });
+      broadcastToUser(senderId, {
+        type: "gift.sent",
+        transactionId: result.transactionId,
+        receiverId: String(receiverId),
+        giftId,
+        quantity: result.quantity,
+        coinsSpent: result.coinsSpent,
+        animation: result.gift?.animation ?? giftId
+      });
+    }
+    return res.status(201).json(result);
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Gift failed" }); }
 });
 
