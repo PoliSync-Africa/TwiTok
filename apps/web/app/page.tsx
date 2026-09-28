@@ -26,9 +26,9 @@ const demoVideos: FeedVideo[] = [
 ];
 
 const tabs = [
-  { label: "For You", surface: "FOR_YOU" },
+  { label: "You", surface: "FOR_YOU" },
   { label: "Following", surface: "FOLLOWING" },
-  { label: "Africa", surface: "AFRICA" }
+  { label: "Explore Africa", surface: "AFRICA" }
 ] as const;
 
 export default function Home() {
