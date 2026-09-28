@@ -10,8 +10,8 @@ feedRouter.get("/:surface", requireUser, async (req, res) => {
   try {
     const surface = String(req.params.surface).toUpperCase() as "FOR_YOU" | "FOLLOWING" | "AFRICA";
     if (!["FOR_YOU","FOLLOWING","AFRICA"].includes(surface)) return res.status(400).json({ error: "Invalid feed surface" });
-    const videos = await getFeed(await getDb(), req.userId!, surface, typeof req.query.countryCode === "string" ? req.query.countryCode : undefined, Number(req.query.limit ?? 20));
-    res.json({ surface, videos });
+    const result = await getFeed(await getDb(), req.userId!, surface, typeof req.query.countryCode === "string" ? req.query.countryCode : undefined, Number(req.query.limit ?? 10), typeof req.query.cursor === "string" ? req.query.cursor : undefined);
+    res.json({ surface, ...result });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load feed" }); }
 });
 
