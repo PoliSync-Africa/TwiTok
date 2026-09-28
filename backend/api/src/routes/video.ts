@@ -25,7 +25,7 @@ videoRouter.post("/photos/uploads/:uploadId/complete", requireUser, async (req, 
 
 videoRouter.post("/posts/photos", requireUser, async (req, res) => {
   try { res.status(201).json(await createPhotoPost(await getDb(), req.userId!, {
-    uploadIds: req.body?.uploadIds, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments
+    uploadIds: req.body?.uploadIds, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch
   })); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo post" }); }
 });
