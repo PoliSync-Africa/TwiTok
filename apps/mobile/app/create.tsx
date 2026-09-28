@@ -124,14 +124,14 @@ export default function CreateScreen() {
   function moveClip(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= assets.length) return;
-    const nextAssets = [...assets]; [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];
-    if (selectedClip === index) setSelectedClip(target);
+    const nextAssets = [...assets];
+    [nextAssets[index], nextAssets[target]] = [nextAssets[target], nextAssets[index]];
     else if (selectedClip === target) setSelectedClip(index);
     const nextSettings = [...clipSettings]; [nextSettings[index], nextSettings[target]] = [nextSettings[target] ?? { ...DEFAULT_CLIP_SETTING }, nextSettings[index] ?? { ...DEFAULT_CLIP_SETTING }];
-    const nextTrims = [...clipTrimRanges]; [nextTrims[index], nextTrims[target]] = [nextTrims[target] ?? { startMs: 0, endMs: nextAssets[target]?.duration ? Math.round(nextAssets[target].duration as number) : null }, nextTrims[index] ?? { startMs: 0, endMs: nextAssets[index]?.duration ? Math.round(nextAssets[index].duration as number) : null }];
-    setAssets(nextAssets); setClipSettings(nextSettings); setClipTrimRanges(nextTrims);
-  }
-  function setTransition(index: number, type: string) {
+    const nextSettings = [...clipSettings];
+    [nextSettings[index], nextSettings[target]] = [nextSettings[target] ?? { ...DEFAULT_CLIP_SETTING }, nextSettings[index] ?? { ...DEFAULT_CLIP_SETTING }];
+    const nextTrims = [...clipTrimRanges];
+    [nextTrims[index], nextTrims[target]] = [nextTrims[target] ?? { startMs: 0, endMs: nextAssets[target]?.duration ? Math.round(nextAssets[target].duration as number) : null }, nextTrims[index] ?? { startMs: 0, endMs: nextAssets[index]?.duration ? Math.round(nextAssets[index].duration as number) : null }];
     setClipTransitions(prev => prev.map((x, i) => i === index ? { ...x, type } : x));
   }
   function updateClipSetting(index: number, patch: Partial<ClipSetting>) {
@@ -285,14 +285,21 @@ export default function CreateScreen() {
       </View> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
-        {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><Pressable style={[styles.clip,index===selectedClip&&styles.clipSelected]} onPress={()=>{ advanceToNextClip.current = false; setSelectedClip(index); }}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
-  <Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text>
-  <View style={styles.clipActions}>
-    <Pressable onPress={()=>moveClip(index,-1)}><Text style={styles.action}>‹</Text></Pressable>
-    <Pressable onPress={()=>moveClip(index,1)}><Text style={styles.action}>›</Text></Pressable>
-    <Pressable onPress={()=>{const next=assets.filter((_,i)=>i!==index);replaceAssets(next)}}><Text style={styles.remove}>×</Text></Pressable>
-  </View>
-</Pressable>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
+         {assets.length ? <FlatList
+           data={assets}
+           horizontal
+           keyExtractor={(a,i)=>a.uri+i}
+           contentContainerStyle={styles.assets}
+           renderItem={({item,index})=><Pressable style={[styles.clip,index===selectedClip&&styles.clipSelected]} onPress={()=>{ advanceToNextClip.current = false; setSelectedClip(index); }}>
+             <Text style={styles.clipIcon}>▶</Text>
+             <Text style={styles.clipText}>Clip {index+1}</Text>
+             <View style={styles.clipActions}>
+               <Pressable onPress={()=>moveClip(index,-1)}><Text style={styles.action}>‹</Text></Pressable>
+               <Pressable onPress={()=>moveClip(index,1)}><Text style={styles.action}>›</Text></Pressable>
+               <Pressable onPress={()=>{const next=assets.filter((_,i)=>i!==index);replaceAssets(next)}}><Text style={styles.remove}>×</Text></Pressable>
+             </View>
+           </Pressable>}
+         /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
         {mode === "VIDEO" && assets.length ? <View style={styles.previewCard}>
           <View style={styles.previewStage}>
             <VideoView player={player} style={styles.previewVideo} nativeControls={false} contentFit="contain" />
@@ -323,7 +330,13 @@ export default function CreateScreen() {
           </View>
         </View> : null}
         {mode === "VIDEO" && assets.length > 1 ? <View style={styles.timelineBox}><View style={styles.timelineHeader}><Text style={styles.helper}>Clip timeline</Text><Text style={styles.timelineMeta}>Editing Clip {selectedClip + 1}</Text></View><View style={styles.timelineRow}>{assets.map((asset,i)=>{const range=clipTrimRanges[i] ?? {startMs:0,endMs:asset.duration?Math.round(asset.duration):null};const d=Math.max(500,Math.round(asset.duration ?? durationMs/Math.max(1,assets.length) ?? 10000));const end=range.endMs ?? d;const span=Math.max(500,end-range.startMs);return <Pressable key={asset.uri+i} onPress={()=>{advanceToNextClip.current = false;setSelectedClip(i);setTimeout(()=>seekPreview(range.startMs),50);}} style={[styles.timelineClip,{width:Math.max(64,Math.min(220,64+span/100))},i===selectedClip&&styles.timelineClipSelected]}><Text style={styles.timelineClipText}>Clip {i+1}</Text><View style={styles.timelineRange}><View style={[styles.timelinePlayhead,{left:`${i===selectedClip?Math.max(0,Math.min(100,((previewTimeMs-range.startMs)/span)*100)):0}%`}]}/></View></Pressable>})}</View><View style={styles.timelineControls}><Pressable style={styles.small} onPress={()=>seekPreview(selectedClipStartMs)}><Text style={styles.choiceText}>Clip start</Text></Pressable><Pressable style={styles.small} onPress={()=>seekPreview(Math.max(selectedClipStartMs,selectedClipEndMs-100))}><Text style={styles.choiceText}>Clip end</Text></Pressable><Text style={styles.timelineMeta}>{(selectedClipStartMs/1000).toFixed(1)}s → {(selectedClipEndMs/1000).toFixed(1)}s</Text></View></View> : null}
-        {marker}<Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text><View style={styles.row}><Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable><Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable></View></View> : null}
+         {mode === "VIDEO" && assets.length ? <View style={styles.coverBox}>
+           <Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text>
+           <View style={styles.row}>
+             <Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable>
+             <Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable>
+           </View>
+         </View> : null}
         {mode === "VIDEO" && assets.length ? <View style={styles.trimBox}>
           <Text style={styles.helper}>Trim clip • {(trimStartMs/1000).toFixed(1)}s — {(trimEndMs ? trimEndMs/1000 : previewDurationMs/1000).toFixed(1)}s</Text>
           <View style={styles.trimTrack}
