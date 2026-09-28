@@ -69,11 +69,12 @@ export default function CameraStudioScreen() {
     try {
       const result = await recordingRef.current;
       if (!result?.uri) throw new Error("Camera did not return a video.");
+      const actualDurationMs = recordingStartedAt.current ? Math.max(1, Math.min(durationLimit * 1000, Date.now() - recordingStartedAt.current)) : Math.max(1, elapsedMs);
       router.replace({
         pathname: "/create",
         params: {
           recordedUri: result.uri,
-          recordedDuration: String(Math.max(1, Math.round(elapsedMs || durationLimit * 1000))),
+          recordedDuration: String(Math.round(actualDurationMs)),
           recordedEffect: effect,
           recordedSpeed: String(speed)
         }
