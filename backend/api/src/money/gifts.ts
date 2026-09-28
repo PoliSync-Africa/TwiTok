@@ -17,18 +17,23 @@ export async function initializeGiftIndexes(db: Db) {
   await Promise.all([
     db.collection("gift_transactions").createIndex({ transactionId: 1 }, { unique: true }),
     db.collection("gift_transactions").createIndex({ senderId: 1, createdAt: -1 }),
-    db.collection("gift_transactions").createIndex({ receiverId: 1, createdAt: -1 })
+    db.collection("gift_transactions").createIndex({ receiverId: 1, createdAt: -1 }),
+    db.collection("gift_transactions").createIndex({ senderId: 1, idempotencyKey: 1 }, { unique: true })
   ]);
 }
 
 export async function sendGift(db: Db, input: {
-  senderId: string; receiverId: string; giftId: string; quantity?: number;
+  senderId: string; receiverId: string; giftId: string; quantity?: number; idempotencyKey: string;
   context: "LIVE"|"VIDEO"|"COMMENT";
 }) {
   if (input.senderId === input.receiverId) throw new Error("You cannot gift yourself");
   const gift = GIFT_CATALOG.find((item) => item.giftId === input.giftId);
   if (!gift) throw new Error("Gift not found");
-  const quantity = Math.max(1, Math.floor(input.quantity ?? 1));
+  const idempotencyKey = String(input.idempotencyKey ?? "").trim();
+  if (!idempotencyKey || idempotencyKey.length > 128) throw new Error("A valid Idempotency-Key is required");
+  const existing = await db.collection("gift_transactions").findOne({ senderId: input.senderId, idempotencyKey });
+  if (existing) return { transactionId: existing.transactionId, duplicate: true, gift: GIFT_CATALOG.find((item) => item.giftId === existing.giftId), quantity: existing.quantity, coinsSpent: existing.coinsSpent, diamondsAwarded: existing.diamondsAwarded, creatorSharePercent: 30, platformSharePercent: 70 };
+  const quantity = Math.max(1, Math.min(100, Math.floor(input.quantity ?? 1)));
   const coins = gift.coins * quantity;
   const diamonds = Number((coins * CREATOR_DIAMONDS_PER_COIN).toFixed(2));
   const transactionId = randomUUID();
@@ -58,7 +63,7 @@ export async function sendGift(db: Db, input: {
         { $inc: { diamondBalance: diamonds, cashBalanceUsd: Number((diamonds * DIAMOND_CASH_VALUE_USD).toFixed(6)) }, $set: { updatedAt: now } }, { session }
       );
       await db.collection("gift_transactions").insertOne({
-        transactionId, senderId: input.senderId, receiverId: input.receiverId,
+        transactionId, senderId: input.senderId, receiverId: input.receiverId, idempotencyKey,
         giftId: gift.giftId, giftName: gift.name, quantity, coinsSpent: coins,
         diamondsAwarded: diamonds, platformSharePercent: 70, creatorSharePercent: 30,
         context: input.context, createdAt: now
