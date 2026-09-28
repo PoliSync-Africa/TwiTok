@@ -249,7 +249,7 @@ export default function CreateScreen() {
           const complete=await fetch(API+"/videos/photos/uploads/"+session.uploadId+"/complete",{method:"POST",headers:{Authorization:"Bearer "+token}}); if(!complete.ok) throw new Error("Unable to complete photo upload.");
           uploadIds.push(session.uploadId); setStatus("Uploading photo "+(index+1)+" of "+assets.length+"…");
         }
-        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30)})});
+        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),allowDuet:duet,allowStitch:stitch})});
         const data=await post.json().catch(()=>({})); if(!post.ok) throw new Error(data.error||"Unable to publish photo post.");
         Alert.alert("Posted","Your TwiTok photo post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
