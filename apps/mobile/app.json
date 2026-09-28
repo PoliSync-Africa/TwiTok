@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "TwiTok",
+    "slug": "twitok",
+    "version": "0.1.0",
+    "scheme": "twitok",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "africa.twitok.app"
+    },
+    "android": {
+      "package": "africa.twitok.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"]
+  }
+}
