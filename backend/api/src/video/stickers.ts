@@ -24,7 +24,11 @@ export function listStickers(category?: string) {
 }
 
 export function getSticker(id: string) {
-  return STICKERS.find(x => x.id === id) ?? null;
+  const known = STICKERS.find(x => x.id === id);
+  if (known) return known;
+  if (/^flag-[A-Z]{2}$/.test(id)) return { id, name: id.slice(5), emoji: "", category: "Flags" as const };
+  if (/^emoji-[0-9a-f]+(?:-[0-9a-f]+)*$/i.test(id)) return { id, name: "Emoji", emoji: "", category: "Emojis" as const };
+  return null;
 }
 
 export async function ensureStickerIndexes(db: Db) {
