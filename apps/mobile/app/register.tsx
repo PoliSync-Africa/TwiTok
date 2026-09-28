@@ -6,7 +6,6 @@ import { saveAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 export default function RegisterScreen() {
-  const [username,setUsername]=useState("");
   const [email,setEmail]=useState("");
   const [phone,setPhone]=useState("");
   const [password,setPassword]=useState("");
@@ -16,19 +15,18 @@ export default function RegisterScreen() {
   const [error,setError]=useState("");
 
   async function register(){
-    if(!username.trim()||(!email.trim()&&!phone.trim())||!password||!dateOfBirth||!countryCode.trim()){setError("Enter an email address or phone number, plus all required fields.");return;}
+    if((!email.trim()&&!phone.trim())||!password||!dateOfBirth||!countryCode.trim()){setError("Enter an email address or phone number, plus all required fields.");return;}
     setBusy(true);setError("");
     try{
-      const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:username.trim(),email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:countryCode.trim().toUpperCase()})});
+      const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:countryCode.trim().toUpperCase()})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok||!d.token) throw new Error(d.error??"Unable to create account");
-      await saveAuthToken(d.token); router.replace("/feed");
+      await saveAuthToken(d.token); router.replace("/profile-setup");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create account");}finally{setBusy(false);}
   }
 
   return <ScrollView contentContainerStyle={styles.container}>
     <Text style={styles.logo}>TwiTok</Text><Text style={styles.title}>Create your account</Text>
-    <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="Username" placeholderTextColor="#777" autoCapitalize="none"/>
     <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email address (or use phone)" placeholderTextColor="#777" autoCapitalize="none" keyboardType="email-address"/>
     <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry/>
     <TextInput style={styles.input} value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="Date of birth (YYYY-MM-DD)" placeholderTextColor="#777"/>
