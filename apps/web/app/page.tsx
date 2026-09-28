@@ -408,6 +408,7 @@ export default function Home() {
                       </video>
                     : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
               <div className="gradient"/>
+              {giftBursts.filter(b => b.videoId === v.id).map(b => <div key={b.id} style={giftStyles.burst}><span style={giftStyles.emojiLarge}>{b.emoji}</span><b>{b.label}{b.quantity > 1 ? " ×" + b.quantity : ""}</b></div>)}
               <div className="video-copy">
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
                 <h2>{v.caption ?? ""}</h2>
@@ -478,3 +479,21 @@ export default function Home() {
     </div>}
   </main>;
 }
+
+
+const giftStyles: Record<string, CSSProperties> = {
+  sheet:{position:"fixed",left:"50%",bottom:0,transform:"translateX(-50%)",width:"min(680px,100%)",background:"#111",border:"1px solid #333",borderRadius:"22px 22px 0 0",padding:18,zIndex:1000,boxSizing:"border-box",boxShadow:"0 -10px 40px rgba(0,0,0,.45)"},
+  header:{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:18},
+  balance:{display:"block",fontSize:13,color:"#aaa",marginTop:5},
+  close:{background:"#222",color:"#fff",border:0,borderRadius:20,fontSize:24,width:40,height:40},
+  grid:{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8,marginTop:16,maxHeight:260,overflowY:"auto"},
+  gift:{background:"#1b1b1b",color:"#fff",border:"1px solid #292929",borderRadius:14,padding:"12px 6px",display:"flex",flexDirection:"column",alignItems:"center",gap:5,cursor:"pointer"},
+  emoji:{fontSize:30},
+  emojiLarge:{fontSize:38},
+  quantity:{display:"flex",alignItems:"center",gap:8,marginTop:14,color:"#aaa"},
+  quantityButton:{background:"#222",color:"#fff",border:"1px solid #333",borderRadius:8,padding:"7px 12px"},
+  active:{background:"#fff",color:"#000",border:"1px solid #fff",borderRadius:8,padding:"7px 12px",fontWeight:800},
+  message:{margin:"12px 0 0",color:"#fff"},
+  giftButton:{background:"#ff2d55",color:"#fff",border:0,borderRadius:10,padding:"8px 12px",fontWeight:800},
+  burst:{position:"absolute",right:18,bottom:120,zIndex:30,background:"rgba(0,0,0,.72)",borderRadius:20,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,color:"#fff"}
+};
