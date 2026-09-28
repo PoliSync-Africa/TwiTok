@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
 import { getSticker } from "./stickers.js";
-import { createPresignedUpload, createPresignedPlayback, headMediaObject, mediaConfigured } from "../media/storage.js";
+import { createPresignedUpload, headMediaObject, mediaConfigured } from "../media/storage.js";
 import { verifySourceAndQueue } from "./processing.js";
 
 export type VideoVisibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
@@ -255,7 +255,7 @@ export async function createVideoRemixUpload(db: Db, userId: ObjectId, remixId: 
   return { uploadId, objectKey, uploadUrl: signed.url, expiresInSeconds: signed.expiresInSeconds };
 }
 
-export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { mediaUrl: string; caption?: string }) {
+export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { uploadId: string; caption?: string }) {
   if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
   const uploadId = String(input.uploadId ?? "").trim();
   if (!uploadId) throw new Error("uploadId is required");
