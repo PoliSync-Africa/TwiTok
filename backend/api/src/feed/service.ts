@@ -35,9 +35,10 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const blocked = await db.collection("blocks").find({ $or: [{ blockerId: userId }, { blockedId: userId }] }).limit(5000).toArray();
   const blockedIds = blocked.flatMap(x => [x.blockerId, x.blockedId]).filter(Boolean);
   const feedback = await db.collection("video_feedback").find({ userId, type: "NOT_INTERESTED" }).project({ videoId: 1 }).limit(5000).toArray();
-  const excluded = [...blockedIds, ...feedback.map(x => x.videoId)];
-  const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: excluded } };
-  if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !excluded.some((x: ObjectId) => x.equals(id))) };
+  const blockedOwnerIds = blockedIds;
+  const excludedVideoIds = feedback.map(x => x.videoId);
+  const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
+  if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const videos = await db.collection("videos").aggregate([
@@ -45,7 +46,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
       { $match: { userId } },
       { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
-      { $group: { _id: "$type", count: { $sum: 1 }, totalWatchMs: { $sum: "$watchMs" }, latest: { $max: "$createdAt" } } }
+      { $group: { _id: null, count: { $sum: 1 }, totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }, latest: { $max: "$createdAt" } } }
     ], as: "viewerEvents" } },
     { $addFields: {
       _engagement: { $add: [
