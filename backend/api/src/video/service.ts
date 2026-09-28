@@ -10,6 +10,8 @@ export type VideoStatus = "UPLOADING" | "PROCESSING" | "READY" | "PUBLISHED" | "
 
 const ALLOWED_MIME = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 const MAX_BYTES = 500 * 1024 * 1024;
+const PHOTO_MAX_BYTES = 20 * 1024 * 1024;
+const PHOTO_MIME = new Set(["image/jpeg","image/png","image/webp"]);
 
 export async function initializeVideoIndexes(db: Db) {
   await Promise.all([
@@ -35,6 +37,60 @@ function validateUpload(input: { mimeType: string; sizeBytes: number }) {
 function normalizeHashtags(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map(String).map((tag) => tag.trim().replace(/^#/, "").toLowerCase()).filter(Boolean))].slice(0, 30);
+}
+
+export async function createPhotoUploadSession(db: Db, userId: ObjectId, input: { mimeType: string; sizeBytes: number }) {
+  if (!PHOTO_MIME.has(input.mimeType)) throw new Error("Unsupported photo format");
+  if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > PHOTO_MAX_BYTES) throw new Error("Photo size is outside the allowed range");
+  const uploadId = crypto.randomUUID();
+  const objectKey = `photos/${userId.toHexString()}/${new Date().toISOString().slice(0, 10)}/${uploadId}/source`;
+  const now = new Date();
+  await db.collection("photo_uploads").insertOne({ uploadId, userId, objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "UPLOADING", createdAt: now, updatedAt: now });
+  if (!mediaConfigured()) return { uploadId, objectKey, uploadUrl: null, storageConfigured: false };
+  const signed = await createPresignedUpload({ objectKey, mimeType: input.mimeType, expiresInSeconds: 900 });
+  return { uploadId, objectKey, uploadUrl: signed.url, expiresInSeconds: signed.expiresInSeconds, storageConfigured: true };
+}
+
+export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: string) {
+  const upload = await db.collection("photo_uploads").findOne({ uploadId, userId, status: "UPLOADING" });
+  if (!upload) throw new Error("Photo upload session not found");
+  await headMediaObject(upload.objectKey);
+  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", updatedAt: new Date() } });
+  return { uploadId, status: "READY" };
+}
+
+export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; visibility?: VideoVisibility; allowComments?: boolean }) {
+  const uploadIds = Array.isArray(input.uploadIds) ? [...new Set(input.uploadIds.map(String).filter(Boolean))].slice(0, 35) : [];
+  if (!uploadIds.length) throw new Error("At least one photo is required");
+  const uploads = await db.collection("photo_uploads").find({ uploadId: { $in: uploadIds }, userId, status: "READY" }).toArray();
+  if (uploads.length !== uploadIds.length) throw new Error("One or more photos are not ready");
+  const caption = String(input.caption ?? "").trim().slice(0, 2200);
+  const postId = new ObjectId();
+  const safety = await evaluateText(db, { userId: userId.toHexString(), contentId: postId.toHexString(), text: caption, actionType: "VIDEO_CAPTION" });
+  if (safety.decision === "BLOCK") throw new Error("Caption blocked by TwiTok Safety Engine");
+  const now = new Date();
+  await db.collection("videos").insertOne({
+    _id: postId, ownerId: userId, mediaType: "PHOTO", photoObjectKeys: uploads.map(x => x.objectKey),
+    photoMimeTypes: uploads.map(x => x.mimeType), caption, hashtags: normalizeHashtags([]),
+    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: false, allowStitch: false,
+    status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
+  });
+  return { postId: postId.toHexString(), status: "PUBLISHED", mediaType: "PHOTO", photoCount: uploads.length };
+}
+
+export async function createTextPost(db: Db, userId: ObjectId, input: { text?: string; visibility?: VideoVisibility; allowComments?: boolean }) {
+  const text = String(input.text ?? "").trim().slice(0, 4000);
+  if (!text) throw new Error("Text is required");
+  const postId = new ObjectId();
+  const safety = await evaluateText(db, { userId: userId.toHexString(), contentId: postId.toHexString(), text, actionType: "VIDEO_CAPTION" });
+  if (safety.decision === "BLOCK") throw new Error("Text post blocked by TwiTok Safety Engine");
+  const now = new Date();
+  await db.collection("videos").insertOne({
+    _id: postId, ownerId: userId, mediaType: "TEXT", textBody: text, caption: text, hashtags: [],
+    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: false, allowStitch: false,
+    status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
+  });
+  return { postId: postId.toHexString(), status: "PUBLISHED", mediaType: "TEXT" };
 }
 
 export async function createUploadSession(db: Db, userId: ObjectId, input: {
