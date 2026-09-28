@@ -413,7 +413,7 @@ export default function CreateScreen() {
           <Text style={styles.helper}>Per-clip trim</Text>
           {assets.map((asset, i) => {
             const range = clipTrimRanges[i] ?? { startMs: 0, endMs: asset.duration ? Math.round(asset.duration) : null };
-            const duration = Math.max(1000, Math.round(asset.duration ?? (durationMs / Math.max(1, assets.length)) || 10000));
+            const duration = Math.max(1000, Math.round(asset.duration ?? (durationMs / Math.max(1, assets.length) || 10000)));
             const end = range.endMs ?? duration;
             const updateRange = (startMs:number, endMs:number) => setClipTrimRanges(prev => prev.map((x,j)=>j===i ? { startMs:Math.max(0,Math.min(startMs,endMs-500)), endMs:Math.max(startMs+500,Math.min(endMs,duration)) } : x));
             return <View key={asset.uri+i} style={styles.clipTrimRow}>
