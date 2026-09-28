@@ -287,7 +287,7 @@ export default function Home() {
         <div className="comments-list">
           {notifications.length ? notifications.map(item => {
             const actor = item.actor?.username ? "@" + item.actor.username : "Someone";
-            const text = item.type === "FOLLOW" ? "followed you" : item.type === "LIKE" ? "liked your video" : "commented on your video";
+            const text = item.type === "FOLLOW" ? "followed you" : item.type === "LIKE" ? "liked your video" : item.type === "REPOST" ? "reposted your video" : "commented on your video";
             return <article className={"comment-item " + (item.read ? "" : "notification-unread")} key={item.id}>
               <div className="comment-avatar">♥</div><div><strong>{actor}</strong><p>{text}</p><small>{new Date(item.createdAt).toLocaleString()}</small></div>
             </article>;
