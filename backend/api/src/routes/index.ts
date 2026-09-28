@@ -12,6 +12,7 @@ import { feedRouter } from "./feed.js";
 import { mediaRouter } from "./media.js";
 import musicRouter from "./music.js";
 import { messagesRouter } from "./messages.js";
+import { engagementRouter } from "./engagement.js";
 
 export const apiRouter = Router();
 
@@ -28,3 +29,4 @@ apiRouter.use("/live", liveRouter);
 apiRouter.use("/safety", safetyRouter);
 apiRouter.use("/monetization", monetizationRouter);
 apiRouter.use("/messages", messagesRouter);
+apiRouter.use("/engagement", engagementRouter);
