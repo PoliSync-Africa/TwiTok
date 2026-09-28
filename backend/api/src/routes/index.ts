@@ -16,6 +16,7 @@ import { engagementRouter } from "./engagement.js";
 import { notificationsRouter } from "./notifications.js";
 import { searchRouter } from "./search.js";
 import { playlistsRouter } from "./playlists.js";
+import { storiesRouter } from "./stories.js";
 
 export const apiRouter = Router();
 
@@ -36,3 +37,4 @@ apiRouter.use("/engagement", engagementRouter);
 apiRouter.use("/notifications", notificationsRouter);
 apiRouter.use("/search", searchRouter);
 apiRouter.use("/playlists", playlistsRouter);
+apiRouter.use("/stories", storiesRouter);
