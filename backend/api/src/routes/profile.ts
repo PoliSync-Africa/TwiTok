@@ -62,6 +62,33 @@ profileRouter.get("/:username/videos", async (req, res) => {
 });
 
 
+profileRouter.get("/:username/reposts", async (req, res) => {
+  try {
+    const db = await getDb();
+    const owner = await db.collection("users").findOne({ username: String(req.params.username).toLowerCase() }, { projection: { _id: 1 } });
+    if (!owner) return res.status(404).json({ error: "Profile not found" });
+    const reposts = await db.collection("video_reposts").find({ userId: owner._id }).sort({ createdAt: -1 }).limit(60).toArray();
+    const ids = reposts.map(r => r.videoId).filter(Boolean);
+    const videos = await db.collection("videos").find({ _id: { $in: ids }, status: "PUBLISHED", visibility: "PUBLIC" }).project({ _id: 1, playback: 1, thumbnail: 1, caption: 1, publishedAt: 1 }).toArray();
+    const byId = new Map(videos.map(v => [v._id.toHexString(), v]));
+    res.json({ videos: ids.map(id => byId.get(id.toHexString())).filter(Boolean).map(v => ({ id: v!._id.toHexString(), playback: v!.playback ?? null, thumbnail: v!.thumbnail ?? null, caption: v!.caption ?? "", publishedAt: v!.publishedAt ?? null })) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load reposts" }); }
+});
+
+profileRouter.get("/:username/saved", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const owner = await db.collection("users").findOne({ username: String(req.params.username).toLowerCase() }, { projection: { _id: 1 } });
+    if (!owner) return res.status(404).json({ error: "Profile not found" });
+    if (!owner._id.equals(req.userId!)) return res.status(403).json({ error: "Saved videos are private" });
+    const saves = await db.collection("video_saves").find({ userId: owner._id }).sort({ createdAt: -1 }).limit(60).toArray();
+    const ids = saves.map(s => s.videoId).filter(Boolean);
+    const videos = await db.collection("videos").find({ _id: { $in: ids }, status: "PUBLISHED" }).project({ _id: 1, playback: 1, thumbnail: 1, caption: 1, publishedAt: 1 }).toArray();
+    const byId = new Map(videos.map(v => [v._id.toHexString(), v]));
+    res.json({ videos: ids.map(id => byId.get(id.toHexString())).filter(Boolean).map(v => ({ id: v!._id.toHexString(), playback: v!.playback ?? null, thumbnail: v!.thumbnail ?? null, caption: v!.caption ?? "", publishedAt: v!.publishedAt ?? null })) });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load saved videos" }); }
+});
+
 profileRouter.post("/:username/follow", requireUser, async (req, res) => {
   try {
     const db = await getDb();
