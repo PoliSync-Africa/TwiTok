@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 import { useEffect, useMemo, useState } from "react";
 
 type Wallet = { coinBalance?: number; diamondBalance?: number; cashBalanceUsd?: number };
@@ -94,7 +96,7 @@ function Card({ label, value }: { label: string; value: string }) {
   return <div style={styles.card}><span>{label}</span><b>{value}</b></div>;
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page:{minHeight:"100vh",background:"#080808",color:"#fff",padding:"32px max(20px,calc((100vw - 1100px)/2))",fontFamily:"Arial, sans-serif"},
   header:{display:"flex",justifyContent:"space-between",gap:20,alignItems:"flex-start",marginBottom:28},
   kicker:{fontSize:12,fontWeight:800,letterSpacing:2,color:"#ff2d55"},
@@ -109,7 +111,6 @@ const styles: Record<string, React.CSSProperties> = {
   rule:{display:"flex",justifyContent:"space-between",gap:20,padding:"12px 0",borderTop:"1px solid #242424"},
   grid:{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:10},
   package:{background:"#181818",borderRadius:12,padding:14,display:"flex",flexDirection:"column",gap:8},
-  package strong:{},
   note:{fontSize:12,color:"#777",marginBottom:0},
   columns:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18},
   row:{display:"flex",justifyContent:"space-between",gap:16,padding:"12px 0",borderTop:"1px solid #222"},
