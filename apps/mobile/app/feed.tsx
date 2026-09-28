@@ -172,11 +172,13 @@ export default function FeedScreen() {
   const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"AFRICA">("FOR_YOU");
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    setLoading(true); setError(""); setActiveIndex(0);
+    setLoading(true); setError(""); setActiveIndex(0); setNextCursor(null);
     (async () => {
       try {
         const token = await getAuthToken();
@@ -184,7 +186,10 @@ export default function FeedScreen() {
         const r = await fetch(API + "/feed/" + surface + "?limit=10", { headers: { Authorization: `Bearer ${token}` } });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error ?? "Feed unavailable");
-        if (active) setVideos(data.videos ?? data.items ?? []);
+        if (active) {
+          setVideos(data.videos ?? data.items ?? []);
+          setNextCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
+        }
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : "Feed unavailable");
       } finally {
@@ -210,6 +215,25 @@ export default function FeedScreen() {
 
   if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><Text style={styles.muted}>Return to the home screen and sign in to continue.</Text></View>;
 
+  async function loadMore() {
+    if (loading || loadingMore || !nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+      const r = await fetch(API + "/feed/" + surface + "?limit=10&cursor=" + encodeURIComponent(nextCursor), { headers: { Authorization: `Bearer ${token}` } });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) return;
+      setVideos(current => {
+        const existing = new Set(current.map(item => item.id));
+        return [...current, ...(data.videos ?? data.items ?? []).filter((item: Video) => !existing.has(item.id))];
+      });
+      setNextCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   return (
     <FlatList
       data={videos}
@@ -217,6 +241,9 @@ export default function FeedScreen() {
       pagingEnabled
       showsVerticalScrollIndicator={false}
       onMomentumScrollEnd={event => setActiveIndex(Math.round(event.nativeEvent.contentOffset.y / height))}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.7}
+      ListFooterComponent={loadingMore ? <View style={styles.feedFooter}><ActivityIndicator color="#fff" /><Text style={styles.muted}>Loading more…</Text></View> : null}
       renderItem={({ item, index }) => <VideoCard item={item} active={index === activeIndex} surface={surface} onSurface={setSurface} onEvent={(type, watchMs) => recordEvent(item.id, type, watchMs)} onNotInterested={async () => { await recordEvent(item.id, "NOT_INTERESTED"); setVideos(v => v.filter(x => x.id !== item.id)); }} />}
       getItemLayout={(_, index) => ({ length: height, offset: height * index, index })}
       ListEmptyComponent={<View style={styles.center}><Text style={styles.muted}>No videos available yet.</Text></View>}
@@ -246,6 +273,7 @@ const styles = StyleSheet.create({
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
   tab: { color: "#aaa", fontSize: 13 },
+  feedFooter:{height:80,backgroundColor:"#000",alignItems:"center",justifyContent:"center",gap:6},
   center: { flex: 1, minHeight: height, backgroundColor: "#000", alignItems: "center", justifyContent: "center", padding: 24, gap: 10 },
   muted: { color: "#aaa", textAlign: "center" },
   error: { color: "#ff5b6e", textAlign: "center", fontSize: 16, fontWeight: "700" }
