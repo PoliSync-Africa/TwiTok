@@ -33,6 +33,14 @@
           "microphonePermission": "Allow TwiTok to record voice comments.",
           "enableBackgroundRecording": false
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow TwiTok to use your camera to create videos.",
+          "microphonePermission": "Allow TwiTok to record audio with your videos.",
+          "recordAudioAndroid": true
+        }
       ]
     ]
   }
