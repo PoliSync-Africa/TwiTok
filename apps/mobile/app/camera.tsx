@@ -23,6 +23,7 @@ export default function CameraStudioScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [effect, setEffect] = useState<Effect>("NONE");
+  const [grid, setGrid] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -117,6 +118,7 @@ export default function CameraStudioScreen() {
         animateShutter
       />
       {effectOverlay ? <View pointerEvents="none" style={[styles.effectOverlay, effectOverlay]} /> : null}
+      {grid ? <View pointerEvents="none" style={styles.gridOverlay}><View style={styles.gridV1}/><View style={styles.gridV2}/><View style={styles.gridH1}/><View style={styles.gridH2}/></View> : null}
 
       <View style={styles.topBar}>
         <Pressable style={styles.circle} onPress={() => router.back()}>
@@ -125,6 +127,7 @@ export default function CameraStudioScreen() {
         <Text style={styles.title}>Camera</Text>
         <Pressable style={styles.circle} onPress={() => setFlash(v => v === "off" ? "on" : v === "on" ? "auto" : "off")}>
           <Text style={styles.icon}>{flash === "on" ? "⚡" : flash === "auto" ? "A" : "↯"}</Text>
+          <Pressable onPress={()=>setGrid(v=>!v)} accessibilityLabel="Toggle camera grid"><Text style={styles.icon}>{grid ? "▦" : "⊞"}</Text></Pressable>
         </Pressable>
       </View>
 
@@ -243,6 +246,7 @@ const styles = StyleSheet.create({
   error:{color:"#ffb3c1",textAlign:"center",marginTop:8,paddingHorizontal:16},
   hint:{color:"#fff",textAlign:"center",fontSize:12,fontWeight:"700",marginTop:8},
   effectOverlay:{position:"absolute",top:0,bottom:0,left:0,right:0},
+  gridOverlay:{position:"absolute",top:0,bottom:0,left:0,right:0},gridV1:{position:"absolute",top:0,bottom:0,left:"33.333%",width:1,backgroundColor:"rgba(255,255,255,.35)"},gridV2:{position:"absolute",top:0,bottom:0,left:"66.666%",width:1,backgroundColor:"rgba(255,255,255,.35)"},gridH1:{position:"absolute",left:0,right:0,top:"33.333%",height:1,backgroundColor:"rgba(255,255,255,.35)"},gridH2:{position:"absolute",left:0,right:0,top:"66.666%",height:1,backgroundColor:"rgba(255,255,255,.35)"} ,
   effectVibrant:{backgroundColor:"rgba(255,180,80,0.12)"},
   effectWarm:{backgroundColor:"rgba(255,140,40,0.18)"},
   effectCool:{backgroundColor:"rgba(60,150,255,0.16)"},
