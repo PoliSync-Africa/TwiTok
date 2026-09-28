@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 type Wallet = { coinBalance?: number; diamondBalance?: number; cashBalanceUsd?: number };
 type Catalog = { coinPackages: Array<{ sku: string; coins: number; priceUsd: number }>; gifts: Array<{ giftId: string; name: string; coins: number; animation: string }>; creatorSharePercent: number; platformSharePercent: number; diamondCashValueUsd: number; minWithdrawalUsd: number };
 type LedgerRow = { type: string; coinsDelta?: number; diamondsDelta?: number; cashDeltaUsd?: number; createdAt?: string };
-type GiftRow = { giftName: string; quantity: number; coinsSpent: number; diamondsAwarded: number; createdAt?: string };
+type GiftRow = { giftName: string; quantity: number; coinsSpent: number; diamondsAwarded: number; createdAt?: string };\ntype Withdrawal = { withdrawalId: string; amountUsd: number; payoutAmount: number; payoutCurrency: string; type: string; status: string; createdAt?: string };
 
 const money = (n: number) => "$" + n.toFixed(2);
 
@@ -16,7 +16,7 @@ export default function WalletPage() {
   const [wallet, setWallet] = useState<Wallet>({});
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
-  const [gifts, setGifts] = useState<GiftRow[]>([]);
+  const [gifts, setGifts] = useState<GiftRow[]>([]);\n  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);\n  const [withdrawAmount, setWithdrawAmount] = useState("");\n  const [payoutType, setPayoutType] = useState<"BANK" | "MOBILE_MONEY">("MOBILE_MONEY");\n  const [destination, setDestination] = useState({ name: "", accountNumber: "", bankCode: "" });\n  const [payoutMessage, setPayoutMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -35,7 +35,7 @@ export default function WalletPage() {
       setWallet(await w.json());
       if (c.ok) setCatalog(await c.json());
       if (l.ok) setLedger((await l.json()).transactions ?? []);
-      if (g.ok) setGifts((await g.json()).gifts ?? []);
+      if (g.ok) setGifts((await g.json()).gifts ?? []);\n      const wd = await fetch(api + "/wallet/me/withdrawals?limit=20", { headers, cache: "no-store" });\n      if (wd.ok) setWithdrawals((await wd.json()).withdrawals ?? []);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load wallet"); }
     finally { setLoading(false); }
   }
@@ -85,8 +85,31 @@ export default function WalletPage() {
 
       <section style={styles.panel}>
         <h2 style={styles.heading}>Bank & Mobile Money</h2>
-        <p style={styles.sub}>The payout layer supports bank and mobile-money destinations by country. Provider settlement and identity verification are kept server-side so exchange rates and payout status cannot be altered by the client.</p>
-        <button style={styles.disabled} disabled>Set up payout method — provider integration next</button>
+        <p style={styles.sub}>Ghana payouts support bank and mobile money. Your cash balance is reserved when the request is created and restored automatically if the provider rejects or reverses the transfer.</p>
+        <div style={styles.formGrid}>
+          <select style={styles.input} value={payoutType} onChange={e => setPayoutType(e.target.value as "BANK" | "MOBILE_MONEY")}><option value="MOBILE_MONEY">Mobile Money</option><option value="BANK">Bank</option></select>
+          <input style={styles.input} placeholder="Account name" value={destination.name} onChange={e => setDestination({...destination,name:e.target.value})} />
+          <input style={styles.input} placeholder={payoutType === "MOBILE_MONEY" ? "MoMo number" : "Bank account number"} value={destination.accountNumber} onChange={e => setDestination({...destination,accountNumber:e.target.value})} />
+          <input style={styles.input} placeholder={payoutType === "MOBILE_MONEY" ? "Provider code" : "Bank code"} value={destination.bankCode} onChange={e => setDestination({...destination,bankCode:e.target.value})} />
+          <input style={styles.input} type="number" min={catalog?.minWithdrawalUsd ?? 10} step="0.01" placeholder="Amount in USD" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} />
+        </div>
+        <button style={styles.withdraw} onClick={async () => {
+          setPayoutMessage("");
+          const token = window.localStorage.getItem("twitok_user_token");
+          const amount = Number(withdrawAmount);
+          if (!token || !Number.isFinite(amount) || amount < (catalog?.minWithdrawalUsd ?? 10)) { setPayoutMessage("Enter at least the $10 minimum and sign in."); return; }
+          const response = await fetch(api + "/wallet/withdrawals", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({countryCode:"GH",type:payoutType,amountUsd:amount,destination}) });
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) { setPayoutMessage(body.error ?? "Withdrawal failed."); return; }
+          setPayoutMessage("Withdrawal submitted: " + body.status);
+          setWithdrawAmount("");
+          setLoading(true); void load();
+        }}>Withdraw earnings</button>
+        {payoutMessage && <p style={styles.sub}>{payoutMessage}</p>}
+      </section>
+      <section style={styles.panel}>
+        <h2 style={styles.heading}>Withdrawal history</h2>
+        {withdrawals.length === 0 ? <p style={styles.empty}>No withdrawals yet.</p> : withdrawals.map(w => <div style={styles.row} key={w.withdrawalId}><span><b>{w.status}</b><small>{w.type} · {w.createdAt ? new Date(w.createdAt).toLocaleString() : ""}</small></span><span>{money(w.amountUsd)} → {w.payoutAmount.toFixed(2)} {w.payoutCurrency}</span></div>)}
       </section>
     </main>
   );
@@ -116,6 +139,6 @@ const styles: Record<string, CSSProperties> = {
   row:{display:"flex",justifyContent:"space-between",gap:16,padding:"12px 0",borderTop:"1px solid #222"},
   rowSmall:{},
   empty:{color:"#777"},
-  disabled:{width:"100%",padding:14,borderRadius:10,border:"1px solid #333",background:"#191919",color:"#888"},
+  formGrid:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10},\n  input:{width:"100%",boxSizing:"border-box",padding:13,borderRadius:10,border:"1px solid #333",background:"#181818",color:"#fff"},\n  withdraw:{marginTop:12,width:"100%",padding:14,borderRadius:10,border:0,background:"#fff",color:"#000",fontWeight:800},
 };
 
