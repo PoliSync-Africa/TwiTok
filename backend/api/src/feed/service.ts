@@ -29,7 +29,7 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
   }
 }
 
-export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20) {
+export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string) {
   const following = await db.collection("follows").find({ followerId: userId }).project({ followingId: 1 }).limit(5000).toArray();
   const followingIds = following.map(x => x.followingId);
   const blocked = await db.collection("blocks").find({ $or: [{ blockerId: userId }, { blockedId: userId }] }).limit(5000).toArray();
@@ -74,8 +74,27 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       },
       owner: { $arrayElemAt: ["$_owner", 0] }
     } },
+    ...(cursor ? (() => {
+      try {
+        const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+        if (!Number.isFinite(parsed.score) || !Number.isFinite(parsed.freshness) || !ObjectId.isValid(parsed.id)) return [];
+        return [{ $match: { $or: [
+          { _engagement: { $lt: parsed.score } },
+          { _engagement: parsed.score, _freshness: { $gt: parsed.freshness } },
+          { _engagement: parsed.score, _freshness: parsed.freshness, publishedAt: { $lt: new Date(parsed.publishedAt) } },
+          { _engagement: parsed.score, _freshness: parsed.freshness, publishedAt: new Date(parsed.publishedAt), _id: { $lt: new ObjectId(parsed.id) } }
+        ] } }];
+      } catch { return []; }
+    })() : []),
     { $sort: { _engagement: -1, _freshness: 1, publishedAt: -1, _id: -1 } },
     { $limit: safeLimit }
   ]).toArray();
-  return videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null }));
+  const next = videos.length === safeLimit && videos.length > 0 ? (() => {
+    const last: any = videos[videos.length - 1];
+    return Buffer.from(JSON.stringify({
+      score: Number(last._engagement ?? 0), freshness: Number(last._freshness ?? 0),
+      publishedAt: (last.publishedAt ?? new Date(0)).toISOString(), id: last._id.toHexString()
+    })).toString("base64url");
+  })() : null;
+  return { videos: videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null })), nextCursor: next };
 }
