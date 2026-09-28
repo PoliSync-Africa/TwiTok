@@ -104,7 +104,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments }:
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
       </View>
-      <View style={styles.bottomTabs}><Pressable onPress={() => setSurface("FOR_YOU")}><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable></Pressable><Pressable onPress={() => setSurface("FOLLOWING")}><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable></Pressable><Pressable onPress={() => setSurface("AFRICA")}><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></Pressable></View>
+      <View style={styles.bottomTabs}><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
     </>
   );
 }
@@ -118,6 +118,7 @@ export default function FeedScreen() {
 
   useEffect(() => {
     let active = true;
+    setLoading(true); setError(""); setActiveIndex(0);
     (async () => {
       try {
         const token = await getAuthToken();
