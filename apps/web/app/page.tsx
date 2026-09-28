@@ -16,7 +16,7 @@ type FeedVideo = {
   autoCaptionsStatus?: string;
   autoCaptionLanguage?: string;
   captionTracks?: Record<string, { language: string; label: string; url: string; sourceLanguage?: string }>;
-  engagement?: { likeCount: number; commentCount: number; shareCount: number; saveCount: number; liked: boolean; saved: boolean };
+  engagement?: { likeCount: number; commentCount: number; shareCount: number; saveCount: number; repostCount: number; liked: boolean; saved: boolean; reposted: boolean };
 };
 
 const demoVideos: FeedVideo[] = [
@@ -129,7 +129,7 @@ export default function Home() {
     });
   }, [videos, captionLanguage]);
 
-  async function engage(videoId: string, action: "like" | "save" | "share") {
+  async function engage(videoId: string, action: "like" | "save" | "share" | "repost") {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token || videoId.startsWith("demo-")) return;
     try {
@@ -145,7 +145,7 @@ export default function Home() {
       if (!response.ok) return;
       const data = await response.json();
       if (data.engagement) setVideos(items => items.map(item => item.id === videoId ? { ...item, engagement: data.engagement } : item));
-      track(videoId, action === "like" ? "LIKE" : action === "save" ? "SAVE" : "SHARE");
+      track(videoId, action === "like" ? "LIKE" : action === "save" ? "SAVE" : action === "repost" ? "SHARE" : "SHARE");
     } catch {}
   }
 
@@ -275,7 +275,7 @@ export default function Home() {
               <button onClick={() => engage(v.id, "like")} aria-label="Like video">{v.engagement?.liked ? "♥" : "♡"}<small>{v.engagement?.likeCount ?? 0}</small></button>
               <button onClick={() => openComments(v.id)} aria-label="Open comments">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
               <button onClick={() => engage(v.id, "share")} aria-label="Share video">↗<small>{v.engagement?.shareCount ?? 0}</small></button>
-              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>
+              <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>\n              <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
             </div>
           </article>;
         })}
