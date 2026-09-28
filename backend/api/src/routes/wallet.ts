@@ -106,6 +106,7 @@ walletRouter.post("/gifts", requireUser, async (req, res) => {
       broadcastToUser(senderId, {
         type: "gift.sent",
         transactionId: result.transactionId,
+        videoId: result.videoId ?? null,
         receiverId: String(receiverId),
         giftId,
         quantity: result.quantity,
