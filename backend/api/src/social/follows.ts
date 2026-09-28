@@ -32,9 +32,10 @@ export async function getProfile(db: Db, username: string, viewerId?: ObjectId) 
   const blocked = viewerId ? await isBlockedEitherWay(db, viewerId, user._id) : false;
   if (blocked && !viewerId?.equals(user._id)) return { unavailable: true };
 
-  const [followers, following, relationship] = await Promise.all([
+  const [followers, following, likes, relationship] = await Promise.all([
     db.collection("follows").countDocuments({ followingId: user._id }),
     db.collection("follows").countDocuments({ followerId: user._id }),
+    db.collection("video_likes").countDocuments({ userId: user._id }),
     viewerId ? db.collection("follows").findOne({ followerId: viewerId, followingId: user._id }) : null
   ]);
   const pending = viewerId ? Boolean(await db.collection("follow_requests").findOne({ requesterId: viewerId, targetId: user._id, status: "PENDING" })) : false;
@@ -42,7 +43,7 @@ export async function getProfile(db: Db, username: string, viewerId?: ObjectId) 
   return {
     id: user._id.toHexString(), username: user.username, nickname: user.nickname,
     countryCode: user.countryCode, bio: user.bio ?? "", accountType: user.accountType, profilePhotoUrl: user.profilePhotoKey ? (await createPresignedPlayback(user.profilePhotoKey, 900)).url : null, isPrivate: Boolean(user.isPrivate),
-    followers, following, isFollowing: Boolean(relationship), followPending: pending, createdAt: user.createdAt
+    followers, following, likes, isFollowing: Boolean(relationship), followPending: pending, createdAt: user.createdAt
   };
 }
 
