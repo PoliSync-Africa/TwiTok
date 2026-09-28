@@ -14,7 +14,8 @@ export default function ProfileScreen() {
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
-  const [videos,setVideos]=useState<Video[]>([]);\n  const [activeTab,setActiveTab]=useState<"videos"|"reposts"|"saved">("videos");
+  const [videos,setVideos]=useState<Video[]>([]);
+  const [activeTab,setActiveTab]=useState<"videos"|"reposts"|"saved">("videos");
   const [viewerId,setViewerId]=useState("");
 
   async function load() {
