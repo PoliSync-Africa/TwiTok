@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
+import { createNotification } from "./notifications.js";
 
 export type FollowState = "FOLLOWING" | "PENDING";
 
@@ -57,6 +58,7 @@ export async function followUser(db: Db, followerId: ObjectId, followingId: Obje
     return { following: false, pending: true };
   }
   await db.collection("follows").updateOne({ followerId, followingId }, { $setOnInsert: { followerId, followingId, createdAt: new Date() } }, { upsert: true });
+  await createNotification(db, { recipientId: followingId, actorId: followerId, type: "FOLLOW" });
   return { following: true, pending: false };
 }
 
