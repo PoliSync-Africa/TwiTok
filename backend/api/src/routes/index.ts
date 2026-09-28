@@ -17,6 +17,7 @@ import { notificationsRouter } from "./notifications.js";
 import { searchRouter } from "./search.js";
 import { playlistsRouter } from "./playlists.js";
 import { storiesRouter } from "./stories.js";
+import { walletRouter } from "./wallet.js";
 
 export const apiRouter = Router();
 
@@ -28,6 +29,7 @@ apiRouter.use("/media", mediaRouter);
 apiRouter.use("/music", musicRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/money", moneyRouter);
+apiRouter.use("/wallet", walletRouter);
 apiRouter.use("/creator", creatorRouter);
 apiRouter.use("/live", liveRouter);
 apiRouter.use("/safety", safetyRouter);
