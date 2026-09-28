@@ -31,7 +31,9 @@ export default function WalletScreen() {
       const token=await getAuthToken();
       if(!token){ Alert.alert("Sign in","Please sign in to view your wallet."); router.back(); return; }
       const h={Authorization:"Bearer "+token};
-      configureRevenueCat(String((await import("../lib/auth")).getCurrentUserId?.() ?? ""));
+      const rc=await fetch(API+"/wallet/revenuecat/config",{headers:h});
+      const rcJson=await rc.json().catch(()=>({}));
+      if(rc.ok && rcJson.appUserId) configureRevenueCat(String(rcJson.appUserId));
       const [w,g,wd]=await Promise.all([
         fetch(API+"/wallet/me",{headers:h}),
         fetch(API+"/wallet/me/gifts?limit=20",{headers:h}),
