@@ -6,7 +6,7 @@ const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api
 const WS = API.replace(/^http/, "ws").replace(/\/api\/v1$/, "") + "/realtime";
 
 type Conversation = { id: string; otherUser: { username?: string; nickname?: string } | null; lastMessagePreview?: string | null };
-type Message = { _id: string; conversationId: string; senderId: string; text: string; status: string; createdAt: string };
+type Message = { _id: string; conversationId: string; senderId: string; text: string; status: "SENT" | "DELIVERED" | "READ" | string; createdAt: string };
 
 export default function MessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -32,7 +32,11 @@ export default function MessagesPage() {
 
   async function openConversation(conversation: Conversation) {
     setActive(conversation);
-    try { setMessages((await request("/messages/conversations/" + conversation.id + "/messages")).messages ?? []); await request("/messages/conversations/" + conversation.id + "/read", { method: "POST" }); }
+    try {
+      setMessages((await request("/messages/conversations/" + conversation.id + "/messages")).messages ?? []);
+      await request("/messages/conversations/" + conversation.id + "/delivered", { method: "POST" });
+      await request("/messages/conversations/" + conversation.id + "/read", { method: "POST" });
+    }
     catch (e) { setMessage(e instanceof Error ? e.message : "Unable to load conversation"); }
   }
 
@@ -73,6 +77,10 @@ export default function MessagesPage() {
           setMessages(items => items.some(item => item._id === data.message._id) ? items : [...items, data.message]);
           void loadConversations();
         }
+        if (data.type === "message:status" && data.messageIds?.length) {
+          const ids = new Set<string>(data.messageIds);
+          setMessages(items => items.map(item => ids.has(item._id) ? { ...item, status: data.status } : item));
+        }
       } catch {}
     };
     return () => { ws.close(); socket.current = null; };
@@ -93,7 +101,13 @@ export default function MessagesPage() {
         <section style={{ display: "flex", flexDirection: "column" }}>
           <header style={{ padding: 16, borderBottom: "1px solid #ddd" }}><b>{active?.otherUser?.nickname ?? active?.otherUser?.username ?? "Select a conversation"}</b></header>
           <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
-            {messages.map(m => <div key={m._id} style={{ margin: "8px 0", textAlign: "left" }}><span style={{ display: "inline-block", padding: "10px 12px", borderRadius: 12, background: "#f1f1f1" }}>{m.text}</span><small style={{ marginLeft: 8 }}>{m.status}</small></div>)}
+            {messages.map(m => {
+              const mine = m.senderId !== active?.otherUser;
+              return <div key={m._id} style={{ margin: "8px 0", textAlign: "left" }}>
+                <span style={{ display: "inline-block", padding: "10px 12px", borderRadius: 12, background: "#f1f1f1" }}>{m.text}</span>
+                <small style={{ marginLeft: 8 }}>{m.status}</small>
+              </div>;
+            })}
           </div>
           <form onSubmit={e => { e.preventDefault(); void sendMessage(); }} style={{ display: "flex", gap: 8, padding: 16, borderTop: "1px solid #ddd" }}>
             <input value={text} onChange={e => setText(e.target.value)} placeholder="Write a message…" disabled={!active} style={{ flex: 1 }} />
