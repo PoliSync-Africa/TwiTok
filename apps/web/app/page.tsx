@@ -448,6 +448,19 @@ export default function Home() {
         </div>
       </section>
     </div>}
+    {giftVideoId && <div className="comments-backdrop" role="presentation" onClick={() => !giftBusy && setGiftVideoId(null)}>
+      <section onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Gift tray" style={giftStyles.sheet}>
+        <div style={giftStyles.header}><div><strong>Send a Gift</strong><small style={giftStyles.balance}>🪙 {coinBalance.toLocaleString()} Coins</small></div><button type="button" onClick={() => setGiftVideoId(null)} style={giftStyles.close}>×</button></div>
+        <div style={giftStyles.grid}>
+          {giftCatalog.map(gift => <button key={gift.giftId} disabled={giftBusy} onClick={() => void sendGift(gift.giftId)} style={giftStyles.gift}>
+            <span style={giftStyles.emoji}>{gift.animation === "rose" ? "🌹" : gift.animation === "heart" ? "❤️" : gift.animation === "clap" ? "👏" : gift.animation === "kente" ? "🟩" : gift.animation === "drum" ? "🥁" : gift.animation === "crown" ? "👑" : gift.animation === "lion" ? "🦁" : "💎"}</span>
+            <b>{gift.name}</b><small>{gift.coins.toLocaleString()} Coins</small>
+          </button>)}
+        </div>
+        <div style={giftStyles.quantity}><span>Quantity</span>{[1,5,10].map(q => <button key={q} onClick={() => setGiftQuantity(q)} style={giftQuantity === q ? giftStyles.active : giftStyles.quantityButton}>×{q}</button>)}</div>
+        {giftMessage && <p style={giftStyles.message}>{giftMessage}</p>}
+      </section>
+    </div>}
     {commentsVideoId && <div className="comments-backdrop" role="presentation" onClick={() => setCommentsVideoId(null)}>
       <section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Comments" onClick={event => event.stopPropagation()}>
         <header className="comments-header"><strong>Comments</strong><button type="button" onClick={() => setCommentsVideoId(null)} aria-label="Close comments">×</button></header>
