@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { createNotification } from "./notifications.js";
+import { createPresignedPlayback } from "../media/storage.js";
 
 export type FollowState = "FOLLOWING" | "PENDING";
 
@@ -40,7 +41,7 @@ export async function getProfile(db: Db, username: string, viewerId?: ObjectId) 
 
   return {
     id: user._id.toHexString(), username: user.username, nickname: user.nickname,
-    countryCode: user.countryCode, bio: user.bio ?? "", accountType: user.accountType, isPrivate: Boolean(user.isPrivate),
+    countryCode: user.countryCode, bio: user.bio ?? "", accountType: user.accountType, profilePhotoUrl: user.profilePhotoKey ? (await createPresignedPlayback(user.profilePhotoKey, 900)).url : null, isPrivate: Boolean(user.isPrivate),
     followers, following, isFollowing: Boolean(relationship), followPending: pending, createdAt: user.createdAt
   };
 }
