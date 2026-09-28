@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
 import { getSticker } from "./stickers.js";
-import { createPresignedUpload, mediaConfigured } from "../media/storage.js";
+import { createPresignedUpload, createPresignedPlayback, headMediaObject, mediaConfigured } from "../media/storage.js";
 import { verifySourceAndQueue } from "./processing.js";
 
 export type VideoVisibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
@@ -241,14 +241,32 @@ export async function getVideoRemix(db: Db, userId: ObjectId, remixId: string) {
   };
 }
 
+export async function createVideoRemixUpload(db: Db, userId: ObjectId, remixId: string, input: { mimeType: string; sizeBytes: number }) {
+  if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
+  if (!["video/mp4", "video/quicktime", "video/webm"].includes(input.mimeType)) throw new Error("Unsupported video format");
+  if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > MAX_BYTES) throw new Error("Video size is outside the allowed range");
+  const remix = await db.collection("video_remixes").findOne({ _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT" });
+  if (!remix) throw new Error("Remix draft not found");
+  if (!mediaConfigured()) throw new Error("Media storage is not configured");
+  const uploadId = crypto.randomUUID();
+  const objectKey = `remixes/${userId.toHexString()}/${new Date().toISOString().slice(0, 10)}/${remixId}/${uploadId}/source`;
+  const signed = await createPresignedUpload({ objectKey, mimeType: input.mimeType, expiresInSeconds: 900 });
+  await db.collection("video_remixes").updateOne({ _id: remix._id, creatorId: userId, status: "DRAFT" }, { $set: { uploadId, objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes, uploadStatus: "UPLOADING", updatedAt: new Date() } });
+  return { uploadId, objectKey, uploadUrl: signed.url, expiresInSeconds: signed.expiresInSeconds };
+}
+
 export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { mediaUrl: string; caption?: string }) {
   if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
-  const mediaUrl = String(input.mediaUrl ?? "").trim().slice(0, 2000);
-  if (!mediaUrl) throw new Error("mediaUrl is required");
+  const uploadId = String(input.uploadId ?? "").trim();
+  if (!uploadId) throw new Error("uploadId is required");
+  const remix = await db.collection("video_remixes").findOne({ _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT", uploadId, uploadStatus: "UPLOADING" });
+  if (!remix?.objectKey) throw new Error("Remix upload session not found");
+  const head = await headMediaObject(remix.objectKey);
+  if (head.ContentLength != null && Number(head.ContentLength) !== Number(remix.sizeBytes)) throw new Error("Uploaded object size does not match the declared size");
   const caption = String(input.caption ?? "").trim().slice(0, 2200);
   const result = await db.collection("video_remixes").findOneAndUpdate(
-    { _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT" },
-    { $set: { mediaUrl, caption, status: "READY", updatedAt: new Date() } },
+    { _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT", uploadId },
+    { $set: { caption, status: "READY", uploadStatus: "READY", updatedAt: new Date() } },
     { returnDocument: "after" }
   );
   if (!result) throw new Error("Remix draft not found");
