@@ -3,7 +3,7 @@ import { getDb } from "../db/mongo.js";
 import { ObjectId } from "mongodb";
 import { createPresignedUpload, createPresignedPlayback } from "../media/storage.js";
 import { requireUser } from "../auth/middleware.js";
-import { addComment, getEngagement, listComments, recordShare, toggleLike, toggleRepost, toggleSave } from "../social/engagement.js";
+import { addComment, getEngagement, listComments, listCommentReplies, recordShare, toggleCommentLike, toggleLike, toggleRepost, toggleSave } from "../social/engagement.js";
 
 export const engagementRouter = Router();
 
