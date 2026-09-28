@@ -43,7 +43,9 @@ walletRouter.post("/gifts", requireUser, async (req, res) => {
     const { receiverId, giftId, quantity, context = "VIDEO" } = req.body ?? {};
     const senderId = req.userId!.toHexString();
     if (!receiverId || !giftId) return res.status(400).json({ error: "receiverId and giftId are required" });
-    return res.status(201).json(await sendGift(await getDb(), { senderId, receiverId: String(receiverId), giftId, quantity, context }));
+    const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
+    if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
+    return res.status(201).json(await sendGift(await getDb(), { senderId, receiverId: String(receiverId), giftId, quantity, context, idempotencyKey }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Gift failed" }); }
 });
 
