@@ -39,6 +39,23 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: excluded } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !excluded.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
-  const videos = await db.collection("videos").find(query).sort({ publishedAt: -1, _id: -1 }).limit(Math.min(Math.max(limit, 1), 20)).toArray();
+  const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
+  const videos = await db.collection("videos").aggregate([
+    { $match: query },
+    { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
+      { $match: { userId } },
+      { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
+      { $group: { _id: "$type", count: { $sum: 1 }, totalWatchMs: { $sum: "$watchMs" }, latest: { $max: "$createdAt" } } }
+    ], as: "viewerEvents" } },
+    { $addFields: {
+      _engagement: { $add: [
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.count", 0] }, 0] }, 0.5] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00005] }
+      ] },
+      _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
+    } },
+    { $sort: { _engagement: -1, _freshness: 1, publishedAt: -1, _id: -1 } },
+    { $limit: safeLimit }
+  ]).toArray();
   return videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null }));
 }
