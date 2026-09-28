@@ -51,12 +51,15 @@ authRouter.patch("/profile-setup", requireUser, async (req, res) => {
   try {
     const username = String(req.body?.username ?? "").trim().toLowerCase();
     const nickname = String(req.body?.nickname ?? "").trim();
+    const bio = String(req.body?.bio ?? "").trim();
+    const isPrivate = Boolean(req.body?.isPrivate);
     if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Username must be 3-24 characters, use letters, numbers, dots or underscores, and not end with a dot" });
     if (!nickname || nickname.length > 50) return res.status(400).json({ error: "Nickname is required and must be 1-50 characters" });
+    if (bio.length > 80) return res.status(400).json({ error: "Bio must be 80 characters or less" });
     const db = await getDb();
     const existing = await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } });
     if (existing) return res.status(409).json({ error: "That username is already taken" });
-    await db.collection("users").updateOne({ _id: req.userId! }, { $set: { username, nickname, profileSetupComplete: true, updatedAt: new Date() } });
+    await db.collection("users").updateOne({ _id: req.userId! }, { $set: { username, nickname, bio, isPrivate, profileSetupComplete: true, updatedAt: new Date() } });
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     if (!user) return res.status(404).json({ error: "Account not found" });
     res.json({ user });
