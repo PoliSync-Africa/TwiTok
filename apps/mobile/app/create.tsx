@@ -25,6 +25,7 @@ export default function CreateScreen() {
   const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
   const [caption, setCaption] = useState("");
+  const [hashtags, setHashtags] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [speed, setSpeed] = useState(1);
@@ -339,6 +340,7 @@ export default function CreateScreen() {
       </View> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
+        {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
          {assets.length ? <FlatList
            data={assets}
            horizontal
