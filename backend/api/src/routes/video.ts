@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { completeUpload, createUploadSession, createVideoDraft, publishVideo } from "../video/service.js";
+import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, publishVideo } from "../video/service.js";
 import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
@@ -111,6 +111,14 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
       autoCaptions: req.body?.autoCaptions === true, captionLanguage: req.body?.captionLanguage, effect: req.body?.effect, stickers: req.body?.stickers
     }));
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create video draft" }); }
+});
+
+videoRouter.post("/:videoId/remix", requireUser, async (req, res) => {
+  try {
+    const mode = String(req.body?.mode ?? "").toUpperCase();
+    if (mode !== "DUET" && mode !== "STITCH") return res.status(400).json({ error: "mode must be DUET or STITCH" });
+    res.status(201).json({ remix: await createVideoRemix(await getDb(), req.userId!, String(req.params.videoId), mode as "DUET" | "STITCH") });
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create remix" }); }
 });
 
 videoRouter.post("/:videoId/publish", requireUser, async (req, res) => {
