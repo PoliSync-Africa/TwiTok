@@ -128,7 +128,7 @@ videoRouter.post("/remixes/:remixId/upload", requireUser, async (req, res) => {
 
 videoRouter.post("/remixes/:remixId/complete", requireUser, async (req, res) => {
   try {
-    res.json({ remix: await completeVideoRemix(await getDb(), req.userId!, String(req.params.remixId), { mediaUrl: String(req.body?.mediaUrl ?? ""), caption: req.body?.caption }) });
+    res.json({ remix: await completeVideoRemix(await getDb(), req.userId!, String(req.params.remixId), { uploadId: String(req.body?.uploadId ?? ""), caption: req.body?.caption }) });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete remix" }); }
 });
 
