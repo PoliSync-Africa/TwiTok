@@ -1,4 +1,6 @@
 import express from "express";
+import { createServer } from "node:http";
+import { attachRealtime } from "./realtime/ws.js";
 import cors from "cors";
 import helmet from "helmet";
 import { getDb } from "./db/mongo.js";
@@ -21,6 +23,8 @@ import { ensureTranslationIndexes } from "./video/translation.js";
 import { ensureStickerIndexes } from "./video/stickers.js";
 
 const app = express();
+const httpServer = createServer(app);
+attachRealtime(httpServer);
 const port = Number(process.env.PORT ?? 4000);
 
 app.use(helmet());
@@ -52,10 +56,11 @@ async function start() {
     await ensureTranscriptionIndexes(db);
     await ensureTranslationIndexes(db);
     await ensureStickerIndexes(db);
+    await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
   } else {
     console.warn("MONGODB_URI is not configured. Database features are disabled.");
   }
-  app.listen(port, () => console.log(`TwiTok API listening on port ${port}`));
+  httpServer.listen(port, () => console.log(`TwiTok API listening on port ${port}`));
 }
 
 start().catch((error) => {
