@@ -3,7 +3,7 @@ import { getDb } from "../db/mongo.js";
 import { ObjectId } from "mongodb";
 import { createPresignedUpload, createPresignedPlayback } from "../media/storage.js";
 import { requireUser } from "../auth/middleware.js";
-import { addComment, getEngagement, listComments, listCommentReplies, recordShare, toggleCommentLike, toggleLike, toggleRepost, toggleSave } from "../social/engagement.js";
+import { addComment, deleteComment, getEngagement, listComments, listCommentReplies, recordShare, toggleCommentLike, toggleLike, togglePinComment, toggleRepost, toggleSave } from "../social/engagement.js";
 
 export const engagementRouter = Router();
 
@@ -68,11 +68,22 @@ engagementRouter.get("/comments/media", requireUser, async (req, res) => {
 });
 
 engagementRouter.get("/:videoId/comments", requireUser, async (req, res) => {
-  try { res.json({ comments: await listComments(await getDb(), String(req.params.videoId), Number(req.query.limit ?? 30)) }); }
+  try { res.json({ comments: await listComments(await getDb(), req.userId!, String(req.params.videoId), Number(req.query.limit ?? 30)) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load comments" }); }
 });
 
 engagementRouter.post("/:videoId/comments", requireUser, async (req, res) => {
-  try { res.status(201).json({ comment: await addComment(await getDb(), req.userId!, String(req.params.videoId), String(req.body?.text ?? ""), Array.isArray(req.body?.attachments) ? req.body.attachments : []) }); }
+  try { res.status(201).json({ comment: await addComment(await getDb(), req.userId!, String(req.params.videoId), String(req.body?.text ?? ""), Array.isArray(req.body?.attachments) ? req.body.attachments : [], req.body?.parentId ? String(req.body.parentId) : undefined) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to add comment" }); }
+});
+
+
+engagementRouter.delete("/comments/:commentId", requireUser, async (req, res) => {
+  try { res.json(await deleteComment(await getDb(), req.userId!, String(req.params.commentId))); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to delete comment" }); }
+});
+
+engagementRouter.post("/comments/:commentId/pin", requireUser, async (req, res) => {
+  try { res.json(await togglePinComment(await getDb(), req.userId!, String(req.params.commentId))); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to pin comment" }); }
 });
