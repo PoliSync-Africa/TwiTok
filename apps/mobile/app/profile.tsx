@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
-type Profile = { id:string; username:string; nickname?:string; bio?:string; countryCode?:string; followers:number; following:number; isFollowing:boolean; followPending:boolean; isPrivate:boolean };
+type Video = { id:string; thumbnail?:string|null; playback?:string|null; caption?:string };
+type Profile = { id:string; username:string; nickname?:string; bio?:string; countryCode?:string; followers:number; following:number; isFollowing:boolean; followPending:boolean; isPrivate:boolean; profilePhotoUrl?:string|null };
 
 export default function ProfileScreen() {
   const { username } = useLocalSearchParams<{username:string}>();
@@ -13,6 +14,8 @@ export default function ProfileScreen() {
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
+  const [videos,setVideos]=useState<Video[]>([]);
+  const [viewerId,setViewerId]=useState("");
 
   async function load() {
     if(!username) return;
@@ -22,6 +25,10 @@ export default function ProfileScreen() {
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Profile unavailable");
       setProfile(d.profile);
+      const me=await fetch(API+"/auth/me",{headers:token?{Authorization:"Bearer "+token}:{}});
+      const md=await me.json().catch(()=>({})); setViewerId(md.user?._id?.toString?.() || md.user?.id || "");
+      const vr=await fetch(API+"/profile/"+encodeURIComponent(String(username))+"/videos",{headers:token?{Authorization:"Bearer "+token}:{}});
+      const vd=await vr.json().catch(()=>({})); if(vr.ok) setVideos(vd.videos??[]);
     } catch(e){setError(e instanceof Error?e.message:"Profile unavailable");}
     finally{setLoading(false);}
   }
@@ -48,19 +55,21 @@ export default function ProfileScreen() {
   return <View style={styles.screen}>
     <View style={styles.header}><Pressable onPress={()=>router.back()}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.headerTitle}>Profile</Text><View style={{width:32}}/></View>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.avatar}><Text style={styles.avatarText}>{(profile.nickname||profile.username||"?").slice(0,1).toUpperCase()}</Text></View>
+      <View style={styles.avatar}>{profile.profilePhotoUrl?<Image source={{uri:profile.profilePhotoUrl}} style={styles.avatarImage}/>:<Text style={styles.avatarText}>{(profile.nickname||profile.username||"?").slice(0,1).toUpperCase()}</Text>}</View>
       <Text style={styles.nickname}>{profile.nickname||profile.username}</Text>
       <Text style={styles.username}>@{profile.username}</Text>
+      {viewerId===profile.id&&<Pressable style={styles.editButton} onPress={()=>router.push({pathname:"/edit-profile",params:{username:profile.username,nickname:profile.nickname??"",bio:profile.bio??"",isPrivate:String(profile.isPrivate)}})}><Text style={styles.editText}>Edit profile</Text></Pressable>}
       {!!profile.bio&&<Text style={styles.bio}>{profile.bio}</Text>}
       <View style={styles.stats}><View><Text style={styles.stat}>{profile.followers}</Text><Text style={styles.statLabel}>Followers</Text></View><View><Text style={styles.stat}>{profile.following}</Text><Text style={styles.statLabel}>Following</Text></View></View>
       <Pressable onPress={follow} disabled={busy} style={[styles.followButton,profile.isFollowing&&styles.followingButton,profile.followPending&&styles.pendingButton]}>
         {busy?<ActivityIndicator color="#fff" size="small"/>:<Text style={styles.followText}>{profile.isFollowing?"Following":profile.followPending?"Requested":"Follow"}</Text>}
       </Pressable>
       {profile.isPrivate&&!profile.isFollowing?<Text style={styles.private}>This account is private. Follow to see their content.</Text>:<Text style={styles.private}>Creator profile</Text>}
+      <View style={styles.grid}>{videos.map(v=><Pressable key={v.id} style={styles.gridItem} onPress={()=>v.playback&&router.push({pathname:"/feed",params:{videoId:v.id}})}>{v.thumbnail?<Image source={{uri:v.thumbnail}} style={styles.gridImage}/>:<View style={styles.gridFallback}><Text style={styles.gridFallbackText}>▶</Text></View>}</Pressable>)}</View>
     </ScrollView>
   </View>;
 }
 
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:"#000"}, header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"#222"}, back:{color:"#fff",fontSize:40,lineHeight:40},headerTitle:{color:"#fff",fontSize:18,fontWeight:"800"},content:{alignItems:"center",padding:24},avatar:{width:92,height:92,borderRadius:46,backgroundColor:"#252525",alignItems:"center",justifyContent:"center",marginTop:18},avatarText:{color:"#fff",fontSize:34,fontWeight:"900"},nickname:{color:"#fff",fontSize:22,fontWeight:"800",marginTop:14},username:{color:"#aaa",fontSize:15,marginTop:4},bio:{color:"#ddd",fontSize:15,textAlign:"center",lineHeight:21,marginTop:14,maxWidth:330},stats:{flexDirection:"row",gap:55,marginTop:24,marginBottom:24},stat:{color:"#fff",fontSize:20,fontWeight:"900",textAlign:"center"},statLabel:{color:"#aaa",fontSize:12,marginTop:3},followButton:{minWidth:180,height:44,borderRadius:6,backgroundColor:"#ff2d55",alignItems:"center",justifyContent:"center"},followingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},pendingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},followText:{color:"#fff",fontWeight:"800"},private:{color:"#888",fontSize:13,textAlign:"center",marginTop:24},center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:24},error:{color:"#ff7188",textAlign:"center",marginBottom:15},link:{color:"#fff",fontWeight:"700"}
+ screen:{flex:1,backgroundColor:"#000"}, header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"#222"}, back:{color:"#fff",fontSize:40,lineHeight:40},headerTitle:{color:"#fff",fontSize:18,fontWeight:"800"},content:{alignItems:"center",padding:24},avatar:{width:92,height:92,borderRadius:46,backgroundColor:"#252525",alignItems:"center",justifyContent:"center",marginTop:18},avatarText:{color:"#fff",fontSize:34,fontWeight:"900"},nickname:{color:"#fff",fontSize:22,fontWeight:"800",marginTop:14},username:{color:"#aaa",fontSize:15,marginTop:4},bio:{color:"#ddd",fontSize:15,textAlign:"center",lineHeight:21,marginTop:14,maxWidth:330},stats:{flexDirection:"row",gap:55,marginTop:24,marginBottom:24},stat:{color:"#fff",fontSize:20,fontWeight:"900",textAlign:"center"},statLabel:{color:"#aaa",fontSize:12,marginTop:3},followButton:{minWidth:180,height:44,borderRadius:6,backgroundColor:"#ff2d55",alignItems:"center",justifyContent:"center"},followingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},pendingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},followText:{color:"#fff",fontWeight:"800"},private:{color:"#888",fontSize:13,textAlign:"center",marginTop:24},editButton:{marginTop:12,paddingHorizontal:24,height:38,borderRadius:5,borderWidth:1,borderColor:"#444",alignItems:"center",justifyContent:"center"},editText:{color:"#fff",fontWeight:"800"},grid:{width:"100%",flexDirection:"row",flexWrap:"wrap",gap:2,marginTop:28,borderTopWidth:1,borderTopColor:"#222",paddingTop:2},gridItem:{width:"32.8%",aspectRatio:.72,backgroundColor:"#171717"},gridImage:{width:"100%",height:"100%"},gridFallback:{flex:1,alignItems:"center",justifyContent:"center"},gridFallbackText:{color:"#777",fontSize:20},center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:24},error:{color:"#ff7188",textAlign:"center",marginBottom:15},link:{color:"#fff",fontWeight:"700"}
 });
