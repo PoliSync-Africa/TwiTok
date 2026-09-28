@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { getAuthToken } from "../lib/auth";
+import { configureRevenueCat, getCoinPackages, purchaseCoinPackage } from "../lib/revenuecat";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 type Wallet = { coinBalance?: number; diamondBalance?: number; cashBalanceUsd?: number };
 type Gift = { giftName: string; quantity: number; coinsSpent: number; diamondsAwarded: number; createdAt?: string };
 type Withdrawal = { withdrawalId: string; amountUsd: number; payoutAmount: number; payoutCurrency: string; type: string; status: string; createdAt?: string };
+type CoinPackage = { sku: string; coins: number; priceUsd: number };
 
 export default function WalletScreen() {
   const [wallet,setWallet]=useState<Wallet>({});
@@ -20,6 +22,8 @@ export default function WalletScreen() {
   const [code,setCode]=useState("");
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
+  const [coinPackages,setCoinPackages]=useState<CoinPackage[]>([]);
+  const [purchasing,setPurchasing]=useState(false);
 
   async function load(){
     setLoading(true);
@@ -27,6 +31,7 @@ export default function WalletScreen() {
       const token=await getAuthToken();
       if(!token){ Alert.alert("Sign in","Please sign in to view your wallet."); router.back(); return; }
       const h={Authorization:"Bearer "+token};
+      configureRevenueCat(String((await import("../lib/auth")).getCurrentUserId?.() ?? ""));
       const [w,g,wd]=await Promise.all([
         fetch(API+"/wallet/me",{headers:h}),
         fetch(API+"/wallet/me/gifts?limit=20",{headers:h}),
@@ -35,10 +40,26 @@ export default function WalletScreen() {
       const [wj,gj,wdj]=await Promise.all([w.json(),g.json(),wd.json()]);
       if(!w.ok) throw new Error(wj.error??"Wallet unavailable");
       setWallet(wj); setGifts(gj.gifts??[]); setWithdrawals(wdj.withdrawals??[]);
+      const catalog=await fetch(API+"/wallet/catalog",{headers:h});
+      const catalogJson=await catalog.json().catch(()=>({}));
+      setCoinPackages(catalogJson.coinPackages??[]);
     }catch(e){ Alert.alert("Wallet",e instanceof Error?e.message:"Unable to load wallet"); }
     finally{setLoading(false);}
   }
   useEffect(()=>{void load();},[]);
+
+  async function buyCoins(){
+    try{
+      const packages=await getCoinPackages();
+      if(!packages.length){ Alert.alert("Coin purchases","RevenueCat is not configured for this build yet. Use the web wallet or install the configured App Store/Google Play build."); return; }
+      const selected=packages[0];
+      const match=coinPackages.find(p=>selected.identifier.includes(p.sku)||p.sku.includes(selected.identifier));
+      Alert.alert("Buy Coins", match ? `${match.coins.toLocaleString()} Coins · ${match.priceUsd.toFixed(2)}` : selected.product.title, [
+        {text:"Cancel",style:"cancel"},
+        {text:"Purchase",onPress:async()=>{setPurchasing(true);try{await purchaseCoinPackage(selected);Alert.alert("Purchase complete","Your verified Coins will appear in your TwiTok wallet.");await load();}catch(e){Alert.alert("Purchase",e instanceof Error?e.message:"Purchase was cancelled or failed");}finally{setPurchasing(false);}}}
+      ]);
+    }catch(e){Alert.alert("Coin purchases",e instanceof Error?e.message:"Unable to load Coin packages");}
+  }
 
   async function withdraw(){
     const token=await getAuthToken(); const value=Number(amount);
@@ -65,8 +86,8 @@ export default function WalletScreen() {
         <Stat label="Coins" value={String(Math.floor(wallet.coinBalance??0))}/>
         <Stat label="Diamonds" value={String(Number(wallet.diamondBalance??0).toFixed(2))}/>
       </View>
-      <Pressable style={styles.buyCard} onPress={()=>Alert.alert("Coins","Coin purchases in the mobile app will use the App Store / Google Play purchase flow. Your verified purchase is credited by the server.")}>
-        <View><Text style={styles.buyTitle}>Buy Coins</Text><Text style={styles.buySub}>Use secure in-app purchases</Text></View><Text style={styles.arrow}>›</Text>
+      <Pressable style={styles.buyCard} disabled={purchasing} onPress={()=>void buyCoins()}>
+        <View><Text style={styles.buyTitle}>{purchasing?"Processing…":"Buy Coins"}</Text><Text style={styles.buySub}>Apple App Store / Google Play</Text></View><Text style={styles.arrow}>›</Text>
       </Pressable>
       <Section title="Recent gifts">
         {gifts.length?gifts.map((g,i)=><View style={styles.row} key={i}><View><Text style={styles.rowTitle}>{g.giftName} × {g.quantity}</Text><Text style={styles.rowSub}>{g.createdAt?new Date(g.createdAt).toLocaleString():""}</Text></View><Text style={styles.positive}>+{Number(g.diamondsAwarded).toFixed(2)} ♦</Text></View>):<Text style={styles.empty}>No gifts received yet.</Text>}
