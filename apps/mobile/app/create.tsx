@@ -247,6 +247,7 @@ export default function CreateScreen() {
             <Pressable style={styles.small} onPress={()=>seekPreview(trimEndMs || previewDurationMs)}><Text style={styles.choiceText}>End</Text></Pressable>
           </View>
         </View> : null}
+        {mode === "VIDEO" && assets.length ? <View style={styles.coverBox}><Text style={styles.helper}>Cover frame: {(coverTimeMs/1000).toFixed(1)}s</Text><View style={styles.row}><Pressable style={styles.small} onPress={()=>setCoverTimeMs(Math.round(previewTimeMs))}><Text style={styles.choiceText}>Use current position</Text></Pressable><Pressable style={styles.small} onPress={()=>setCoverTimeMs(0)}><Text style={styles.choiceText}>First frame</Text></Pressable></View></View> : null}
         <Text style={styles.section}>Edit timeline</Text>
         {mode === "VIDEO" ? <>
           <Text style={styles.helper}>Trim start / end (milliseconds)</Text>
