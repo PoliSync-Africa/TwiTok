@@ -198,7 +198,7 @@ export default function CreateScreen() {
       const token = await getAuthToken();
       if (!token) throw new Error("Sign in before posting.");
       if (mode === "TEXT") {
-        const response = await fetch(API + "/videos/posts/text", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({text:caption,visibility,allowComments:comments}) });
+        const response = await fetch(API + "/video/posts/text", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({text:caption,visibility,allowComments:comments}) });
         const data = await response.json().catch(()=>({})); if (!response.ok) throw new Error(data.error || "Unable to publish text post.");
         Alert.alert("Posted","Your TwiTok text post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
@@ -225,7 +225,7 @@ export default function CreateScreen() {
         const mimeType = asset.mimeType || blob.type || "video/mp4";
         if (!mimeType.startsWith("video/")) throw new Error("Only video clips are supported in this post.");
         setStatus(`Uploading clip ${index + 1} of ${assets.length}…`);
-        const sessionResponse = await fetch(API + "/videos/uploads", {
+        const sessionResponse = await fetch(API + "/video/uploads", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
           body: JSON.stringify({ mimeType, sizeBytes: blob.size, durationMs: asset.duration ?? undefined })
@@ -235,7 +235,7 @@ export default function CreateScreen() {
         if (!session.uploadUrl) throw new Error("Media storage is not configured.");
         const uploadResponse = await fetch(session.uploadUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: blob });
         if (!uploadResponse.ok) throw new Error("Clip upload failed.");
-        const completeResponse = await fetch(API + "/videos/uploads/" + session.uploadId + "/complete", { method: "POST", headers: { Authorization: "Bearer " + token } });
+        const completeResponse = await fetch(API + "/video/uploads/" + session.uploadId + "/complete", { method: "POST", headers: { Authorization: "Bearer " + token } });
         if (!completeResponse.ok) {
           const d = await completeResponse.json().catch(() => ({}));
           throw new Error(d.error || "Unable to complete upload.");
@@ -244,7 +244,7 @@ export default function CreateScreen() {
       }
 
       setStatus("Creating your post…");
-      const draftResponse = await fetch(API + "/videos/drafts", {
+      const draftResponse = await fetch(API + "/video/drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
@@ -279,14 +279,14 @@ export default function CreateScreen() {
       setStatus("Processing video…");
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise(resolve => setTimeout(resolve, 2000));
-        const check = await fetch(API + "/videos/" + draft.videoId, { headers: { Authorization: "Bearer " + token } });
+        const check = await fetch(API + "/video/" + draft.videoId, { headers: { Authorization: "Bearer " + token } });
         const video = await check.json().catch(() => ({}));
         if (video.status === "READY") break;
         if (video.status === "FAILED") throw new Error("Video processing failed.");
         if (attempt === 59) throw new Error("Video is still processing. Open your profile later to publish it.");
       }
       setStatus("Publishing…");
-      const publishResponse = await fetch(API + "/videos/" + draft.videoId + "/publish", { method: "POST", headers: { Authorization: "Bearer " + token } });
+      const publishResponse = await fetch(API + "/video/" + draft.videoId + "/publish", { method: "POST", headers: { Authorization: "Bearer " + token } });
       const published = await publishResponse.json().catch(() => ({}));
       if (!publishResponse.ok) throw new Error(published.error || "Unable to publish post.");
       Alert.alert("Posted", "Your TwiTok video is now live.", [{ text: "View feed", onPress: () => router.replace("/feed") }]);
