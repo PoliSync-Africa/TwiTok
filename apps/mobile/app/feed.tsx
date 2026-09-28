@@ -18,7 +18,7 @@ type Engagement = { likeCount:number; commentCount:number; shareCount:number; sa
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 const { height, width } = Dimensions.get("window");
 
-function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void }) {
+function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void }) {
   const [engagement, setEngagement] = useState<Engagement | null>(null);
   const [busy, setBusy] = useState(false);
   const source = item.playback?.hlsUrl || item.playback?.mp4Url || null;
@@ -78,7 +78,7 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   }, [active, player, source]);
 
   if (!source) {
-    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} engagement={engagement} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} /></View>;
+    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} /></View>;
   }
 
   return (
@@ -89,7 +89,7 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   );
 }
 
-function Overlay({ item, engagement, onAction, onComments }: { item: Video; engagement: Engagement | null; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void }) {
+function Overlay({ item, engagement, surface, onSurface, onAction, onComments }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void }) {
   return (
     <>
       <View style={styles.scrim} />
@@ -104,13 +104,14 @@ function Overlay({ item, engagement, onAction, onComments }: { item: Video; enga
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
       </View>
-      <View style={styles.bottomTabs}><Text style={styles.tabActive}>You</Text><Text style={styles.tab}>Following</Text><Text style={styles.tab}>Explore Africa</Text></View>
+      <View style={styles.bottomTabs}><Pressable onPress={() => setSurface("FOR_YOU")}><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable></Pressable><Pressable onPress={() => setSurface("FOLLOWING")}><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable></Pressable><Pressable onPress={() => setSurface("AFRICA")}><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></Pressable></View>
     </>
   );
 }
 
 export default function FeedScreen() {
   const [videos, setVideos] = useState<Video[]>([]);
+  const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"AFRICA">("FOR_YOU");
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -121,7 +122,7 @@ export default function FeedScreen() {
       try {
         const token = await getAuthToken();
         if (!token) throw new Error("Sign in to view your feed.");
-        const r = await fetch(API + "/feed/FOR_YOU?limit=10", { headers: { Authorization: `Bearer ${token}` } });
+        const r = await fetch(API + "/feed/" + surface + "?limit=10", { headers: { Authorization: `Bearer ${token}` } });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error ?? "Feed unavailable");
         if (active) setVideos(data.videos ?? data.items ?? []);
@@ -132,7 +133,7 @@ export default function FeedScreen() {
       }
     })();
     return () => { active = false; };
-  }, []);
+  }, [surface]);
 
   const recordEvent = async (videoId: string, type: string, watchMs?: number) => {
     try {
@@ -157,7 +158,7 @@ export default function FeedScreen() {
       pagingEnabled
       showsVerticalScrollIndicator={false}
       onMomentumScrollEnd={event => setActiveIndex(Math.round(event.nativeEvent.contentOffset.y / height))}
-      renderItem={({ item, index }) => <VideoCard item={item} active={index === activeIndex} onEvent={(type, watchMs) => recordEvent(item.id, type, watchMs)} />}
+      renderItem={({ item, index }) => <VideoCard item={item} active={index === activeIndex} surface={surface} onSurface={setSurface} onEvent={(type, watchMs) => recordEvent(item.id, type, watchMs)} />}
       getItemLayout={(_, index) => ({ length: height, offset: height * index, index })}
       ListEmptyComponent={<View style={styles.center}><Text style={styles.muted}>No videos available yet.</Text></View>}
     />
