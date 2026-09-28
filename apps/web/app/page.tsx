@@ -345,7 +345,7 @@ export default function Home() {
                     ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
                         {v.autoCaptionsUrl ? <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" /> : null}{Object.values(v.captionTracks ?? {}).map(captionTrack => <track key={captionTrack.language} kind="captions" src={captionTrack.url} srcLang={captionTrack.language} label={captionTrack.label} />)}
                       </video>
-                    : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>
+                    : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
               <div className="gradient"/>
               <div className="video-copy">
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
