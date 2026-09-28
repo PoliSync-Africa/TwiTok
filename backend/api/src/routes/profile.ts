@@ -62,6 +62,26 @@ profileRouter.get("/:username/videos", async (req, res) => {
 });
 
 
+profileRouter.get("/:username/drafts", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const owner = await db.collection("users").findOne({ username: String(req.params.username).toLowerCase() }, { projection: { _id: 1 } });
+    if (!owner) return res.status(404).json({ error: "Profile not found" });
+    if (!owner._id.equals(req.userId!)) return res.status(403).json({ error: "Drafts are private" });
+    const drafts = await db.collection("videos").find({ ownerId: owner._id, publishedAt: null, status: { $in: ["READY", "PROCESSING"] } }).sort({ updatedAt: -1 }).limit(60).toArray();
+    res.json({ videos: drafts.map(v => ({
+      id: v._id.toHexString(),
+      playback: v.playback ?? null,
+      thumbnail: v.thumbnail ?? null,
+      caption: v.caption ?? "",
+      status: v.status,
+      updatedAt: v.updatedAt ?? null
+    })) });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load drafts" });
+  }
+});
+
 profileRouter.get("/:username/reposts", async (req, res) => {
   try {
     const db = await getDb();
