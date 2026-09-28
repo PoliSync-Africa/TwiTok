@@ -91,6 +91,7 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
     if (!ObjectId.isValid(parentId)) throw new Error("Invalid parent comment");
     const parent = await db.collection("video_comments").findOne({ _id: new ObjectId(parentId), videoId, status: "ACTIVE" }, { projection: { _id: 1 } });
     if (!parent) throw new Error("Parent comment not found");
+    if (parent.parentId) throw new Error("Replies can only be one level deep");
     parentObjectId = new ObjectId(parentId);
   }
   const createdAt = new Date();
@@ -101,14 +102,14 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
   return { id: result.insertedId.toHexString(), userId: userId.toHexString(), text: body, createdAt, parentId: parentObjectId?.toHexString() ?? null, likeCount: 0, liked: false, replyCount: 0, attachments: await Promise.all(attachments.map(async a => ({ ...a, url: (await createPresignedPlayback(a.objectKey, 900)).url }))) };
 }
 
-export async function listComments(db: Db, videoIdString: string, limit = 30) {
+export async function listComments(db: Db, userId: ObjectId, videoIdString: string, limit = 30) {
   const videoId = videoObjectId(videoIdString);
   await getPublicVideo(db, videoId);
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 30, 1), 100);
   const comments = await db.collection("video_comments").find({ videoId, status: { $ne: "DELETED" } }).sort({ createdAt: -1 }).limit(safeLimit).toArray();
   return Promise.all(comments.map(async comment => ({
     id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt, parentId: comment.parentId?.toHexString() ?? null,
-    likeCount: await db.collection("comment_likes").countDocuments({ commentId: comment._id }), liked: false, replyCount: await db.collection("video_comments").countDocuments({ parentId: comment._id, status: "ACTIVE" }),
+    likeCount: await db.collection("comment_likes").countDocuments({ commentId: comment._id }), liked: Boolean(await db.collection("comment_likes").findOne({ commentId: comment._id, userId }, { projection: { _id: 1 } })), replyCount: await db.collection("video_comments").countDocuments({ parentId: comment._id, status: "ACTIVE" }),
     attachments: await Promise.all((comment.attachments ?? []).map(async (a: {objectKey:string;mimeType:string}) => ({ ...a, url: (await createPresignedPlayback(a.objectKey, 900)).url })))
   })));
 }
@@ -154,4 +155,28 @@ export async function listCommentReplies(db: Db, commentIdString: string, limit 
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 100);
   const rows = await db.collection("video_comments").find({ parentId: commentId, status: "ACTIVE" }).sort({ createdAt: 1 }).limit(safeLimit).toArray();
   return rows.map(comment => ({ id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt, parentId: commentIdString, attachments: comment.attachments ?? [] }));
+}
+
+
+export async function deleteComment(db: Db, userId: ObjectId, commentIdString: string) {
+  if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
+  const commentId = new ObjectId(commentIdString);
+  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { userId: 1, videoId: 1 } });
+  if (!comment) throw new Error("Comment not found");
+  const video = await db.collection("videos").findOne({ _id: comment.videoId }, { projection: { ownerId: 1 } });
+  if (!video || (!comment.userId.equals(userId) && !video.ownerId?.equals(userId))) throw new Error("You cannot delete this comment");
+  await db.collection("video_comments").updateOne({ _id: commentId }, { $set: { status: "DELETED", deletedAt: new Date(), updatedAt: new Date() } });
+  return { deleted: true };
+}
+
+export async function togglePinComment(db: Db, userId: ObjectId, commentIdString: string) {
+  if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
+  const commentId = new ObjectId(commentIdString);
+  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { videoId: 1, pinned: 1 } });
+  if (!comment) throw new Error("Comment not found");
+  const video = await db.collection("videos").findOne({ _id: comment.videoId }, { projection: { ownerId: 1 } });
+  if (!video?.ownerId?.equals(userId)) throw new Error("Only the creator can pin comments");
+  if (!comment.pinned) await db.collection("video_comments").updateMany({ videoId: comment.videoId, pinned: true }, { $set: { pinned: false, updatedAt: new Date() } });
+  await db.collection("video_comments").updateOne({ _id: commentId }, { $set: { pinned: !comment.pinned, updatedAt: new Date() } });
+  return { pinned: !comment.pinned };
 }
