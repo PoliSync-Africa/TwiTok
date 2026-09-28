@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -11,7 +11,7 @@ export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("");\n  const [speed, setSpeed] = useState(1);\n  const [effect, setEffect] = useState("NONE");\n  const [visibility, setVisibility] = useState("PUBLIC");\n  const [comments, setComments] = useState(true);\n  const [duet, setDuet] = useState(true);\n  const [stitch, setStitch] = useState(true);\n  const [coverTimeMs, setCoverTimeMs] = useState(0);\n  const [originalVolume, setOriginalVolume] = useState(1);\n  const [addedSoundVolume, setAddedSoundVolume] = useState(1);\n  const [soundId, setSoundId] = useState("");\n  const [overlayText, setOverlayText] = useState("");
 
   async function pickGallery() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -109,12 +109,26 @@ export default function CreateScreen() {
         <Pressable style={styles.mode} onPress={recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
         <Pressable style={styles.mode} onPress={pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
       </View>
-      <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
-      {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><View style={styles.clip}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text><Pressable onPress={()=>setAssets(a=>a.filter((_,i)=>i!==index))}><Text style={styles.remove}>×</Text></Pressable></View>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
-      {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
+      <ScrollView contentContainerStyle={styles.content}>
+        <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
+        {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><View style={styles.clip}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text><Pressable onPress={()=>setAssets(a=>a.filter((_,i)=>i!==index))}><Text style={styles.remove}>×</Text></Pressable></View>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
+        <Text style={styles.section}>Edit</Text>
+        <View style={styles.row}>{["0.5","1","1.5","2"].map(v=><Pressable key={v} style={[styles.choice,speed===Number(v)&&styles.selected]} onPress={()=>setSpeed(Number(v))}><Text style={styles.choiceText}>{v}×</Text></Pressable>)}</View>
+        <View style={styles.row}>{["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].map(v=><Pressable key={v} style={[styles.choice,effect===v&&styles.selected]} onPress={()=>setEffect(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
+        <TextInput value={overlayText} onChangeText={setOverlayText} placeholder="Add text overlay (optional)" placeholderTextColor="#777" style={styles.input} maxLength={150} />
+        <Text style={styles.section}>Sound</Text>
+        <TextInput value={soundId} onChangeText={setSoundId} placeholder="Sound ID (optional)" placeholderTextColor="#777" style={styles.input} />
+        <View style={styles.row}><Text style={styles.label}>Original {Math.round(originalVolume*100)}%</Text><Pressable style={styles.small} onPress={()=>setOriginalVolume(v=>v>=1?0:Math.min(1,v+0.25))}><Text style={styles.choiceText}>Adjust</Text></Pressable><Text style={styles.label}>Added {Math.round(addedSoundVolume*100)}%</Text><Pressable style={styles.small} onPress={()=>setAddedSoundVolume(v=>v>=1?0:Math.min(1,v+0.25))}><Text style={styles.choiceText}>Adjust</Text></Pressable></View>
+        <Text style={styles.section}>Cover</Text>
+        <TextInput value={String(coverTimeMs)} onChangeText={v=>setCoverTimeMs(Math.max(0,Number(v)||0))} keyboardType="numeric" placeholder="Cover time in milliseconds" placeholderTextColor="#777" style={styles.input} />
+        <Text style={styles.section}>Post settings</Text>
+        <View style={styles.row}>{["PUBLIC","FOLLOWERS","PRIVATE"].map(v=><Pressable key={v} style={[styles.choice,visibility===v&&styles.selected]} onPress={()=>setVisibility(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
+        <View style={styles.row}>{[[comments,"Comments"],[duet,"Duet"],[stitch,"Stitch"]].map(([on,label])=><Pressable key={String(label)} style={[styles.choice,on&&styles.selected]} onPress={()=>{ if(label==="Comments") setComments(!comments); else if(label==="Duet") setDuet(!duet); else setStitch(!stitch); }}><Text style={styles.choiceText}>{label}: {on?"On":"Off"}</Text></Pressable>)}</View>
+        {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
+      </ScrollView>
     </View>
   );
 }
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:"#000",paddingTop:48},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"}
+ screen:{flex:1,backgroundColor:"#000",paddingTop:48},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"}
 });
