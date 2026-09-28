@@ -73,6 +73,6 @@ engagementRouter.get("/:videoId/comments", requireUser, async (req, res) => {
 });
 
 engagementRouter.post("/:videoId/comments", requireUser, async (req, res) => {
-  try { res.status(201).json({ comment: await addComment(await getDb(), req.userId!, String(req.params.videoId), String(req.body?.text ?? "")) }); }
+  try { res.status(201).json({ comment: await addComment(await getDb(), req.userId!, String(req.params.videoId), String(req.body?.text ?? ""), Array.isArray(req.body?.attachments) ? req.body.attachments : []) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to add comment" }); }
 });
