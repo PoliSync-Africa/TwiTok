@@ -61,6 +61,7 @@ export default function Home() {
   const [giftQuantity, setGiftQuantity] = useState(1);
   const [giftBusy, setGiftBusy] = useState(false);
   const [giftMessage, setGiftMessage] = useState("");
+  const [giftAttemptCoins, setGiftAttemptCoins] = useState<number | null>(null);
   const [giftBursts, setGiftBursts] = useState<Array<{ id: string; videoId: string; emoji: string; label: string; quantity: number }>>([]);
 
   useEffect(() => {
@@ -176,7 +177,8 @@ export default function Home() {
     const gift = giftCatalog.find(item => item.giftId === giftId);
     if (!token || !video?.ownerId || !gift) { setGiftMessage("Sign in and select a creator video."); return; }
     const totalCoins = gift.coins * giftQuantity;
-    if (coinBalance < totalCoins) { setGiftMessage("Not enough Coins. Buy more Coins to continue."); return; }
+    if (coinBalance < totalCoins) { setGiftAttemptCoins(totalCoins); setGiftMessage(`Not enough Coins for ${gift.name} ×${giftQuantity}.`); return; }
+    setGiftAttemptCoins(null);
     setGiftBusy(true);
     setGiftMessage("");
     try {
@@ -425,7 +427,7 @@ export default function Home() {
               <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
               <button onClick={() => remixVideo(v.id, "DUET")} aria-label="Duet video">Duet</button>
               <button onClick={() => remixVideo(v.id, "STITCH")} aria-label="Stitch video">Stitch</button>
-              <button onClick={() => { setGiftVideoId(v.id); setGiftMessage(""); }} aria-label="Send gift" style={giftStyles.giftButton}>🎁 Gift</button>
+              <button onClick={() => { setGiftVideoId(v.id); setGiftMessage(""); setGiftAttemptCoins(null); }} aria-label="Send gift" style={giftStyles.giftButton}>🎁 Gift</button>
             </div>
           </article>;
         })}
@@ -451,7 +453,7 @@ export default function Home() {
     </div>}
     {giftVideoId && <div className="comments-backdrop" role="presentation" onClick={() => !giftBusy && setGiftVideoId(null)}>
       <section onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Gift tray" style={giftStyles.sheet}>
-        <div style={giftStyles.header}><div><strong>Send a Gift</strong><small style={giftStyles.balance}>🪙 {coinBalance.toLocaleString()} Coins</small></div><button type="button" onClick={() => setGiftVideoId(null)} style={giftStyles.close}>×</button></div>
+        <div style={giftStyles.header}><div><strong>Send a Gift</strong><small style={giftStyles.balance}>🪙 {coinBalance.toLocaleString()} Coins</small></div><button type="button" onClick={() => { setGiftVideoId(null); setGiftAttemptCoins(null); }} style={giftStyles.close}>×</button></div>
         <div style={giftStyles.grid}>
           {giftCatalog.map(gift => <button key={gift.giftId} disabled={giftBusy} onClick={() => void sendGift(gift.giftId)} style={giftStyles.gift}>
             <span style={giftStyles.emoji}>{giftEmoji(gift.animation)}</span>
@@ -460,6 +462,10 @@ export default function Home() {
         </div>
         <div style={giftStyles.quantity}><span>Quantity</span>{[1,5,10].map(q => <button key={q} onClick={() => setGiftQuantity(q)} style={giftQuantity === q ? giftStyles.active : giftStyles.quantityButton}>×{q}</button>)}</div>
         {giftMessage && <p style={giftStyles.message}>{giftMessage}</p>}
+        {giftAttemptCoins !== null && coinBalance < giftAttemptCoins && <div style={giftStyles.insufficient}>
+          <span>🪙 You have {coinBalance.toLocaleString()} Coins, but need {giftAttemptCoins.toLocaleString()}.</span>
+          <Link href="/wallet" style={giftStyles.buyCoins}>Buy Coins</Link>
+        </div>}
       </section>
     </div>}
     {commentsVideoId && <div className="comments-backdrop" role="presentation" onClick={() => setCommentsVideoId(null)}>
@@ -560,7 +566,8 @@ const giftStyles: Record<string, CSSProperties> = {
   quantity:{display:"flex",alignItems:"center",gap:8,marginTop:14,color:"#aaa"},
   quantityButton:{background:"#222",color:"#fff",border:"1px solid #333",borderRadius:8,padding:"7px 12px"},
   active:{background:"#fff",color:"#000",border:"1px solid #fff",borderRadius:8,padding:"7px 12px",fontWeight:800},
-  buyCoins:{display:"inline-block",marginTop:12,background:"#fff",color:"#000",borderRadius:10,padding:"9px 13px",fontWeight:800,textDecoration:"none"},
+  buyCoins:{display:"inline-block",marginTop:0,background:"#fff",color:"#000",borderRadius:10,padding:"9px 13px",fontWeight:800,textDecoration:"none",whiteSpace:"nowrap"},
+  insufficient:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginTop:12,padding:"10px 12px",background:"#241818",border:"1px solid #5a3030",borderRadius:12,color:"#fff",fontSize:13},
   message:{margin:"12px 0 0",color:"#fff"},
   giftButton:{background:"#ff2d55",color:"#fff",border:0,borderRadius:10,padding:"8px 12px",fontWeight:800},
   burst:{position:"absolute",right:18,bottom:120,zIndex:30,background:"rgba(0,0,0,.72)",borderRadius:20,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,color:"#fff"}
