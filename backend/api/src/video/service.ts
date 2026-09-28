@@ -39,6 +39,11 @@ function normalizeHashtags(value: unknown): string[] {
   return [...new Set(value.map(String).map((tag) => tag.trim().replace(/^#/, "").toLowerCase()).filter(Boolean))].slice(0, 30);
 }
 
+function normalizeMentions(value: unknown): string[] {
+  const raw = Array.isArray(value) ? value : String(value ?? "").split(/[\s,]+/);
+  return [...new Set(raw.map(String).map((tag) => tag.trim().replace(/^@/, "").toLowerCase()).filter(Boolean))].slice(0, 30);
+}
+
 export async function createPhotoUploadSession(db: Db, userId: ObjectId, input: { mimeType: string; sizeBytes: number }) {
   if (!PHOTO_MIME.has(input.mimeType)) throw new Error("Unsupported photo format");
   if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > PHOTO_MAX_BYTES) throw new Error("Photo size is outside the allowed range");
@@ -126,7 +131,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 }
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
-  uploadId: string; caption?: string; hashtags?: unknown; visibility?: VideoVisibility;
+  uploadId: string; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility;
   allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown; clipTrimRanges?: unknown; clipTransitions?: unknown; clipSettings?: unknown;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
