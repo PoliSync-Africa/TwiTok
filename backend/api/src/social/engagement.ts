@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
+import { createNotification } from "./notifications.js";
 
 function videoObjectId(videoId: string) {
   if (!ObjectId.isValid(videoId)) throw new Error("Invalid video id");
@@ -8,7 +9,7 @@ function videoObjectId(videoId: string) {
 async function getPublicVideo(db: Db, videoId: ObjectId) {
   const video = await db.collection("videos").findOne(
     { _id: videoId, status: "PUBLISHED", visibility: "PUBLIC" },
-    { projection: { _id: 1, allowComments: 1 } }
+    { projection: { _id: 1, allowComments: 1, ownerId: 1 } }
   );
   if (!video) throw new Error("Video not found");
   return video;
@@ -49,6 +50,8 @@ export async function toggleLike(db: Db, userId: ObjectId, videoIdString: string
     return { liked: false };
   }
   await db.collection("video_likes").insertOne({ videoId, userId, createdAt: new Date() });
+  const video = await getPublicVideo(db, videoId);
+  if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "LIKE", videoId });
   return { liked: true };
 }
 
@@ -75,6 +78,7 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
   const result = await db.collection("video_comments").insertOne({
     videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt
   });
+  if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "COMMENT", videoId, commentId: result.insertedId });
   return { id: result.insertedId.toHexString(), userId: userId.toHexString(), text: body, createdAt };
 }
 
