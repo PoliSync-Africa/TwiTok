@@ -114,6 +114,21 @@ export default function Home() {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [api]);
 
+  useEffect(() => {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(protocol + "//" + window.location.host + "/realtime");
+    socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "auth", token })));
+    socket.addEventListener("message", event => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data?.type === "notification:new") setUnreadNotifications(count => count + 1);
+      } catch {}
+    });
+    return () => socket.close();
+  }, []);
+
   async function openStory(storyId: string) {
     setStoryOpen(storyId);
     const token = window.localStorage.getItem("twitok_user_token");
