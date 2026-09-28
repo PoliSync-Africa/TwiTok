@@ -12,7 +12,12 @@ type ClipSetting = { speed: number; volume: number; muted: boolean };
 type StickerOverlay = { stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number };
 const DEFAULT_CLIP_SETTING: ClipSetting = { speed: 1, volume: 1, muted: false };
 const TRANSITIONS = ["NONE","FADE","DISSOLVE","WIPELEFT","WIPERIGHT","SLIDELEFT","SLIDERIGHT"];
-const STICKERS = [["africa","🌍"],["ghana","🇬🇭"],["nigeria","🇳🇬"],["kenya","🇰🇪"],["south-africa","🇿🇦"],["celebrate","🎉"],["love","❤️"],["fire","🔥"],["laugh","😂"],["wow","😮"],["clap","👏"],["dance","💃"],["drum","🥁"],["music","🎶"],["community","🤝"],["food","🍲"]] as const;
+const BASE_STICKERS = [["africa","🌍"],["ghana","🇬🇭"],["nigeria","🇳🇬"],["kenya","🇰🇪"],["south-africa","🇿🇦"],["celebrate","🎉"],["love","❤️"],["fire","🔥"],["laugh","😂"],["wow","😮"],["clap","👏"],["dance","💃"],["drum","🥁"],["music","🎶"],["community","🤝"],["food","🍲"]] as const;
+const EMOJI_CATALOG = Array.from("😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 🥸 🤗 🤭 🫢 🫣 🤫 🤔 🫡 🤐 😐 😑 😶 🫥 😏 😒 🙄 😬 😮‍💨 🤥 🫨 😴 🤤 😪 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 🤯 🤠 😕 🫤 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 🥹 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 ☠️ 💩 🤡 👹 👺 👻 👽 👾 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾 🙈 🙉 🙊 💌 💘 💝 💖 💗 💓 💞 💕 💟 ❣️ ❤️‍🔥 ❤️ 🩷 🧡 💛 💚 💙 🩵 💜 🤎 🖤 🩶 🤍 💋 💯 💢 💥 💫 💦 💨 💬 💭 💤 👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 🫷 🫸 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 🖕 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 👶 🧒 👦 👧 🧑 👨 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷 💇 💆 🧖 🛀 🛌 🧘 🧍 🧎 🚶 🏃 💃 🕺 👯 👮 🕵️ 💂 🥷 👷 🤴 👸 👑 🎅 🤶 🧙 🧚 🧛 🧜 🧝 🧞 🧟 💐 🌸 💮 🪷 🏵️ 🌹 🥀 🌺 🌻 🌼 🌷 🪻 🌱 🪴 🌲 🌳 🌴 🌵 🎋 🎍 🍀 ☘️ 🍁 🍂 🍃 🍄 🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐽 🐸 🐵 🐒 🐔 🐧 🐦 🐤 🐣 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🪱 🦋 🐌 🐞 🐜 🪰 🪲 🪳 🦟 🦗 🕷️ 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦀 🦞 🦐 🐠 🐟 🐡 🦈 🐬 🐳 🐋 🦭 🐊 🐅 🐆 🦓 🦍 🦧 🐘 🦏 🦛 🐪 🐫 🦒 🦘 🦬 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐈 🐓 🦃 🕊️ 🦢 🦩 🦚 🦜 🦥 🦦 🦨 🦡 🐾 🐉 🐲 🌍 🌎 🌏 🌙 ☀️ ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☁️ ❄️ ☃️ ☔ 💧 🌊 🌪️ 🌋 🌌 🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🥑 🫛 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🫒 🧄 🧅 🥔 🍠 🥐 🥯 🍞 🥖 🥨 🧀 🥚 🍳 🧈 🥞 🧇 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🫓 🥪 🥙 🧆 🌮 🌯 🫔 🍜 🍝 🍣 🍤 🍚 🍛 🍱 🥟 🥠 🥡 🍦 🍧 🍨 🍩 🍪 🎂 🍰 🧁 🍫 🍿 🍭 🍬 🍮 ☕ 🧃 🥤 🧋 🍺 🍻 🍷 🥂 🍾 🧊 ⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🎱 🪀 🪁 🏆 🥇 🥈 🥉 🎮 🕹️ 🎲 ♟️ 🎯 🎳 🎸 🎹 🥁 🎺 🎻 🎤 🎧 🎬 📷 📱 💻 ⌚ 💡 🔦 📚 ✏️ 📝 📌 📎 🔒 🔑 🔔 ❤️ 👍 🔥 🚀 💎 💰 🎁 🎈 🎉 🎊 🪅 🧨 ✅ ❌ ⚠️ ❗ ❓ ⁉️ 💯 🆗 🆕 🆙 🆒 🏳️ 🏴 🏁 🚩");
+const COUNTRY_CODES = "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW".split(" ");
+const FLAG_STICKERS = COUNTRY_CODES.map(code => ["flag-"+code, String.fromCodePoint(...code.split("").map(c => 0x1F1E6 + c.charCodeAt(0)-65))] as const);
+const emojiStickerId = (emoji:string) => "emoji-"+Array.from(emoji).map(c => c.codePointAt(0)!.toString(16)).join("-");
+const EMOJI_STICKERS = EMOJI_CATALOG.map((emoji,i) => [emojiStickerId(emoji), emoji, "emoji-"+i] as const);
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -57,6 +62,8 @@ export default function CreateScreen() {
   const [overlayX, setOverlayX] = useState(0.5);
   const [overlayY, setOverlayY] = useState(0.8);
   const [stickers, setStickers] = useState<StickerOverlay[]>([]);
+  const [stickerTab, setStickerTab] = useState<"emoji"|"flags">("emoji");
+  const [customEmoji, setCustomEmoji] = useState("");
   const durationMs = assets.reduce((sum, asset) => sum + (asset.duration ?? 0), 0);
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
   const [clipTrimRanges, setClipTrimRanges] = useState<{startMs:number;endMs:number|null}[]>([]);
@@ -470,11 +477,19 @@ export default function CreateScreen() {
             </ScrollView>
           </View>)}
         </View> : null}
-        <Text style={styles.section}>Stickers</Text>
+        <Text style={styles.section}>Stickers & Emojis</Text>
+         <View style={styles.row}>
+           <Pressable style={[styles.choice,stickerTab==="emoji"&&styles.selected]} onPress={()=>setStickerTab("emoji")}><Text style={styles.choiceText}>😀 Emojis</Text></Pressable>
+           <Pressable style={[styles.choice,stickerTab==="flags"&&styles.selected]} onPress={()=>setStickerTab("flags")}><Text style={styles.choiceText}>🌍 Flags (249)</Text></Pressable>
+         </View>
+         <View style={styles.emojiInputRow}>
+           <TextInput value={customEmoji} onChangeText={setCustomEmoji} placeholder="Paste or type any emoji…" placeholderTextColor="#777" style={styles.emojiInput}/>
+           <Pressable style={styles.small} onPress={()=>{const e=customEmoji.trim();if(!e)return;setStickers(prev=>[...prev,{stickerId:emojiStickerId(e),startMs:overlayStartMs,endMs:Math.max(overlayStartMs+500,overlayEndMs||3000),x:overlayX,y:overlayY,size:72,rotation:0}]);setCustomEmoji("");}}><Text style={styles.choiceText}>Add</Text></Pressable>
+         </View>
          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
-           {STICKERS.map(([id,emoji])=><Pressable key={id} style={styles.stickerChoice} onPress={()=>setStickers(prev=>prev.some(s=>s.stickerId===id)?prev.filter(s=>s.stickerId!==id):[...prev,{stickerId:id,startMs:overlayStartMs,endMs:Math.max(overlayStartMs+500,overlayEndMs||3000),x:overlayX,y:overlayY,size:72,rotation:0}])}>
-             <Text style={styles.stickerEmoji}>{emoji}</Text>
-             <Text style={styles.stickerName}>{stickers.some(s=>s.stickerId===id)?"Added":"Add"}</Text>
+           {(stickerTab==="emoji"?EMOJI_STICKERS:FLAG_STICKERS).map((item:any)=><Pressable key={item[0]} style={styles.stickerChoice} onPress={()=>setStickers(prev=>prev.some(s=>s.stickerId===item[0])?prev.filter(s=>s.stickerId!==item[0]):[...prev,{stickerId:item[0],startMs:overlayStartMs,endMs:Math.max(overlayStartMs+500,overlayEndMs||3000),x:overlayX,y:overlayY,size:72,rotation:0}])}>
+             <Text style={styles.stickerEmoji}>{item[1]}</Text>
+             <Text style={styles.stickerName}>{stickers.some(s=>s.stickerId===item[0])?"Added":"Add"}</Text>
            </Pressable>)}
          </ScrollView>
          {stickers.length ? <View style={styles.row}>
