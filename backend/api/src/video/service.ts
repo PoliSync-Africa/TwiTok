@@ -236,9 +236,23 @@ export async function getVideoRemix(db: Db, userId: ObjectId, remixId: string) {
     id: remix._id.toHexString(), mode: remix.mode, status: remix.status,
     sourceVideoId: remix.sourceVideoId?.toHexString?.() ?? String(remix.sourceVideoId),
     sourceCaption: remix.sourceCaption ?? "", sourcePlayback: remix.sourcePlayback ?? null,
-    sourceThumbnail: remix.sourceThumbnail ?? null, caption: remix.caption ?? "",
+    sourceThumbnail: remix.sourceThumbnail ?? null, caption: remix.caption ?? "", mediaUrl: remix.mediaUrl ?? null,
     createdAt: remix.createdAt, updatedAt: remix.updatedAt
   };
+}
+
+export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { mediaUrl: string; caption?: string }) {
+  if (!ObjectId.isValid(remixId)) throw new Error("Invalid remix id");
+  const mediaUrl = String(input.mediaUrl ?? "").trim().slice(0, 2000);
+  if (!mediaUrl) throw new Error("mediaUrl is required");
+  const caption = String(input.caption ?? "").trim().slice(0, 2200);
+  const result = await db.collection("video_remixes").findOneAndUpdate(
+    { _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT" },
+    { $set: { mediaUrl, caption, status: "READY", updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  if (!result) throw new Error("Remix draft not found");
+  return getVideoRemix(db, userId, remixId);
 }
 
 export async function updateVideoRemix(db: Db, userId: ObjectId, remixId: string, input: { caption?: string }) {
