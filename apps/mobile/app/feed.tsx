@@ -83,7 +83,7 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   return (
     <View style={styles.video}>
       <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
-      <Overlay item={item} />
+      <Overlay item={item} engagement={engagement} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} />
     </View>
   );
 }
