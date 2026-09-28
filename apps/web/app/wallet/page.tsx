@@ -25,6 +25,8 @@ export default function WalletPage() {
   const [payoutMessage, setPayoutMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [purchaseMessage, setPurchaseMessage] = useState("");
+  const [purchaseSku, setPurchaseSku] = useState<string | null>(null);
 
   async function load() {
     const token = window.localStorage.getItem("twitok_user_token");
@@ -76,7 +78,19 @@ export default function WalletPage() {
 
       <section style={styles.panel}>
         <h2 style={styles.heading}>Coin packages</h2>
-        <div style={styles.grid}>{(catalog?.coinPackages ?? []).map(p => <div style={styles.package} key={p.sku}><b>{p.coins.toLocaleString()} Coins</b><strong>{money(p.priceUsd)}</strong><small>{p.sku}</small></div>)}</div>
+        <div style={styles.grid}>{(catalog?.coinPackages ?? []).map(p => <div style={styles.package} key={p.sku}><b>{p.coins.toLocaleString()} Coins</b><strong>{money(p.priceUsd)}</strong><small>{p.sku}</small><button style={styles.buy} disabled={purchaseSku === p.sku} onClick={async () => {
+          setPurchaseMessage(""); setPurchaseSku(p.sku);
+          try {
+            const token = window.localStorage.getItem("twitok_user_token");
+            if (!token) { setPurchaseMessage("Sign in to buy Coins."); return; }
+            const response = await fetch(api + "/wallet/coins/paystack/initialize", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({sku:p.sku}) });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || !body.authorizationUrl) { setPurchaseMessage(body.error ?? "Unable to start payment."); return; }
+            window.location.href = body.authorizationUrl;
+          } catch { setPurchaseMessage("Unable to start payment. Please try again."); }
+          finally { setPurchaseSku(null); }
+        }}>{purchaseSku === p.sku ? "Opening…" : "Buy Coins"}</button></div>)}</div>
+        {purchaseMessage && <p style={styles.sub}>{purchaseMessage}</p>}
         <p style={styles.note}>Purchasing is intentionally separated from the wallet display. Apple/Google purchases must be verified server-side before Coins are credited.</p>
       </section>
 
@@ -142,6 +156,7 @@ const styles: Record<string, CSSProperties> = {
   rule:{display:"flex",justifyContent:"space-between",gap:20,padding:"12px 0",borderTop:"1px solid #242424"},
   grid:{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:10},
   package:{background:"#181818",borderRadius:12,padding:14,display:"flex",flexDirection:"column",gap:8},
+  buy:{marginTop:4,padding:"10px 12px",border:0,borderRadius:9,background:"#fff",color:"#000",fontWeight:800,cursor:"pointer"},
   note:{fontSize:12,color:"#777",marginBottom:0},
   columns:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18},
   row:{display:"flex",justifyContent:"space-between",gap:16,padding:"12px 0",borderTop:"1px solid #222"},
