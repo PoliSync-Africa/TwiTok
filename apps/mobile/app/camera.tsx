@@ -143,10 +143,7 @@ export default function CameraStudioScreen() {
           <Text style={styles.icon}>×</Text>
         </Pressable>
         <Text style={styles.title}>Camera</Text>
-        <Pressable style={styles.circle} onPress={() => setFlash(v => v === "off" ? "on" : v === "on" ? "auto" : "off")}>
-          <Text style={styles.icon}>{flash === "on" ? "⚡" : flash === "auto" ? "A" : "↯"}</Text>
-          <Pressable onPress={()=>setGrid(v=>!v)} accessibilityLabel="Toggle camera grid"><Text style={styles.icon}>{grid ? "▦" : "⊞"}</Text></Pressable>
-        </Pressable>
+        <View style={styles.topActions}><Pressable style={styles.circle} onPress={() => setFlash(v => v === "off" ? "on" : v === "on" ? "auto" : "off")}><Text style={styles.icon}>{flash === "on" ? "⚡" : flash === "auto" ? "A" : "↯"}</Text></Pressable><Pressable style={styles.circle} onPress={()=>setGrid(v=>!v)} accessibilityLabel="Toggle camera grid"><Text style={styles.icon}>{grid ? "▦" : "⊞"}</Text></Pressable></View>
       </View>
 
       <View style={styles.sideControls}>
@@ -237,7 +234,7 @@ const styles = StyleSheet.create({
   primary:{backgroundColor:"#ff2d55",paddingHorizontal:20,paddingVertical:14,borderRadius:24},
   primaryText:{color:"#fff",fontWeight:"900"},
   cancel:{color:"#aaa",fontWeight:"800",padding:20},
-  topBar:{position:"absolute",top:54,left:16,right:16,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},
+  topBar:{position:"absolute",top:54,left:16,right:16,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},topActions:{flexDirection:"row",gap:8},
   circle:{width:42,height:42,borderRadius:21,backgroundColor:"rgba(0,0,0,.42)",alignItems:"center",justifyContent:"center"},
   icon:{color:"#fff",fontSize:25,fontWeight:"700"},
   title:{color:"#fff",fontSize:18,fontWeight:"900"},
