@@ -18,6 +18,8 @@ export default function CameraStudioScreen() {
   const [muted, setMuted] = useState(false);
   const [zoom, setZoom] = useState(0);
   const [timer, setTimer] = useState<0 | 3 | 10>(0);
+  const [durationLimit, setDurationLimit] = useState<15 | 60 | 600>(60);
+  const [speed, setSpeed] = useState<0.5 | 1 | 1.5 | 2>(1);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [effect, setEffect] = useState<Effect>("NONE");
@@ -45,7 +47,7 @@ export default function CameraStudioScreen() {
 
     if (!cameraRef.current) return;
     setRecording(true);
-    recordingRef.current = cameraRef.current.recordAsync({ maxDuration: 600 });
+    recordingRef.current = cameraRef.current.recordAsync({ maxDuration: durationLimit });
     try {
       const result = await recordingRef.current;
       if (!result?.uri) throw new Error("Camera did not return a video.");
@@ -54,7 +56,8 @@ export default function CameraStudioScreen() {
         params: {
           recordedUri: result.uri,
           recordedDuration: "0",
-          recordedEffect: effect
+          recordedEffect: effect,
+          recordedSpeed: String(speed)
         }
       });
     } catch (e) {
@@ -89,6 +92,8 @@ export default function CameraStudioScreen() {
       </View>
     );
   }
+
+  const durationLabel = durationLimit === 600 ? "10m" : durationLimit + "s";
 
   const effectOverlay =
     effect === "VIBRANT" ? styles.effectVibrant :
@@ -145,6 +150,7 @@ export default function CameraStudioScreen() {
       ) : null}
 
       <View style={styles.bottom}>
+        <Text style={styles.sectionLabel}>Filters</Text>
         <View style={styles.effectsRow}>
           {EFFECTS.map(item => (
             <Pressable key={item} onPress={() => setEffect(item)} style={[styles.effectChip, effect === item && styles.effectChipActive]}>
@@ -153,6 +159,25 @@ export default function CameraStudioScreen() {
           ))}
         </View>
 
+        <Text style={styles.sectionLabel}>Length</Text>
+        <View style={styles.timerRow}>
+          {[15,60,600].map(value => (
+            <Pressable key={"length"+value} onPress={() => setDurationLimit(value as 15|60|600)} style={[styles.timerChip, durationLimit === value && styles.timerActive]}>
+              <Text style={styles.timerText}>{value === 600 ? "10m" : value + "s"}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Speed</Text>
+        <View style={styles.timerRow}>
+          {[0.5,1,1.5,2].map(value => (
+            <Pressable key={"speed"+value} onPress={() => setSpeed(value as 0.5|1|1.5|2)} style={[styles.timerChip, speed === value && styles.timerActive]}>
+              <Text style={styles.timerText}>{value}×</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Timer</Text>
         <View style={styles.timerRow}>
           {[0,3,10].map(value => (
             <Pressable key={value} onPress={() => setTimer(value as 0|3|10)} style={[styles.timerChip, timer === value && styles.timerActive]}>
@@ -204,7 +229,8 @@ const styles = StyleSheet.create({
   effectChip:{borderWidth:1,borderColor:"rgba(255,255,255,.35)",borderRadius:16,paddingHorizontal:10,paddingVertical:7},
   effectChipActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},
   effectText:{color:"#fff",fontSize:10,fontWeight:"800"},
-  timerRow:{flexDirection:"row",justifyContent:"center",gap:8,marginBottom:12},
+  sectionLabel:{color:"#fff",fontSize:11,fontWeight:"900",textAlign:"center",marginBottom:6,textTransform:"uppercase"},
+  timerRow:{flexDirection:"row",justifyContent:"center",gap:8,marginBottom:10},
   timerChip:{borderWidth:1,borderColor:"rgba(255,255,255,.35)",borderRadius:16,paddingHorizontal:12,paddingVertical:7},
   timerActive:{backgroundColor:"rgba(255,255,255,.18)",borderColor:"#fff"},
   timerText:{color:"#fff",fontSize:12,fontWeight:"800"},
