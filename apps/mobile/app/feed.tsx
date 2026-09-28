@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
+import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
 
 type Video = {
@@ -170,6 +171,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
 }
 
 export default function FeedScreen() {
+  const { videoId: requestedVideoId } = useLocalSearchParams<{ videoId?: string }>();
   const [videos, setVideos] = useState<Video[]>([]);
   const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"AFRICA">("FOR_YOU");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -189,7 +191,10 @@ export default function FeedScreen() {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error ?? "Feed unavailable");
         if (active) {
-          setVideos(data.videos ?? data.items ?? []);
+          const nextVideos = data.videos ?? data.items ?? [];
+          setVideos(nextVideos);
+          const requestedIndex = requestedVideoId ? nextVideos.findIndex((video: Video) => video.id === String(requestedVideoId)) : -1;
+          setActiveIndex(requestedIndex >= 0 ? requestedIndex : 0);
           setNextCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
         }
       } catch (e) {
