@@ -4,7 +4,7 @@ import { getDb } from "../db/mongo.js";
 import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
 import { GIFT_CATALOG, sendGift } from "../money/gifts.js";
 import { createWithdrawal, processGhanaWithdrawal, reconcilePaystackTransfer } from "../money/withdrawal.js";
-import { verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
+import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
 import { requireUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
@@ -55,6 +55,31 @@ walletRouter.get("/:userId", requireUser, async (req, res) => {
   catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Wallet lookup failed" }); }
 });
 
+walletRouter.post("/coins/paystack/initialize", requireUser, async (req, res) => {
+  try {
+    const sku = String(req.body?.sku ?? "");
+    const pkg = COIN_PACKAGES.find((item) => item.sku === sku);
+    if (!pkg) return res.status(400).json({ error: "Invalid Coin package" });
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { email: 1, dateOfBirth: 1 } });
+    if (!user?.email) return res.status(400).json({ error: "An email address is required for Coin purchases" });
+    if (user.dateOfBirth) {
+      const dob = new Date(user.dateOfBirth);
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - 18);
+      if (dob > cutoff) return res.status(403).json({ error: "Coin purchases require an adult account" });
+    }
+    const rate = Number(process.env.TWITOK_USD_GHS_RATE);
+    if (!Number.isFinite(rate) || rate <= 0) return res.status(503).json({ error: "GHS payment exchange rate is not configured" });
+    const amountGhs = Number((pkg.priceUsd * rate).toFixed(2));
+    const reference = "TWITOK-" + randomUUID().replaceAll("-", "").slice(0, 24);
+    const callbackUrl = process.env.TWITOK_PAYSTACK_CALLBACK_URL;
+    const result = await initializeCoinPurchase({ email: user.email, amountGhs, reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, callbackUrl });
+    await db.collection("coin_purchases").insertOne({ reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, priceUsd: pkg.priceUsd, amountGhs, status: "INITIALIZED", provider: "PAYSTACK", createdAt: new Date() });
+    return res.status(201).json({ reference, authorizationUrl: result.authorization_url, accessCode: result.access_code, amountGhs, currency: "GHS", coins: pkg.coins });
+  } catch (error) { return res.status(502).json({ error: error instanceof Error ? error.message : "Coin purchase initialization failed" }); }
+});
+
 walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
   try {
     const expected = process.env.REVENUECAT_WEBHOOK_AUTH;
@@ -68,6 +93,28 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const result = await creditPurchasedCoins(await getDb(), { userId, coins: pkg.coins, provider: "REVENUECAT", providerTransactionId: transactionId, sku: pkg.sku });
     return res.status(200).json({ ok: true, duplicate: result.duplicate });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" }); }
+});
+
+walletRouter.post("/coins/paystack/webhook", async (req, res) => {
+  try {
+    const rawBody = (req as typeof req & { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
+    if (!verifyPaystackWebhookSignature(rawBody, req.header("x-paystack-signature"))) return res.status(401).json({ error: "Invalid signature" });
+    if (String(req.body?.event ?? "") !== "charge.success") return res.json({ ok: true, ignored: true });
+    const reference = String(req.body?.data?.reference ?? "");
+    if (!reference) return res.status(400).json({ error: "Payment reference missing" });
+    const verified = await verifyPaystackTransaction(reference);
+    if (verified.status !== "success" || verified.currency !== "GHS") return res.status(400).json({ error: "Payment is not successful" });
+    const db = await getDb();
+    const purchase = await db.collection("coin_purchases").findOne({ reference });
+    if (!purchase) return res.status(404).json({ error: "Coin purchase not found" });
+    const rate = Number(process.env.TWITOK_USD_GHS_RATE);
+    const expectedAmount = Math.round(Number(purchase.amountGhs) * 100);
+    if (!Number.isFinite(rate) || Math.abs(Number(verified.amount) - expectedAmount) > 1) return res.status(400).json({ error: "Payment amount mismatch" });
+    if (purchase.status === "CREDITED") return res.json({ ok: true, duplicate: true });
+    const result = await creditPurchasedCoins(db, { userId: String(purchase.userId), coins: Number(purchase.coins), provider: "PAYSTACK", providerTransactionId: reference, sku: String(purchase.sku) });
+    await db.collection("coin_purchases").updateOne({ reference }, { $set: { status: "CREDITED", creditedAt: new Date() } });
+    return res.json({ ok: true, duplicate: result.duplicate, coins: purchase.coins });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Coin payment webhook failed" }); }
 });
 
 walletRouter.post("/payout/paystack/webhook", async (req, res) => {
