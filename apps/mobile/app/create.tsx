@@ -41,11 +41,14 @@ export default function CreateScreen() {
     replaceAssets([{ uri, mimeType: "video/mp4", duration: duration > 0 ? duration : null }]);
     setMode("VIDEO");
     const nextSpeed = Number(recordedSpeed ?? 1);
-    if ([0.5, 1, 1.5, 2].includes(nextSpeed)) setSpeed(nextSpeed);
+    if ([0.5, 1, 1.5, 2].includes(nextSpeed)) {
+      setSpeed(nextSpeed);
+      setClipSettings([{ ...DEFAULT_CLIP_SETTING, speed: nextSpeed }]);
+    }
     if (recordedEffect && ["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].includes(String(recordedEffect))) {
       setEffect(String(recordedEffect));
     }
-  }, [recordedUri, recordedDuration, recordedEffect]);
+  }, [recordedUri, recordedDuration, recordedEffect, recordedSpeed]);
   const [overlayText, setOverlayText] = useState("");
   const [overlayStartMs, setOverlayStartMs] = useState(0);
   const [overlayEndMs, setOverlayEndMs] = useState(3000);
