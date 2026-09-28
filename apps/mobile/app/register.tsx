@@ -21,13 +21,17 @@ export default function RegisterScreen() {
       const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:countryCode.trim().toUpperCase()})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok||!d.token) throw new Error(d.error??"Unable to create account");
-      await saveAuthToken(d.token); router.replace("/profile-setup");
+      await saveAuthToken(d.token);
+      router.replace("/profile-setup");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create account");}finally{setBusy(false);}
   }
 
   return <ScrollView contentContainerStyle={styles.container}>
-    <Text style={styles.logo}>TwiTok</Text><Text style={styles.title}>Create your account</Text>
+    <Text style={styles.logo}>TwiTok</Text>
+    <Text style={styles.title}>Create your account</Text>
+    <Text style={styles.subtitle}>Sign up with your email or phone number.</Text>
     <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email address (or use phone)" placeholderTextColor="#777" autoCapitalize="none" keyboardType="email-address"/>
+    <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number (or use email)" placeholderTextColor="#777" keyboardType="phone-pad"/>
     <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry/>
     <TextInput style={styles.input} value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="Date of birth (YYYY-MM-DD)" placeholderTextColor="#777"/>
     <TextInput style={styles.input} value={countryCode} onChangeText={setCountryCode} placeholder="Country code" placeholderTextColor="#777" autoCapitalize="characters" maxLength={2}/>
@@ -39,10 +43,11 @@ export default function RegisterScreen() {
 const styles=StyleSheet.create({
  container:{flexGrow:1,backgroundColor:"#000",padding:24,justifyContent:"center"},
  logo:{color:"#fff",fontSize:42,fontWeight:"900",textAlign:"center",marginBottom:18},
- title:{color:"#fff",fontSize:25,fontWeight:"800",textAlign:"center",marginBottom:26},
+ title:{color:"#fff",fontSize:25,fontWeight:"800",textAlign:"center",marginBottom:10},
+ subtitle:{color:"#aaa",fontSize:14,textAlign:"center",marginBottom:20},
  input:{backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d",borderRadius:12,color:"#fff",paddingHorizontal:16,paddingVertical:14,marginBottom:12,fontSize:16},
  button:{backgroundColor:"#ff2d55",borderRadius:12,padding:15,alignItems:"center",marginTop:8},
  buttonText:{color:"#fff",fontWeight:"800",fontSize:16},
  error:{color:"#ff7188",textAlign:"center",marginBottom:10},
- or:{color:"#777",textAlign:"center",fontSize:12,fontWeight:"800",marginBottom:12},\n hint:{color:"#777",textAlign:"center",fontSize:12,marginTop:-4,marginBottom:12},\n back:{color:"#aaa",textAlign:"center",marginTop:20}
+ back:{color:"#aaa",textAlign:"center",marginTop:20}
 });
