@@ -21,6 +21,22 @@ const ffprobeBin = process.env.FFPROBE_BIN ?? "ffprobe";
 const pollMs = Number(process.env.TWITOK_VIDEO_WORKER_POLL_MS ?? 2000);
 const fontFile = process.env.TWITOK_FONT_FILE ?? "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 const stickerMap: Record<string,string> = { africa:"🌍", ghana:"🇬🇭", nigeria:"🇳🇬", kenya:"🇰🇪", "south-africa":"🇿🇦", celebrate:"🎉", love:"❤️", fire:"🔥", laugh:"😂", wow:"😮", clap:"👏", dance:"💃", drum:"🥁", music:"🎶", community:"🤝", food:"🍲" };
+function resolveStickerGlyph(id: string) {
+  const known = stickerMap[id];
+  if (known) return known;
+  if (/^flag-[A-Z]{2}$/.test(id)) {
+    return id.slice(5).split("").map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join("");
+  }
+  if (/^emoji-[0-9a-f]+(?:-[0-9a-f]+)*$/i.test(id)) {
+    try {
+      const glyph = id.slice(6).split("-").map(x => Number.parseInt(x, 16)).map(cp => String.fromCodePoint(cp)).join("");
+      return glyph.length <= 32 ? glyph : "";
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
 
 if (!bucket || !accessKeyId || !secretAccessKey) throw new Error("Media storage credentials are required");
 const s3 = new S3Client({
@@ -153,7 +169,7 @@ async function runFfmpeg(
     let current = variant.base;
     for (let si = 0; si < stickers.length; si++) {
       const sticker = stickers[si];
-      const glyph = stickerMap[sticker.stickerId] ?? "";
+      const glyph = resolveStickerGlyph(sticker.stickerId);
       if (!glyph) continue;
       const file = path.join(outputDir, `sticker-${si}.txt`);
       await fs.promises.writeFile(file, glyph, "utf8");
