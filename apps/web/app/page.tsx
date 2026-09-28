@@ -424,6 +424,7 @@ export default function Home() {
               <button onClick={() => engage(v.id, "repost")} aria-label="Repost video">{v.engagement?.reposted ? "↻" : "⟳"}<small>{v.engagement?.repostCount ?? 0}</small></button>
               <button onClick={() => remixVideo(v.id, "DUET")} aria-label="Duet video">Duet</button>
               <button onClick={() => remixVideo(v.id, "STITCH")} aria-label="Stitch video">Stitch</button>
+              <button onClick={() => { setGiftVideoId(v.id); setGiftMessage(""); }} aria-label="Send gift" style={giftStyles.giftButton}>🎁 Gift</button>
             </div>
           </article>;
         })}
