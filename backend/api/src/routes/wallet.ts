@@ -86,16 +86,17 @@ walletRouter.post("/payout/paystack/webhook", async (req, res) => {
 
 walletRouter.post("/gifts", requireUser, async (req, res) => {
   try {
-    const { receiverId, giftId, quantity, context = "VIDEO" } = req.body ?? {};
+    const { receiverId, giftId, quantity, context = "VIDEO", videoId } = req.body ?? {};
     const senderId = req.userId!.toHexString();
     if (!receiverId || !giftId) return res.status(400).json({ error: "receiverId and giftId are required" });
     const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
     if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
-    const result = await sendGift(await getDb(), { senderId, receiverId: String(receiverId), giftId, quantity, context, idempotencyKey });
+    const result = await sendGift(await getDb(), { senderId, receiverId: String(receiverId), giftId, quantity, context, videoId: videoId ? String(videoId) : undefined, idempotencyKey });
     if (!result.duplicate) {
       broadcastToUser(String(receiverId), {
         type: "gift.received",
         transactionId: result.transactionId,
+        videoId: result.videoId ?? null,
         giftId,
         quantity: result.quantity,
         coinsSpent: result.coinsSpent,
