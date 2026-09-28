@@ -15,13 +15,19 @@ profileRouter.patch("/me", requireUser, async (req, res) => {
     const nickname = String(req.body?.nickname ?? "").trim();
     const bio = String(req.body?.bio ?? "").trim();
     const isPrivate = Boolean(req.body?.isPrivate);
+    const current = await db.collection("users").findOne({ _id: req.userId! }, { projection: { username: 1, nickname: 1, nameLastChangedAt: 1 } });
+    const nameChanged = username !== current?.username || nickname !== current?.nickname;
+    if (nameChanged && current?.nameLastChangedAt) {
+      const nextAllowed = new Date(new Date(current.nameLastChangedAt).getTime() + 60 * 24 * 60 * 60 * 1000);
+      if (new Date() < nextAllowed) return res.status(429).json({ error: "You can change your name again after 60 days", nextNameChangeAt: nextAllowed.toISOString() });
+    }
     if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Invalid username" });
     if (!nickname || nickname.length > 50) return res.status(400).json({ error: "Nickname is required and must be 1-50 characters" });
     if (bio.length > 80) return res.status(400).json({ error: "Bio must be 80 characters or less" });
     const db = await getDb();
     const existing = await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } });
     if (existing) return res.status(409).json({ error: "That username is already taken" });
-    await db.collection("users").updateOne({ _id: req.userId! }, { $set: { username, nickname, bio, isPrivate, profileSetupComplete: true, updatedAt: new Date() } });
+    await db.collection("users").updateOne({ _id: req.userId! }, { $set: { username, nickname, bio, isPrivate, profileSetupComplete: true, ...(nameChanged ? { nameLastChangedAt: new Date() } : {}), updatedAt: new Date() } });
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     res.json({ user });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update profile" }); }
