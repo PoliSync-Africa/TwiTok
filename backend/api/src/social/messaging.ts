@@ -92,20 +92,72 @@ export async function createTextMessage(db: Db, userId: ObjectId, conversationId
   return db.collection("messages").findOne({ _id: result.insertedId });
 }
 
+export type MessageStatusUpdate = {
+  conversationId: string;
+  status: Exclude<MessageStatus, "SENT">;
+  messageIds: string[];
+  senderIds: string[];
+  at: string;
+};
+
 export async function markMessagesDelivered(db: Db, userId: ObjectId, conversationId: ObjectId) {
   const now = new Date();
-  await db.collection("messages").updateMany(
+  const pending = await db.collection("messages").find(
     { conversationId, recipientId: userId, status: "SENT" },
+    { projection: { _id: 1, senderId: 1 } }
+  ).toArray();
+
+  if (!pending.length) {
+    return {
+      conversationId: conversationId.toHexString(),
+      status: "DELIVERED" as const,
+      messageIds: [] as string[],
+      senderIds: [] as string[],
+      at: now.toISOString()
+    };
+  }
+
+  await db.collection("messages").updateMany(
+    { _id: { $in: pending.map(message => message._id) }, status: "SENT" },
     { $set: { status: "DELIVERED", deliveredAt: now, updatedAt: now } }
   );
-  return now;
+
+  return {
+    conversationId: conversationId.toHexString(),
+    status: "DELIVERED" as const,
+    messageIds: pending.map(message => message._id.toHexString()),
+    senderIds: [...new Set(pending.map(message => message.senderId.toHexString()))],
+    at: now.toISOString()
+  };
 }
 
 export async function markMessagesRead(db: Db, userId: ObjectId, conversationId: ObjectId) {
   const now = new Date();
-  await db.collection("messages").updateMany(
+  const pending = await db.collection("messages").find(
     { conversationId, recipientId: userId, status: { $in: ["SENT", "DELIVERED"] } },
+    { projection: { _id: 1, senderId: 1 } }
+  ).toArray();
+
+  if (!pending.length) {
+    return {
+      conversationId: conversationId.toHexString(),
+      status: "READ" as const,
+      messageIds: [] as string[],
+      senderIds: [] as string[],
+      at: now.toISOString()
+    };
+  }
+
+  await db.collection("messages").updateMany(
+    { _id: { $in: pending.map(message => message._id) }, status: { $in: ["SENT", "DELIVERED"] } },
     { $set: { status: "READ", readAt: now, deliveredAt: now, updatedAt: now } }
   );
-  return now;
+
+  return {
+    conversationId: conversationId.toHexString(),
+    status: "READ" as const,
+    messageIds: pending.map(message => message._id.toHexString()),
+    senderIds: [...new Set(pending.map(message => message.senderId.toHexString()))],
+    at: now.toISOString()
+  };
 }
