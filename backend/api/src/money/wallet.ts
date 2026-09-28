@@ -36,7 +36,7 @@ export async function ensureWallet(db: Db, userId: string, session?: ClientSessi
 }
 
 export async function creditPurchasedCoins(db: Db, input: {
-  userId: string; coins: number; provider: "APPLE"|"GOOGLE"|"REVENUECAT"|"WEB";
+  userId: string; coins: number; provider: "APPLE"|"GOOGLE"|"REVENUECAT"|"WEB"|"PAYSTACK";
   providerTransactionId: string; sku: string; grossUsd?: number;
 }) {
   if (!Number.isInteger(input.coins) || input.coins <= 0) throw new Error("Invalid coin amount");
