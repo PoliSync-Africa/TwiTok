@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
+import { router } from "expo-router";
 
 type Video = {
   id: string;
@@ -76,7 +77,7 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   }, [active, player, source]);
 
   if (!source) {
-    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} engagement={engagement} onAction={action} /></View>;
+    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} engagement={engagement} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} /></View>;
   }
 
   return (
@@ -87,12 +88,13 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   );
 }
 
-function Overlay({ item, engagement, onAction }: { item: Video; engagement: Engagement | null; onAction: (kind: "like"|"save"|"share"|"repost") => void }) {
+function Overlay({ item, engagement, onAction, onComments }: { item: Video; engagement: Engagement | null; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void }) {
   return (
     <>
       <View style={styles.scrim} />
       <View style={styles.rightRail}>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("repost")}><Text style={[styles.actionIcon, engagement?.reposted && styles.activeIcon]}>↻</Text><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
