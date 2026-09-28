@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
+import { createPresignedPlayback, mediaConfigured } from "../media/storage.js";
 
 export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
@@ -96,5 +97,10 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       publishedAt: (last.publishedAt ?? new Date(0)).toISOString(), id: last._id.toHexString()
     })).toString("base64url");
   })() : null;
-  return { videos: videos.map(v => ({ id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null })), nextCursor: next };
+  const hydrated = await Promise.all(videos.map(async (v: any) => {
+    const photoKeys = Array.isArray(v.photoObjectKeys) ? v.photoObjectKeys : [];
+    const photos = mediaConfigured() ? (await Promise.all(photoKeys.map((key: string) => createPresignedPlayback(key, 3600).catch(() => null)))).filter(Boolean).map((x: any) => x.url) : [];
+    return { id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
+  }));
+  return { videos: hydrated, nextCursor: next };
 }
