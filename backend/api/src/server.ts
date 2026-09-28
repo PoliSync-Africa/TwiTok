@@ -24,6 +24,7 @@ import { ensureSoundIndexes } from "./music/service.js";
 import { ensureTranscriptionIndexes } from "./video/transcription.js";
 import { ensureTranslationIndexes } from "./video/translation.js";
 import { ensureStickerIndexes } from "./video/stickers.js";
+import { initializePlaylistIndexes } from "./social/playlists.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -62,6 +63,7 @@ async function start() {
     await ensureTranscriptionIndexes(db);
     await ensureTranslationIndexes(db);
     await ensureStickerIndexes(db);
+    await initializePlaylistIndexes(db);
     await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
   } else {
     console.warn("MONGODB_URI is not configured. Database features are disabled.");
