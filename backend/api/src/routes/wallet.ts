@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
 import { GIFT_CATALOG, sendGift } from "../money/gifts.js";
-import { createWithdrawal, processGhanaWithdrawal } from "../money/withdrawal.js";
+import { createWithdrawal, processGhanaWithdrawal, reconcilePaystackTransfer } from "../money/withdrawal.js";
+import { verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
 import { requireUser } from "../auth/middleware.js";
 
@@ -58,6 +59,20 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const result = await creditPurchasedCoins(await getDb(), { userId, coins: pkg.coins, provider: "REVENUECAT", providerTransactionId: transactionId, sku: pkg.sku });
     return res.status(200).json({ ok: true, duplicate: result.duplicate });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" }); }
+});
+
+walletRouter.post("/payout/paystack/webhook", async (req, res) => {
+  try {
+    const rawBody = (req as typeof req & { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
+    if (!verifyPaystackWebhookSignature(rawBody, req.header("x-paystack-signature"))) return res.status(401).json({ error: "Invalid signature" });
+    const event = String(req.body?.event ?? "");
+    if (!["transfer.success", "transfer.failed", "transfer.reversed"].includes(event)) return res.json({ ok: true, ignored: true });
+    const reference = String(req.body?.data?.reference ?? "");
+    const eventId = String(req.body?.data?.id ?? reference + ":" + event);
+    if (!reference) return res.status(400).json({ error: "Transfer reference missing" });
+    const result = await reconcilePaystackTransfer(await getDb(), { eventId, event: event as "transfer.success" | "transfer.failed" | "transfer.reversed", reference, rawStatus: String(req.body?.data?.status ?? "") });
+    return res.json({ ok: true, ...result });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Payout webhook failed" }); }
 });
 
 walletRouter.post("/gifts", requireUser, async (req, res) => {
