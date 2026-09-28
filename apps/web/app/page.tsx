@@ -40,6 +40,10 @@ export default function Home() {
   const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
   const [captionLanguage, setCaptionLanguage] = useState<Record<string, string>>({});
   const [translationBusy, setTranslationBusy] = useState<Record<string, boolean>>({});
+  const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Array<{ id: string; userId: string; text: string; createdAt: string }>>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentsBusy, setCommentsBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,25 +116,32 @@ export default function Home() {
     } catch {}
   }
 
-  async function comment(videoId: string) {
+  async function openComments(videoId: string) {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token || videoId.startsWith("demo-")) return;
-    const text = window.prompt("Add a comment");
-    if (!text?.trim()) return;
+    setCommentsVideoId(videoId);
+    setCommentsBusy(true);
     try {
-      const response = await fetch(`${api}/engagement/${videoId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ text })
-      });
+      const response = await fetch(`${api}/engagement/${videoId}/comments?limit=50`, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.ok) { const data = await response.json(); setComments(Array.isArray(data.comments) ? data.comments : []); }
+    } finally { setCommentsBusy(false); }
+  }
+
+  async function submitComment() {
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token || !commentsVideoId || !commentDraft.trim()) return;
+    const text = commentDraft.trim().slice(0, 500);
+    setCommentsBusy(true);
+    try {
+      const response = await fetch(`${api}/engagement/${commentsVideoId}/comments`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text }) });
       if (!response.ok) return;
-      const engagementResponse = await fetch(`${api}/engagement/${videoId}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (engagementResponse.ok) {
-        const data = await engagementResponse.json();
-        setVideos(items => items.map(item => item.id === videoId ? { ...item, engagement: data } : item));
-      }
-      track(videoId, "COMMENT");
-    } catch {}
+      const data = await response.json();
+      if (data.comment) setComments(items => [data.comment, ...items]);
+      setCommentDraft("");
+      const engagementResponse = await fetch(`${api}/engagement/${commentsVideoId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (engagementResponse.ok) { const engagement = await engagementResponse.json(); setVideos(items => items.map(item => item.id === commentsVideoId ? { ...item, engagement } : item)); }
+      track(commentsVideoId, "COMMENT");
+    } finally { setCommentsBusy(false); }
   }
 
   async function requestTranslation(videoId: string, language: string) {
@@ -229,7 +240,7 @@ export default function Home() {
             </div>
             <div className="actions">
               <button onClick={() => engage(v.id, "like")} aria-label="Like video">{v.engagement?.liked ? "♥" : "♡"}<small>{v.engagement?.likeCount ?? 0}</small></button>
-              <button onClick={() => comment(v.id)} aria-label="Comment on video">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
+              <button onClick={() => openComments(v.id)} aria-label="Open comments">◌<small>{v.engagement?.commentCount ?? 0}</small></button>
               <button onClick={() => engage(v.id, "share")} aria-label="Share video">↗<small>{v.engagement?.shareCount ?? 0}</small></button>
               <button onClick={() => engage(v.id, "save")} aria-label="Save video">{v.engagement?.saved ? "▣" : "▱"}<small>{v.engagement?.saveCount ?? 0}</small></button>
             </div>
@@ -237,5 +248,20 @@ export default function Home() {
         })}
       </div>
     </section>
+    {commentsVideoId && <div className="comments-backdrop" role="presentation" onClick={() => setCommentsVideoId(null)}>
+      <section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Comments" onClick={event => event.stopPropagation()}>
+        <header className="comments-header"><strong>Comments</strong><button type="button" onClick={() => setCommentsVideoId(null)} aria-label="Close comments">×</button></header>
+        <div className="comments-list">
+          {commentsBusy && !comments.length ? <p className="comments-empty">Loading comments…</p> : comments.length ? comments.map(comment => <article className="comment-item" key={comment.id}>
+            <div className="comment-avatar">{comment.userId.slice(-2).toUpperCase()}</div>
+            <div><strong>@user</strong><p>{comment.text}</p><small>{new Date(comment.createdAt).toLocaleString()}</small></div>
+          </article>) : <p className="comments-empty">No comments yet. Be the first to comment.</p>}
+        </div>
+        <form className="comment-form" onSubmit={event => { event.preventDefault(); submitComment(); }}>
+          <input value={commentDraft} maxLength={500} onChange={event => setCommentDraft(event.target.value)} placeholder="Add a comment…" aria-label="Add a comment" />
+          <button type="submit" disabled={commentsBusy || !commentDraft.trim()}>Post</button>
+        </form>
+      </section>
+    </div>}
   </main>;
 }
