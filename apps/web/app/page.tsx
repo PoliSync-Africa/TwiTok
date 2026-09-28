@@ -156,6 +156,15 @@ export default function Home() {
       try {
         const data = JSON.parse(event.data);
         if (data?.type === "notification:new") setUnreadNotifications(count => count + 1);
+        if (data?.type === "gift.received" || data?.type === "gift.sent") {
+          const emoji = data.animation === "rose" ? "🌹" : data.animation === "heart" ? "❤️" : data.animation === "clap" ? "👏" : data.animation === "kente" ? "🟩" : data.animation === "drum" ? "🥁" : data.animation === "crown" ? "👑" : data.animation === "lion" ? "🦁" : "💎";
+          const videoId = String(data.videoId ?? "");
+          if (videoId) {
+            const burst = { id: String(data.transactionId ?? crypto.randomUUID()), videoId, emoji, label: data.type === "gift.received" ? "Gift received" : "Gift sent", quantity: Number(data.quantity ?? 1) };
+            setGiftBursts(items => [...items.slice(-4), burst]);
+            window.setTimeout(() => setGiftBursts(items => items.filter(item => item.id !== burst.id)), 2600);
+          }
+        }
       } catch {}
     });
     return () => socket.close();
