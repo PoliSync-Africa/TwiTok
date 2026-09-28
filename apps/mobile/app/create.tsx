@@ -58,7 +58,8 @@ export default function CreateScreen() {
   const transitionTranslate = useRef(new Animated.Value(0)).current;
   const player = useVideoPlayer(assets[0]?.uri ?? null);
   player.timeUpdateEventInterval = 0.25;
-  const { currentTime } = useEvent(player, "timeUpdate", { currentTime: player.currentTime });
+  const timeUpdate = useEvent(player, "timeUpdate");
+  const currentTime = timeUpdate?.currentTime ?? 0;
   const previewDurationMs = Math.max(1, (player.duration || (assets[0]?.duration ?? durationMs / 1000) || 1) * 1000);
   const selectedRange = clipTrimRanges[selectedClip] ?? { startMs: 0, endMs: assets[selectedClip]?.duration ? Math.round(assets[selectedClip].duration as number) : null };
   const selectedClipDurationMs = Math.max(1000, Math.round(assets[selectedClip]?.duration ?? previewDurationMs));
@@ -153,6 +154,10 @@ export default function CreateScreen() {
     setClipTrimRanges(nextTrims);
     setClipTransitions(nextTransitions);
   }
+  function setTransition(index: number, type: string) {
+    setClipTransitions(prev => prev.map((x, i) => i === index ? { ...x, type } : x));
+  }
+
   function updateClipSetting(index: number, patch: Partial<ClipSetting>) {
     setClipSettings(prev => prev.map((x, i) => i === index ? { ...(x ?? DEFAULT_CLIP_SETTING), ...patch } : x));
   }
@@ -295,7 +300,7 @@ export default function CreateScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
         <Text style={styles.title}>Create</Text>
-        <Pressable onPress={publish} disabled={(mode==="TEXT" ? !caption.trim() : !assets.length) || busy}><Text style={[styles.post, ((mode==="TEXT" ? !caption.trim() : !assets.length) || busy) && styles.disabled]}>Post</Text></Pressable>
+        <Pressable onPress={() => { void publish(); }} disabled={(mode==="TEXT" ? !caption.trim() : !assets.length) || busy}><Text style={[styles.post, ((mode==="TEXT" ? !caption.trim() : !assets.length) || busy) && styles.disabled]}>Post</Text></Pressable>
       </View>
       <View style={styles.modeRow}>{["VIDEO","PHOTO","TEXT"].map(v=><Pressable key={v} style={[styles.mode,mode===v&&styles.modeSelected]} onPress={()=>{setMode(v as any);setAssets([])}}><Text style={styles.modeText}>{v==="VIDEO"?"Video":v==="PHOTO"?"Photo":"Text"}</Text></Pressable>)}</View>
       {mode !== "TEXT" ? <View style={styles.modeRow}>
@@ -408,7 +413,7 @@ export default function CreateScreen() {
           <Text style={styles.helper}>Per-clip trim</Text>
           {assets.map((asset, i) => {
             const range = clipTrimRanges[i] ?? { startMs: 0, endMs: asset.duration ? Math.round(asset.duration) : null };
-            const duration = Math.max(1000, Math.round(asset.duration ?? durationMs / Math.max(1, assets.length) ?? 10000));
+            const duration = Math.max(1000, Math.round(asset.duration ?? (durationMs / Math.max(1, assets.length)) || 10000));
             const end = range.endMs ?? duration;
             const updateRange = (startMs:number, endMs:number) => setClipTrimRanges(prev => prev.map((x,j)=>j===i ? { startMs:Math.max(0,Math.min(startMs,endMs-500)), endMs:Math.max(startMs+500,Math.min(endMs,duration)) } : x));
             return <View key={asset.uri+i} style={styles.clipTrimRow}>
@@ -458,4 +463,24 @@ export default function CreateScreen() {
 }
 const styles=StyleSheet.create({
  screen:{flex:1,backgroundColor:"#000",paddingTop:48},clipActions:{position:"absolute",bottom:4,left:8,right:8,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},action:{color:"#fff",fontSize:24,fontWeight:"900"},transitionRow:{paddingHorizontal:16,paddingVertical:4},transitionChoices:{gap:6},perClip:{paddingHorizontal:16,paddingVertical:4},helper:{color:"#777",fontSize:12,paddingHorizontal:16,paddingTop:4},trimInput:{flex:1,minWidth:130,marginHorizontal:0},draftButton:{marginHorizontal:16,marginTop:14,borderWidth:1,borderColor:"#444",borderRadius:12,padding:14,alignItems:"center"},draftText:{color:"#fff",fontWeight:"800"},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipSelected:{borderWidth:2,borderColor:"#ff2d55"},timelineBox:{marginHorizontal:16,marginTop:8,borderRadius:14,backgroundColor:"#0d0d0d",paddingVertical:10},timelineHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},timelineMeta:{color:"#777",fontSize:12,paddingHorizontal:16},timelineRow:{flexDirection:"row",gap:6,paddingHorizontal:12,paddingVertical:10,alignItems:"center"},timelineClip:{height:48,borderRadius:8,backgroundColor:"#1b1b1b",padding:7,justifyContent:"space-between",borderWidth:1,borderColor:"#292929"},timelineClipSelected:{borderColor:"#ff2d55"},timelineClipText:{color:"#fff",fontSize:12,fontWeight:"800"},timelineRange:{height:5,borderRadius:3,backgroundColor:"#333",position:"relative",overflow:"hidden"},timelinePlayhead:{position:"absolute",top:0,bottom:0,width:3,backgroundColor:"#ff2d55"},timelineControls:{flexDirection:"row",alignItems:"center",gap:6,paddingHorizontal:12,paddingBottom:4},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"},soundButton:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",padding:14},clearSound:{color:"#ff2d55",fontWeight:"800",marginHorizontal:16,marginTop:4},effectOverlay:{position:"absolute",top:0,bottom:0,left:0,right:0},effectVibrant:{backgroundColor:"rgba(255,180,80,0.12)"},effectWarm:{backgroundColor:"rgba(255,140,40,0.18)"},effectCool:{backgroundColor:"rgba(60,150,255,0.16)"},effectNoir:{backgroundColor:"rgba(0,0,0,0.42)"},effectVintage:{backgroundColor:"rgba(150,90,40,0.20)"}
+  previewCard:{marginHorizontal:16,marginTop:10,borderRadius:14,backgroundColor:"#0d0d0d",overflow:"hidden"},
+  previewStage:{height:360,backgroundColor:"#000",position:"relative"},
+  previewVideo:{width:"100%",height:"100%"},
+  transitionOverlay:{position:"absolute",top:0,bottom:0,left:0,right:0,backgroundColor:"#000"},
+  previewControls:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",padding:10},
+  playButton:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:8},
+  timecode:{color:"#aaa",fontSize:12},
+  scrubber:{paddingHorizontal:12,paddingBottom:10},
+  scrubberTrack:{height:5,borderRadius:3,backgroundColor:"#333",overflow:"hidden"},
+  scrubberFill:{height:"100%",backgroundColor:"#ff2d55"},
+  scrubberInput:{marginTop:8,borderWidth:1,borderColor:"#333",borderRadius:8,color:"#fff",padding:8},
+  coverBox:{marginHorizontal:16,marginTop:8,padding:12,borderRadius:12,backgroundColor:"#0d0d0d"},
+  trimBox:{marginHorizontal:16,marginTop:8,padding:12,borderRadius:12,backgroundColor:"#0d0d0d"},
+  trimTrack:{height:44,borderRadius:8,backgroundColor:"#171717",position:"relative",overflow:"hidden",marginTop:8},
+  trimTrackBase:{position:"absolute",left:0,right:0,top:18,height:8,backgroundColor:"#333"},
+  trimSelected:{position:"absolute",top:14,bottom:14,backgroundColor:"rgba(255,45,85,.25)",borderLeftWidth:2,borderRightWidth:2,borderColor:"#ff2d55"},
+  trimHandle:{position:"absolute",top:8,width:8,height:28,borderRadius:4,backgroundColor:"#fff",marginLeft:-4},
+  overlayInput:{flex:1,minWidth:130,marginHorizontal:0},
+  clipTrimSection:{marginTop:8,paddingBottom:8},
+  clipTrimRow:{marginHorizontal:16,marginBottom:8,padding:10,borderRadius:10,backgroundColor:"#0d0d0d"},
 });
