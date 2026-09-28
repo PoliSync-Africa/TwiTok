@@ -1,4 +1,5 @@
 import type { Db } from "mongodb";
+import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -25,8 +26,9 @@ export async function ensureUserIndexes(db: Db) {
   ]);
 }
 
-export async function createUser(db: Db, input: { username: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
-  const username = input.username.trim().toLowerCase();
+export async function createUser(db: Db, input: { username?: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
+  const generatedUsername = `user_${new ObjectId().toHexString().slice(-12)}`;
+  const username = (input.username?.trim().toLowerCase() || generatedUsername);
   if (!/^[a-z0-9._]{3,24}$/.test(username)) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
   if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
   const dob = new Date(input.dateOfBirth);
@@ -43,6 +45,7 @@ export async function createUser(db: Db, input: { username: string; password: st
     countryCode: input.countryCode.trim().toUpperCase(),
     accountType: "PERSONAL",
     isPrivate: false,
+    profileSetupComplete: Boolean(input.username?.trim()),
     status: "ACTIVE",
     emailVerified: false,
     phoneVerified: false,
@@ -64,5 +67,5 @@ export async function authenticateUser(db: Db, identifier: string, password: str
   });
   if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
   if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid login credentials");
-  return { _id: user._id.toHexString(), username: user.username, nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, isPrivate: user.isPrivate };
+  return { _id: user._id.toHexString(), username: user.username, nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }
