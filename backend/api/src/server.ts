@@ -18,6 +18,7 @@ import { initializeVideoIndexes } from "./video/service.js";
 import { initializeFeedIndexes } from "./feed/service.js";
 import { initializeEngagementIndexes } from "./social/engagement.js";
 import { initializeNotificationIndexes } from "./social/notifications.js";
+import { initializeSearchIndexes } from "./search/service.js";
 import { initializeVideoProcessingIndexes } from "./video/processing.js";
 import { ensureSoundIndexes } from "./music/service.js";
 import { ensureTranscriptionIndexes } from "./video/transcription.js";
@@ -56,6 +57,7 @@ async function start() {
     await initializeFeedIndexes(db);
     await initializeEngagementIndexes(db);
     await initializeNotificationIndexes(db);
+    await initializeSearchIndexes(db);
     await ensureSoundIndexes(db);
     await ensureTranscriptionIndexes(db);
     await ensureTranslationIndexes(db);
