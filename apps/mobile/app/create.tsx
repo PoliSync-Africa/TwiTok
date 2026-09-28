@@ -52,19 +52,26 @@ export default function CreateScreen() {
   const selectedClipEndMs = selectedRange.endMs ?? selectedClipDurationMs;
   const selectedClipStartMs = Math.min(selectedRange.startMs, Math.max(0, selectedClipEndMs - 500));
   const previewTimeMs = Math.max(0, Math.min(previewDurationMs, currentTime * 1000));
+  const activeClipSetting = clipSettings[selectedClip] ?? DEFAULT_CLIP_SETTING;
   useEffect(() => {
     const asset = assets[selectedClip];
     if (!asset?.uri) return;
     player.pause();
+    player.playbackRate = activeClipSetting.speed;
+    player.volume = activeClipSetting.volume;
+    player.muted = activeClipSetting.muted;
     void player.replaceAsync(asset.uri).then(() => {
       const range = clipTrimRanges[selectedClip];
+      player.playbackRate = activeClipSetting.speed;
+      player.volume = activeClipSetting.volume;
+      player.muted = activeClipSetting.muted;
       player.currentTime = Math.max(0, range?.startMs ?? 0) / 1000;
       if (advanceToNextClip.current) {
         advanceToNextClip.current = false;
         player.play();
       }
     }).catch(() => undefined);
-  }, [selectedClip, assets, clipTrimRanges, player]);
+  }, [selectedClip, assets, clipTrimRanges, activeClipSetting.speed, activeClipSetting.volume, activeClipSetting.muted, player]);
   useEffect(() => {
     if (!assets.length || !player.duration) return;
     const start = selectedClipStartMs / 1000;
@@ -100,6 +107,9 @@ export default function CreateScreen() {
   }
   function setTransition(index: number, type: string) {
     setClipTransitions(prev => prev.map((x, i) => i === index ? { ...x, type } : x));
+  }
+  function updateClipSetting(index: number, patch: Partial<ClipSetting>) {
+    setClipSettings(prev => prev.map((x, i) => i === index ? { ...(x ?? DEFAULT_CLIP_SETTING), ...patch } : x));
   }
 
   function chooseSound(){ router.push({ pathname:"/sounds", params:{ select:"1" } }); }
@@ -366,8 +376,9 @@ export default function CreateScreen() {
           {assets.map((_, i) => <View key={i} style={styles.perClip}>
             <Text style={styles.label}>Clip {i + 1}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.transitionChoices}>
-              {[0.5,0.75,1,1.5,2].map(v => <Pressable key={v} style={[styles.choice, clipSettings[i]?.speed === v && styles.selected]} onPress={()=>setClipSettings(prev=>prev.map((x,j)=>j===i?{...x,speed:v}:x))}><Text style={styles.choiceText}>{v}×</Text></Pressable>)}
-              <Pressable style={[styles.choice, clipSettings[i]?.muted && styles.selected]} onPress={()=>setClipSettings(prev=>prev.map((x,j)=>j===i?{...x,muted:!x.muted,volume:x.muted?1:0}:x))}><Text style={styles.choiceText}>{clipSettings[i]?.muted ? "Muted" : "Sound on"}</Text></Pressable>
+              {[0.5,0.75,1,1.5,2].map(v => <Pressable key={v} style={[styles.choice, clipSettings[i]?.speed === v && styles.selected]} onPress={()=>updateClipSetting(i,{speed:v})}><Text style={styles.choiceText}>{v}×</Text></Pressable>)}
+              <Pressable style={[styles.choice, clipSettings[i]?.muted && styles.selected]} onPress={()=>updateClipSetting(i,{muted:!clipSettings[i]?.muted,volume:clipSettings[i]?.muted?1:0})}><Text style={styles.choiceText}>{clipSettings[i]?.muted ? "Muted" : "Sound on"}</Text></Pressable>
+              {[0.25,0.5,0.75,1].map(v => <Pressable key={"vol"+v} style={[styles.choice, clipSettings[i]?.volume === v && !clipSettings[i]?.muted && styles.selected]} onPress={()=>updateClipSetting(i,{volume:v,muted:v===0})}><Text style={styles.choiceText}>{Math.round(v*100)}%</Text></Pressable>)}
             </ScrollView>
           </View>)}
         </View> : null}
