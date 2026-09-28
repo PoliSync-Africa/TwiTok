@@ -9,6 +9,7 @@ type Asset = { uri: string; mimeType?: string | null; duration?: number | null; 
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -23,6 +24,18 @@ export default function CreateScreen() {
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
   const [soundId, setSoundId] = useState("");
   const [overlayText, setOverlayText] = useState("");
+
+  async function pickPhotos() {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, selectionLimit: 35, quality: 1 });
+    if (!result.canceled) setAssets(result.assets.map(a => ({ uri: a.uri, mimeType: a.mimeType, fileSize: a.fileSize, fileName: a.fileName })));
+  }
+
+  async function recordPhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return Alert.alert("Camera permission", "Allow TwiTok to use your camera.");
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 });
+    if (!result.canceled) setAssets(result.assets.map(a => ({ uri: a.uri, mimeType: a.mimeType, fileSize: a.fileSize, fileName: a.fileName })));
+  }
 
   async function pickGallery() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -43,11 +56,32 @@ export default function CreateScreen() {
   }
 
   async function publish() {
-    if (!assets.length || busy) return;
+    if ((mode !== "TEXT" && !assets.length) || (mode === "TEXT" && !caption.trim()) || busy) return;
     setBusy(true); setStatus("Preparing upload…");
     try {
       const token = await getAuthToken();
       if (!token) throw new Error("Sign in before posting.");
+      if (mode === "TEXT") {
+        const response = await fetch(API + "/videos/posts/text", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({text:caption,visibility,allowComments:comments}) });
+        const data = await response.json().catch(()=>({})); if (!response.ok) throw new Error(data.error || "Unable to publish text post.");
+        Alert.alert("Posted","Your TwiTok text post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
+      }
+      if (mode === "PHOTO") {
+        const uploadIds: string[] = [];
+        for (let index=0; index<assets.length; index++) {
+          const blob = await (await fetch(assets[index].uri)).blob();
+          const mimeType = assets[index].mimeType || blob.type || "image/jpeg";
+          const sessionResponse = await fetch(API+"/videos/photos/uploads",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({mimeType,sizeBytes:blob.size})});
+          const session=await sessionResponse.json().catch(()=>({}));
+          if(!sessionResponse.ok || !session.uploadId || !session.uploadUrl) throw new Error(session.error||"Unable to create photo upload.");
+          const upload=await fetch(session.uploadUrl,{method:"PUT",headers:{"Content-Type":mimeType},body:blob}); if(!upload.ok) throw new Error("Photo upload failed.");
+          const complete=await fetch(API+"/videos/photos/uploads/"+session.uploadId+"/complete",{method:"POST",headers:{Authorization:"Bearer "+token}}); if(!complete.ok) throw new Error("Unable to complete photo upload.");
+          uploadIds.push(session.uploadId); setStatus("Uploading photo "+(index+1)+" of "+assets.length+"…");
+        }
+        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments})});
+        const data=await post.json().catch(()=>({})); if(!post.ok) throw new Error(data.error||"Unable to publish photo post.");
+        Alert.alert("Posted","Your TwiTok photo post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
+      }
       const uploads: string[] = [];
       for (let index = 0; index < assets.length; index++) {
         const asset = assets[index];
@@ -114,12 +148,13 @@ export default function CreateScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
         <Text style={styles.title}>Create</Text>
-        <Pressable onPress={publish} disabled={!assets.length || busy}><Text style={[styles.post, (!assets.length || busy) && styles.disabled]}>Post</Text></Pressable>
+        <Pressable onPress={publish} disabled={(mode==="TEXT" ? !caption.trim() : !assets.length) || busy}><Text style={[styles.post, ((mode==="TEXT" ? !caption.trim() : !assets.length) || busy) && styles.disabled]}>Post</Text></Pressable>
       </View>
-      <View style={styles.modeRow}>
-        <Pressable style={styles.mode} onPress={recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
-        <Pressable style={styles.mode} onPress={pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
-      </View>
+      <View style={styles.modeRow}>{["VIDEO","PHOTO","TEXT"].map(v=><Pressable key={v} style={[styles.mode,mode===v&&styles.modeSelected]} onPress={()=>{setMode(v as any);setAssets([])}}><Text style={styles.modeText}>{v==="VIDEO"?"Video":v==="PHOTO"?"Photo":"Text"}</Text></Pressable>)}</View>
+      {mode !== "TEXT" ? <View style={styles.modeRow}>
+        <Pressable style={styles.mode} onPress={mode==="PHOTO"?recordPhoto:recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
+        <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
+      </View> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
         {assets.length ? <FlatList data={assets} horizontal keyExtractor={(a,i)=>a.uri+i} contentContainerStyle={styles.assets} renderItem={({item,index})=><View style={styles.clip}><Text style={styles.clipIcon}>▶</Text><Text style={styles.clipText}>Clip {index+1}</Text><Pressable onPress={()=>setAssets(a=>a.filter((_,i)=>i!==index))}><Text style={styles.remove}>×</Text></Pressable></View>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
@@ -141,5 +176,5 @@ export default function CreateScreen() {
   );
 }
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:"#000",paddingTop:48},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"}
+ screen:{flex:1,backgroundColor:"#000",paddingTop:48},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"}
 });
