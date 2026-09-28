@@ -33,6 +33,10 @@ export default function CreateScreen() {
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   const [overlayText, setOverlayText] = useState("");
+  const [overlayStartMs, setOverlayStartMs] = useState(0);
+  const [overlayEndMs, setOverlayEndMs] = useState(3000);
+  const [overlayX, setOverlayX] = useState(0.5);
+  const [overlayY, setOverlayY] = useState(0.8);
   const durationMs = assets.reduce((sum, asset) => sum + (asset.duration ?? 0), 0);
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
   const [clipTransitions, setClipTransitions] = useState<{type:string;durationMs:number}[]>([]);
@@ -168,7 +172,7 @@ export default function CreateScreen() {
           clipTransitions,
           clipSettings,
           autoCaptions: true,
-          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: 0, endMs: Math.max(3000, durationMs || 3000), x: 0.5, y: 0.8, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
+          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
@@ -254,6 +258,17 @@ export default function CreateScreen() {
         <View style={styles.row}>{["0.5","1","1.5","2"].map(v=><Pressable key={v} style={[styles.choice,speed===Number(v)&&styles.selected]} onPress={()=>setSpeed(Number(v))}><Text style={styles.choiceText}>{v}×</Text></Pressable>)}</View>
         <View style={styles.row}>{["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].map(v=><Pressable key={v} style={[styles.choice,effect===v&&styles.selected]} onPress={()=>setEffect(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
         <TextInput value={overlayText} onChangeText={setOverlayText} placeholder="Add text overlay (optional)" placeholderTextColor="#777" style={styles.input} maxLength={150} />
+        {mode === "VIDEO" ? <View>
+          <Text style={styles.helper}>Text timing & position</Text>
+          <View style={styles.row}>
+            <TextInput value={String(overlayStartMs)} onChangeText={v=>setOverlayStartMs(Math.max(0,Number(v)||0))} keyboardType="numeric" placeholder="Start ms" placeholderTextColor="#777" style={[styles.input,styles.overlayInput]} />
+            <TextInput value={String(overlayEndMs)} onChangeText={v=>setOverlayEndMs(Math.max(500,Number(v)||500))} keyboardType="numeric" placeholder="End ms" placeholderTextColor="#777" style={[styles.input,styles.overlayInput]} />
+          </View>
+          <View style={styles.row}>
+            {[0.2,0.5,0.8].map(v=><Pressable key={v} style={[styles.choice,overlayX===v&&styles.selected]} onPress={()=>setOverlayX(v)}><Text style={styles.choiceText}>X {v}</Text></Pressable>)}
+            {[0.2,0.5,0.8].map(v=><Pressable key={"y"+v} style={[styles.choice,overlayY===v&&styles.selected]} onPress={()=>setOverlayY(v)}><Text style={styles.choiceText}>Y {v}</Text></Pressable>)}
+          </View>
+        </View> : null}
         {mode === "VIDEO" && assets.length > 1 ? <View>
           <Text style={styles.helper}>Transitions between clips</Text>
           {assets.slice(0, -1).map((_, i) => <View key={i} style={styles.transitionRow}>
