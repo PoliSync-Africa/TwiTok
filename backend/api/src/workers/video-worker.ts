@@ -60,6 +60,21 @@ async function uploadFile(file: string, key: string, contentType: string) {
   }));
 }
 
+function effectFilter(input: string, output: string, effect: string) {
+  const filters: Record<string, string> = {
+    NONE: "null",
+    VIBRANT: "eq=contrast=1.08:saturation=1.35",
+    WARM: "colorbalance=rs=.08:gs=.03:bs=-.03",
+    COOL: "colorbalance=rs=-.03:gs=.03:bs=.08",
+    NOIR: "hue=s=0,eq=contrast=1.15:brightness=-0.02",
+    VINTAGE: "eq=contrast=.95:saturation=.75:brightness=.02",
+    BRIGHT: "eq=contrast=1.03:saturation=1.05:brightness=.08",
+    FADE: "eq=contrast=.85:saturation=.9:brightness=.05"
+  };
+  const filter = filters[effect] ?? filters.NONE;
+  return `[${input}]${filter}[${output}]`;
+}
+
 function runProcess(bin: string, args: string[]) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
@@ -149,7 +164,7 @@ async function runFfmpeg(
       current = out;
     }
     const effectOut = `${variant.out}_effect`;
-    filters.push(effectFilter(current, effectOut));
+    filters.push(effectFilter(current, effectOut, effect));
     current = effectOut;
     textOverlays.forEach((overlay, index) => {
       const next = `${variant.out}_${index}`;
