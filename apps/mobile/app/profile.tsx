@@ -14,7 +14,7 @@ export default function ProfileScreen() {
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
-  const [videos,setVideos]=useState<Video[]>([]);
+  const [videos,setVideos]=useState<Video[]>([]);\n  const [activeTab,setActiveTab]=useState<"videos"|"reposts"|"saved">("videos");
   const [viewerId,setViewerId]=useState("");
 
   async function load() {
@@ -65,11 +65,23 @@ export default function ProfileScreen() {
         {busy?<ActivityIndicator color="#fff" size="small"/>:<Text style={styles.followText}>{profile.isFollowing?"Following":profile.followPending?"Requested":"Follow"}</Text>}
       </Pressable>
       {profile.isPrivate&&!profile.isFollowing?<Text style={styles.private}>This account is private. Follow to see their content.</Text>:<Text style={styles.private}>Creator profile</Text>}
+      <View style={styles.tabs}>
+        {(["videos","reposts","saved"] as const).map(tab=><Pressable key={tab} style={[styles.tab,activeTab===tab&&styles.tabActive]} onPress={async()=>{
+          setActiveTab(tab);
+          try {
+            const token=await getAuthToken();
+            const endpoint=tab==="videos"?"videos":tab==="reposts"?"reposts":"saved";
+            const r=await fetch(API+"/profile/"+encodeURIComponent(String(username))+"/"+endpoint,{headers:token?{Authorization:"Bearer "+token}:{}});
+            const d=await r.json().catch(()=>({}));
+            if(r.ok) setVideos(d.videos??[]);
+          } catch {}
+        }}><Text style={[styles.tabText,activeTab===tab&&styles.tabTextActive]}>{tab==="videos"?"Videos":tab==="reposts"?"Reposts":"Saved"}</Text></Pressable>)}
+      </View>
       <View style={styles.grid}>{videos.map(v=><Pressable key={v.id} style={styles.gridItem} onPress={()=>v.playback&&router.push({pathname:"/feed",params:{videoId:v.id}})}>{v.thumbnail?<Image source={{uri:v.thumbnail}} style={styles.gridImage}/>:<View style={styles.gridFallback}><Text style={styles.gridFallbackText}>▶</Text></View>}</Pressable>)}</View>
     </ScrollView>
   </View>;
 }
 
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:"#000"}, header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"#222"}, back:{color:"#fff",fontSize:40,lineHeight:40},headerTitle:{color:"#fff",fontSize:18,fontWeight:"800"},content:{alignItems:"center",padding:24},avatar:{width:92,height:92,borderRadius:46,backgroundColor:"#252525",alignItems:"center",justifyContent:"center",marginTop:18},avatarText:{color:"#fff",fontSize:34,fontWeight:"900"},avatarImage:{width:"100%",height:"100%",borderRadius:46},nickname:{color:"#fff",fontSize:22,fontWeight:"800",marginTop:14},username:{color:"#aaa",fontSize:15,marginTop:4},bio:{color:"#ddd",fontSize:15,textAlign:"center",lineHeight:21,marginTop:14,maxWidth:330},stats:{flexDirection:"row",gap:55,marginTop:24,marginBottom:24},stat:{color:"#fff",fontSize:20,fontWeight:"900",textAlign:"center"},statLabel:{color:"#aaa",fontSize:12,marginTop:3},followButton:{minWidth:180,height:44,borderRadius:6,backgroundColor:"#ff2d55",alignItems:"center",justifyContent:"center"},followingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},pendingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},followText:{color:"#fff",fontWeight:"800"},private:{color:"#888",fontSize:13,textAlign:"center",marginTop:24},editButton:{marginTop:12,paddingHorizontal:24,height:38,borderRadius:5,borderWidth:1,borderColor:"#444",alignItems:"center",justifyContent:"center"},editText:{color:"#fff",fontWeight:"800"},grid:{width:"100%",flexDirection:"row",flexWrap:"wrap",gap:2,marginTop:28,borderTopWidth:1,borderTopColor:"#222",paddingTop:2},gridItem:{width:"32.8%",aspectRatio:.72,backgroundColor:"#171717"},gridImage:{width:"100%",height:"100%"},gridFallback:{flex:1,alignItems:"center",justifyContent:"center"},gridFallbackText:{color:"#777",fontSize:20},center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:24},error:{color:"#ff7188",textAlign:"center",marginBottom:15},link:{color:"#fff",fontWeight:"700"}
+ screen:{flex:1,backgroundColor:"#000"}, header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"#222"}, back:{color:"#fff",fontSize:40,lineHeight:40},headerTitle:{color:"#fff",fontSize:18,fontWeight:"800"},content:{alignItems:"center",padding:24},avatar:{width:92,height:92,borderRadius:46,backgroundColor:"#252525",alignItems:"center",justifyContent:"center",marginTop:18},avatarText:{color:"#fff",fontSize:34,fontWeight:"900"},avatarImage:{width:"100%",height:"100%",borderRadius:46},nickname:{color:"#fff",fontSize:22,fontWeight:"800",marginTop:14},username:{color:"#aaa",fontSize:15,marginTop:4},bio:{color:"#ddd",fontSize:15,textAlign:"center",lineHeight:21,marginTop:14,maxWidth:330},stats:{flexDirection:"row",gap:55,marginTop:24,marginBottom:24},stat:{color:"#fff",fontSize:20,fontWeight:"900",textAlign:"center"},statLabel:{color:"#aaa",fontSize:12,marginTop:3},followButton:{minWidth:180,height:44,borderRadius:6,backgroundColor:"#ff2d55",alignItems:"center",justifyContent:"center"},followingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},pendingButton:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},followText:{color:"#fff",fontWeight:"800"},private:{color:"#888",fontSize:13,textAlign:"center",marginTop:24},editButton:{marginTop:12,paddingHorizontal:24,height:38,borderRadius:5,borderWidth:1,borderColor:"#444",alignItems:"center",justifyContent:"center"},editText:{color:"#fff",fontWeight:"800"},tabs:{width:"100%",flexDirection:"row",marginTop:28,borderTopWidth:1,borderTopColor:"#222"},tab:{flex:1,alignItems:"center",paddingVertical:14,borderBottomWidth:2,borderBottomColor:"transparent"},tabActive:{borderBottomColor:"#fff"},tabText:{color:"#777",fontWeight:"800",fontSize:13},tabTextActive:{color:"#fff"},grid:{width:"100%",flexDirection:"row",flexWrap:"wrap",gap:2,marginTop:0,borderTopWidth:1,borderTopColor:"#222",paddingTop:2},gridItem:{width:"32.8%",aspectRatio:.72,backgroundColor:"#171717"},gridImage:{width:"100%",height:"100%"},gridFallback:{flex:1,alignItems:"center",justifyContent:"center"},gridFallbackText:{color:"#777",fontSize:20},center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:24},error:{color:"#ff7188",textAlign:"center",marginBottom:15},link:{color:"#fff",fontWeight:"700"}
 });
