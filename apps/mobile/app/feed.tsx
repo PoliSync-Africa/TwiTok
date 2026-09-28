@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
 
@@ -11,16 +11,54 @@ type Video = {
   thumbnail?: string | null;
 };
 
+type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
+
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 const { height, width } = Dimensions.get("window");
 
 function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void }) {
+  const [engagement, setEngagement] = useState<Engagement | null>(null);
+  const [busy, setBusy] = useState(false);
   const source = item.playback?.hlsUrl || item.playback?.mp4Url || null;
   const startedAt = useRef<number | null>(null);
   const player = useVideoPlayer(source, p => {
     p.loop = true;
     if (active && source) p.play();
   });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) return;
+        const r = await fetch(API + "/engagement/" + item.id, { headers: { Authorization: "Bearer " + token } });
+        const d = await r.json().catch(() => ({}));
+        if (alive && r.ok) setEngagement(d);
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [item.id]);
+
+  async function action(kind: "like"|"save"|"share"|"repost") {
+    const token = await getAuthToken();
+    if (!token || busy) return;
+    if (kind === "share") {
+      try {
+        await Share.share({ message: "Watch this on TwiTok: " + API.replace(/\/api\/v1$/, "") + "/video/" + item.id });
+        const r = await fetch(API + "/engagement/" + item.id + "/share", { method: "POST", headers: { Authorization: "Bearer " + token } });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.engagement) setEngagement(d.engagement);
+      } catch {}
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await fetch(API + "/engagement/" + item.id + "/" + kind, { method: "POST", headers: { Authorization: "Bearer " + token } });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.engagement) setEngagement(d.engagement);
+    } catch {} finally { setBusy(false); }
+  }
 
   useEffect(() => {
     if (!source) return;
@@ -38,7 +76,7 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   }, [active, player, source]);
 
   if (!source) {
-    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} /></View>;
+    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Overlay item={item} engagement={engagement} onAction={action} /></View>;
   }
 
   return (
@@ -49,14 +87,15 @@ function VideoCard({ item, active, onEvent }: { item: Video; active: boolean; on
   );
 }
 
-function Overlay({ item }: { item: Video }) {
+function Overlay({ item, engagement, onAction }: { item: Video; engagement: Engagement | null; onAction: (kind: "like"|"save"|"share"|"repost") => void }) {
   return (
     <>
       <View style={styles.scrim} />
       <View style={styles.rightRail}>
-        <Pressable style={styles.action}><Text style={styles.actionIcon}>♡</Text><Text style={styles.actionLabel}>Like</Text></Pressable>
-        <Pressable style={styles.action}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>Comment</Text></Pressable>
-        <Pressable style={styles.action}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>Share</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("repost")}><Text style={[styles.actionIcon, engagement?.reposted && styles.activeIcon]}>↻</Text><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
       </View>
       <View style={styles.meta}>
         <Text style={styles.username}>@twitok</Text>
@@ -129,6 +168,7 @@ const styles = StyleSheet.create({
   action: { alignItems: "center", minWidth: 52 },
   actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
+  activeIcon: { color: "#ff2d55" },
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
   username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
   caption: { color: "#fff", fontSize: 15, lineHeight: 21 },
