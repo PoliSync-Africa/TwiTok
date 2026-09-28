@@ -1,5 +1,8 @@
 import express from "express";
 import { createServer } from "node:http";
+import type { Request } from "express";
+
+type RequestWithRawBody = Request & { rawBody?: string };
 import { attachRealtime } from "./realtime/ws.js";
 import cors from "cors";
 import helmet from "helmet";
@@ -36,7 +39,7 @@ const port = Number(process.env.PORT ?? 4000);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.ADMIN_WEB_ORIGIN?.split(",").map((origin) => origin.trim()) ?? true, credentials: true }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { (req as RequestWithRawBody).rawBody = buf.toString("utf8"); } }));
 
 app.get("/health", (_req, res) => {
   res.json({ service: "twitok-api", status: "ok", platform: "TwiTok", version: "0.6.0" });
