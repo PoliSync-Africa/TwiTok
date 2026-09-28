@@ -8,7 +8,7 @@ export default function HomeScreen() {
         <Text style={styles.logo}>TwiTok</Text>
         <Text style={styles.subtitle}>Africa's short-video platform</Text>
       </View>
-      <Pressable style={styles.button}>
+      <Pressable style={styles.button} onPress={() => router.push("/login")}>
         <Text style={styles.buttonText}>Open For You</Text>
       </Pressable>
       <Link href="/feed" asChild>
