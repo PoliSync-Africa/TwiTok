@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useEvent } from "expo";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
@@ -34,6 +36,14 @@ export default function CreateScreen() {
   const durationMs = assets.reduce((sum, asset) => sum + (asset.duration ?? 0), 0);
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
   const [clipTransitions, setClipTransitions] = useState<{type:string;durationMs:number}[]>([]);
+  const player = useVideoPlayer(assets[0]?.uri ?? null);
+  player.timeUpdateEventInterval = 0.25;
+  const { currentTime } = useEvent(player, "timeUpdate", { currentTime: player.currentTime });
+  const previewDurationMs = Math.max(1, (player.duration || (assets[0]?.duration ?? durationMs / 1000) || 1) * 1000);
+  const previewTimeMs = Math.max(0, Math.min(previewDurationMs, currentTime * 1000));
+  function seekPreview(valueMs: number) {
+    player.currentTime = Math.max(0, Math.min(previewDurationMs, valueMs)) / 1000;
+  }
 
   function replaceAssets(next: Asset[]) {
     setAssets(next);
@@ -208,6 +218,31 @@ export default function CreateScreen() {
     <Pressable onPress={()=>{const next=assets.filter((_,i)=>i!==index);replaceAssets(next)}}><Text style={styles.remove}>×</Text></Pressable>
   </View>
 </View>} /> : <View style={styles.empty}><Text style={styles.emptyIcon}>＋</Text><Text style={styles.emptyText}>Add videos from your gallery or record with camera</Text></View>}
+        {mode === "VIDEO" && assets.length ? <View style={styles.previewCard}>
+          <VideoView player={player} style={styles.previewVideo} nativeControls={false} contentFit="contain" />
+          <View style={styles.previewControls}>
+            <Pressable style={styles.playButton} onPress={()=>player.playing ? player.pause() : player.play()}><Text style={styles.choiceText}>{player.playing ? "Pause" : "Play"}</Text></Pressable>
+            <Text style={styles.timecode}>{(previewTimeMs/1000).toFixed(1)}s / {(previewDurationMs/1000).toFixed(1)}s</Text>
+          </View>
+          <View style={styles.scrubber}>
+            <View style={styles.scrubberTrack}><View style={[styles.scrubberFill,{width:`${Math.min(100,(previewTimeMs/previewDurationMs)*100)}%`}]} /></View>
+            <TextInput
+              accessibilityLabel="Video timeline"
+              value={String(Math.round(previewTimeMs))}
+              onChangeText={v=>seekPreview(Number(v)||0)}
+              keyboardType="numeric"
+              style={styles.scrubberInput}
+              placeholder="Position ms"
+              placeholderTextColor="#777"
+            />
+          </View>
+          <View style={styles.row}>
+            <Pressable style={styles.small} onPress={()=>seekPreview(previewTimeMs-1000)}><Text style={styles.choiceText}>−1s</Text></Pressable>
+            <Pressable style={styles.small} onPress={()=>seekPreview(previewTimeMs+1000)}><Text style={styles.choiceText}>+1s</Text></Pressable>
+            <Pressable style={styles.small} onPress={()=>seekPreview(trimStartMs)}><Text style={styles.choiceText}>Start</Text></Pressable>
+            <Pressable style={styles.small} onPress={()=>seekPreview(trimEndMs || previewDurationMs)}><Text style={styles.choiceText}>End</Text></Pressable>
+          </View>
+        </View> : null}
         <Text style={styles.section}>Edit timeline</Text>
         {mode === "VIDEO" ? <>
           <Text style={styles.helper}>Trim start / end (milliseconds)</Text>
