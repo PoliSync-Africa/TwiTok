@@ -26,6 +26,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   const [busy, setBusy] = useState(false);
   const [heartBurst, setHeartBurst] = useState(false);
   const lastTap = useRef(0);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const source = item.playback?.hlsUrl || item.playback?.mp4Url || null;
   const startedAt = useRef<number | null>(null);
   const player = useVideoPlayer(source, p => {
@@ -50,6 +51,8 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   function handleTap() {
     const now = Date.now();
     if (now - lastTap.current < 320) {
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = null;
       lastTap.current = 0;
       setHeartBurst(true);
       void action("like");
@@ -57,7 +60,18 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
       return;
     }
     lastTap.current = now;
+    if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+    singleTapTimer.current = setTimeout(() => {
+      singleTapTimer.current = null;
+      if (!source) return;
+      if (player.playing) player.pause();
+      else player.play();
+    }, 320);
   }
+
+  useEffect(() => () => {
+    if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+  }, []);
 
   async function action(kind: "like"|"save"|"share"|"repost") {
     const token = await getAuthToken();
