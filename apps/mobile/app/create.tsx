@@ -415,7 +415,8 @@ export default function CreateScreen() {
             <TextInput value={String(trimEndMs)} onChangeText={v=>setTrimEndMs(Math.max(0,Number(v)||0))} keyboardType="numeric" placeholder="End (0 = full)" placeholderTextColor="#777" style={[styles.input,styles.trimInput]} />
           </View>
         </> : null}
-        <View style={styles.row}>{["0.5","1","1.5","2"].map(v=><Pressable key={v} style={[styles.choice,speed===Number(v)&&styles.selected]} onPress={()=>setSpeed(Number(v))}><Text style={styles.choiceText}>{v}×</Text></Pressable>)}</View>
+        <Text style={styles.helper}>Selected clip speed</Text>
+         <View style={styles.row}>{["0.5","1","1.5","2"].map(v=><Pressable key={v} style={[styles.choice,activeClipSetting.speed===Number(v)&&styles.selected]} onPress={()=>updateClipSetting(selectedClip,{speed:Number(v)})}><Text style={styles.choiceText}>{v}×</Text></Pressable>)}</View>
         <View style={styles.row}>{["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].map(v=><Pressable key={v} style={[styles.choice,effect===v&&styles.selected]} onPress={()=>setEffect(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
         <TextInput value={overlayText} onChangeText={setOverlayText} placeholder="Add text overlay (optional)" placeholderTextColor="#777" style={styles.input} maxLength={150} />
         {mode === "VIDEO" ? <View>
