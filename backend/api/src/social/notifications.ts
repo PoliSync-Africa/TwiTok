@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
+import { broadcastToUser } from "../realtime/ws.js";
 
 export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT" | "REPOST";
 
@@ -32,7 +33,9 @@ export async function createNotification(
     readAt: null,
     createdAt: now
   });
-  return { id: result.insertedId.toHexString(), createdAt: now };
+  const payload = { id: result.insertedId.toHexString(), type: input.type, videoId: input.videoId?.toHexString?.() ?? null, commentId: input.commentId?.toHexString?.() ?? null, createdAt: now };
+  broadcastToUser(input.recipientId.toHexString(), { type: "notification:new", notification: payload });
+  return payload;
 }
 
 export async function listNotifications(db: Db, userId: ObjectId, limit = 30) {
