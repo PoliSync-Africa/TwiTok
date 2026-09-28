@@ -1,6 +1,6 @@
 import type { Db } from "mongodb";
 import { randomUUID } from "node:crypto";
-import { CREATOR_DIAMONDS_PER_COIN } from "./wallet.js";
+import { CREATOR_DIAMONDS_PER_COIN, DIAMOND_CASH_VALUE_USD } from "./wallet.js";
 
 export const GIFT_CATALOG = [
   { giftId: "rose", name: "Rose", coins: 1, animation: "rose" },
@@ -55,7 +55,7 @@ export async function sendGift(db: Db, input: {
       if (debit.modifiedCount !== 1) throw new Error("Insufficient Coins");
       await db.collection("wallets").updateOne(
         { userId: input.receiverId },
-        { $inc: { diamondBalance: diamonds }, $set: { updatedAt: now } }, { session }
+        { $inc: { diamondBalance: diamonds, cashBalanceUsd: Number((diamonds * DIAMOND_CASH_VALUE_USD).toFixed(6)) }, $set: { updatedAt: now } }, { session }
       );
       await db.collection("gift_transactions").insertOne({
         transactionId, senderId: input.senderId, receiverId: input.receiverId,
@@ -65,7 +65,7 @@ export async function sendGift(db: Db, input: {
       }, { session });
       await db.collection("wallet_ledger").insertMany([
         { transactionId: randomUUID(), userId: input.senderId, type: "GIFT_SENT", coinsDelta: -coins, diamondsDelta: 0, cashDeltaUsd: 0, referenceId: transactionId, createdAt: now },
-        { transactionId: randomUUID(), userId: input.receiverId, type: "GIFT_RECEIVED", coinsDelta: 0, diamondsDelta: diamonds, cashDeltaUsd: 0, referenceId: transactionId, createdAt: now }
+        { transactionId: randomUUID(), userId: input.receiverId, type: "GIFT_RECEIVED", coinsDelta: 0, diamondsDelta: diamonds, cashDeltaUsd: Number((diamonds * DIAMOND_CASH_VALUE_USD).toFixed(6)), referenceId: transactionId, createdAt: now }
       ], { session });
     });
   } finally { await session.endSession(); }
