@@ -9,7 +9,7 @@ type Remix={id:string;mode:"DUET"|"STITCH";status:string;sourceVideoId:string;so
 export default function RemixEditorPage(){
   const params=useParams<{remixId:string}>(); const router=useRouter();
   const api=process.env.NEXT_PUBLIC_TWITOK_API_URL??"http://localhost:4000/api/v1";
-  const [remix,setRemix]=useState<Remix|null>(null); const [caption,setCaption]=useState(""); const [message,setMessage]=useState(""); const [saving,setSaving]=useState(false); const [recording,setRecording]=useState(false); const [mediaUrl,setMediaUrl]=useState(""); const [recorder,setRecorder]=useState<MediaRecorder|null>(null);
+  const [remix,setRemix]=useState<Remix|null>(null); const [caption,setCaption]=useState(""); const [message,setMessage]=useState(""); const [saving,setSaving]=useState(false); const [recording,setRecording]=useState(false); const [mediaUrl,setMediaUrl]=useState(""); const [recorder,setRecorder]=useState<MediaRecorder|null>(null); const [recordingBlob,setRecordingBlob]=useState<Blob|null>(null);
 
   useEffect(()=>{const token=window.localStorage.getItem("twitok_user_token");if(!token)return;
     fetch(api+"/video/remixes/"+encodeURIComponent(params.remixId),{headers:{Authorization:"Bearer "+token},cache:"no-store"}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error??"Unable to load remix");setRemix(d.remix);setCaption(d.remix.caption??"")}).catch(e=>setMessage(e.message));
@@ -22,18 +22,22 @@ export default function RemixEditorPage(){
       const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
       const chunks:Blob[]=[]; const mr=new MediaRecorder(stream);
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-      mr.onstop=()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks,{type:mr.mimeType||"video/webm"});setMediaUrl(URL.createObjectURL(blob));setRecording(false);setRecorder(null)};
+      mr.onstop=()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks,{type:mr.mimeType||"video/webm"});setRecordingBlob(blob);setMediaUrl(URL.createObjectURL(blob));setRecording(false);setRecorder(null)};
       mr.start(); setRecorder(mr); setRecording(true);
     }catch(e){setMessage(e instanceof Error?e.message:"Camera/microphone permission denied")}
   }
   function stopRecording(){recorder?.stop()}
   async function complete(){
-    const token=window.localStorage.getItem("twitok_user_token"); if(!token||!remix||!mediaUrl)return;
+    const token=window.localStorage.getItem("twitok_user_token"); if(!token||!remix||!recordingBlob)return;
     setSaving(true); setMessage("");
     try{
-      const r=await fetch(api+"/video/remixes/"+encodeURIComponent(remix.id)+"/complete",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({mediaUrl,caption})});
+      const sessionRes=await fetch(api+"/video/remixes/"+encodeURIComponent(remix.id)+"/upload",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({mimeType:recordingBlob.type||"video/webm",sizeBytes:recordingBlob.size})});
+      const session=await sessionRes.json(); if(!sessionRes.ok)throw new Error(session.error??"Unable to create upload");
+      const put=await fetch(session.uploadUrl,{method:"PUT",headers:{"Content-Type":recordingBlob.type||"video/webm"},body:recordingBlob});
+      if(!put.ok)throw new Error("Media upload failed");
+      const r=await fetch(api+"/video/remixes/"+encodeURIComponent(remix.id)+"/complete",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadId:session.uploadId,caption})});
       const d=await r.json(); if(!r.ok)throw new Error(d.error??"Unable to save remix");
-      setRemix(d.remix); setMessage("Remix recording saved as ready.");
+      setRemix(d.remix); setRecordingBlob(null); setMessage("Remix recording uploaded and saved.");
     }catch(e){setMessage(e instanceof Error?e.message:"Unable to save remix")}finally{setSaving(false)}
   }
 
