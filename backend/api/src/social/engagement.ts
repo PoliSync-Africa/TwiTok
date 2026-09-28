@@ -99,6 +99,11 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
     videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments, ...(parentObjectId ? { parentId: parentObjectId } : {})
   });
   if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "COMMENT", videoId, commentId: result.insertedId });
+  const mentioned = [...new Set((body.match(/@[a-z0-9._]{3,24}/gi) ?? []).map(x => x.slice(1).toLowerCase()))].slice(0, 20);
+  if (mentioned.length) {
+    const users = await db.collection("users").find({ username: { $in: mentioned } }, { projection: { _id: 1 } }).toArray();
+    for (const user of users) await createNotification(db, { recipientId: user._id, actorId: userId, type: "MENTION", videoId, commentId: result.insertedId });
+  }
   return { id: result.insertedId.toHexString(), userId: userId.toHexString(), text: body, createdAt, parentId: parentObjectId?.toHexString() ?? null, likeCount: 0, liked: false, replyCount: 0, attachments: await Promise.all(attachments.map(async a => ({ ...a, url: (await createPresignedPlayback(a.objectKey, 900)).url }))) };
 }
 
