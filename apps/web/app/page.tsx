@@ -183,7 +183,7 @@ export default function Home() {
       const response = await fetch(api + "/wallet/gifts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({ receiverId: video.ownerId, giftId, quantity: giftQuantity, context: "VIDEO" })
+        body: JSON.stringify({ receiverId: video.ownerId, giftId, quantity: giftQuantity, context: "VIDEO", videoId: video.id })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) { setGiftMessage(data.error ?? "Gift could not be sent."); return; }
