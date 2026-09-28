@@ -15,7 +15,7 @@ export default function ProfileScreen() {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [videos,setVideos]=useState<Video[]>([]);
-  const [activeTab,setActiveTab]=useState<"videos"|"reposts"|"saved"|"drafts">("videos");
+  const [activeTab,setActiveTab]=useState<"videos"|"reposts"|"saved"|"liked"|"drafts">("videos");
   const [viewerId,setViewerId]=useState("");
 
   async function load() {
@@ -83,16 +83,16 @@ export default function ProfileScreen() {
       </Pressable>
       {profile.isPrivate&&!profile.isFollowing?<Text style={styles.private}>This account is private. Follow to see their content.</Text>:<Text style={styles.private}>Creator profile</Text>}
       <View style={styles.tabs}>
-        {(["videos","reposts","saved",...(viewerId===profile?.id?["drafts" as const]:[])] as const).map(tab=><Pressable key={tab} style={[styles.tab,activeTab===tab&&styles.tabActive]} onPress={async()=>{
+        {(["videos","reposts",...(viewerId===profile?.id?["liked" as const,"saved" as const,"drafts" as const]:[])] as const).map(tab=><Pressable key={tab} style={[styles.tab,activeTab===tab&&styles.tabActive]} onPress={async()=>{
           setActiveTab(tab);
           try {
             const token=await getAuthToken();
-            const endpoint=tab==="videos"?"videos":tab==="reposts"?"reposts":tab==="saved"?"saved":"drafts";
+            const endpoint=tab==="videos"?"videos":tab==="reposts"?"reposts":tab==="liked"?"liked":tab==="saved"?"saved":"drafts";
             const r=await fetch(API+"/profile/"+encodeURIComponent(String(username))+"/"+endpoint,{headers:token?{Authorization:"Bearer "+token}:{}});
             const d=await r.json().catch(()=>({}));
             if(r.ok) setVideos(d.videos??[]);
           } catch {}
-        }}><Text style={[styles.tabText,activeTab===tab&&styles.tabTextActive]}>{tab==="videos"?"Videos":tab==="reposts"?"Reposts":tab==="saved"?"Saved":"Drafts"}</Text></Pressable>)}
+        }}><Text style={[styles.tabText,activeTab===tab&&styles.tabTextActive]}>{tab==="videos"?"Videos":tab==="reposts"?"Reposts":tab==="liked"?"Liked":tab==="saved"?"Saved":"Drafts"}</Text></Pressable>)}
       </View>
       <View style={styles.grid}>{videos.map(v=><View key={v.id} style={styles.gridItem}>{v.thumbnail?<Image source={{uri:v.thumbnail}} style={styles.gridImage}/>:<View style={styles.gridFallback}><Text style={styles.gridFallbackText}>{activeTab==="drafts"?"✎":"▶"}</Text></View>}{activeTab==="drafts"?<View style={styles.draftOverlay}><Text style={styles.draftStatus}>{v.status==="PROCESSING"?"Processing":"Draft"}</Text><Pressable style={styles.publishDraftButton} onPress={()=>publishDraft(v.id)} disabled={busy}><Text style={styles.publishDraftText}>Publish</Text></Pressable></View>:<Pressable style={styles.gridTap} onPress={()=>v.playback&&router.push({pathname:"/feed",params:{videoId:v.id}})}/>}</View>)}</View>
     </ScrollView>
