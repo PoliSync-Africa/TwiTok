@@ -7,18 +7,6 @@ import { verifyUserToken } from "../auth/user.js";
 
 export const profileRouter = Router();
 
-profileRouter.get("/:username", async (req, res) => {
-  try {
-    const db = await getDb();
-    let viewerId: ObjectId | undefined;
-    const header = req.headers.authorization;
-    if (header?.startsWith("Bearer ")) { try { viewerId = new ObjectId(verifyUserToken(header.slice(7)).sub); } catch {} }
-    const profile = await getProfile(db, req.params.username, viewerId);
-    if (!profile || ("unavailable" in profile && profile.unavailable)) return res.status(404).json({ error: "Profile not available" });
-    res.json({ profile });
-  } catch { res.status(500).json({ error: "Unable to load profile" }); }
-});
-
 profileRouter.post("/:username/follow", requireUser, async (req, res) => {
   try {
     const db = await getDb();
@@ -73,4 +61,16 @@ profileRouter.delete("/:username/block", requireUser, async (req, res) => {
     if (!target) return res.status(404).json({ error: "User not found" });
     res.json(await unblockUser(db, req.userId!, target._id));
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to unblock user" }); }
+});
+
+profileRouter.get("/:username", async (req, res) => {
+  try {
+    const db = await getDb();
+    let viewerId: ObjectId | undefined;
+    const header = req.headers.authorization;
+    if (header?.startsWith("Bearer ")) { try { viewerId = new ObjectId(verifyUserToken(header.slice(7)).sub); } catch {} }
+    const profile = await getProfile(db, req.params.username, viewerId);
+    if (!profile || ("unavailable" in profile && profile.unavailable)) return res.status(404).json({ error: "Profile not available" });
+    res.json({ profile });
+  } catch { res.status(500).json({ error: "Unable to load profile" }); }
 });
