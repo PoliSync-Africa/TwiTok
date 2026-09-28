@@ -9,8 +9,10 @@ import { getAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
 type ClipSetting = { speed: number; volume: number; muted: boolean };
+type StickerOverlay = { stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number };
 const DEFAULT_CLIP_SETTING: ClipSetting = { speed: 1, volume: 1, muted: false };
 const TRANSITIONS = ["NONE","FADE","DISSOLVE","WIPELEFT","WIPERIGHT","SLIDELEFT","SLIDERIGHT"];
+const STICKERS = [["africa","🌍"],["ghana","🇬🇭"],["nigeria","🇳🇬"],["kenya","🇰🇪"],["south-africa","🇿🇦"],["celebrate","🎉"],["love","❤️"],["fire","🔥"],["laugh","😂"],["wow","😮"],["clap","👏"],["dance","💃"],["drum","🥁"],["music","🎶"],["community","🤝"],["food","🍲"]] as const;
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -54,6 +56,7 @@ export default function CreateScreen() {
   const [overlayEndMs, setOverlayEndMs] = useState(3000);
   const [overlayX, setOverlayX] = useState(0.5);
   const [overlayY, setOverlayY] = useState(0.8);
+  const [stickers, setStickers] = useState<StickerOverlay[]>([]);
   const durationMs = assets.reduce((sum, asset) => sum + (asset.duration ?? 0), 0);
   const [clipSettings, setClipSettings] = useState<ClipSetting[]>([]);
   const [clipTrimRanges, setClipTrimRanges] = useState<{startMs:number;endMs:number|null}[]>([]);
@@ -467,7 +470,19 @@ export default function CreateScreen() {
             </ScrollView>
           </View>)}
         </View> : null}
-        <Text style={styles.section}>Sound</Text>
+        <Text style={styles.section}>Stickers</Text>
+         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
+           {STICKERS.map(([id,emoji])=><Pressable key={id} style={styles.stickerChoice} onPress={()=>setStickers(prev=>prev.some(s=>s.stickerId===id)?prev.filter(s=>s.stickerId!==id):[...prev,{stickerId:id,startMs:overlayStartMs,endMs:Math.max(overlayStartMs+500,overlayEndMs||3000),x:overlayX,y:overlayY,size:72,rotation:0}])}>
+             <Text style={styles.stickerEmoji}>{emoji}</Text>
+             <Text style={styles.stickerName}>{stickers.some(s=>s.stickerId===id)?"Added":"Add"}</Text>
+           </Pressable>)}
+         </ScrollView>
+         {stickers.length ? <View style={styles.row}>
+           {[48,72,100,140].map(size=><Pressable key={size} style={[styles.choice,stickers[stickers.length-1]?.size===size&&styles.selected]} onPress={()=>setStickers(prev=>prev.map((s,i)=>i===prev.length-1?{...s,size}:s))}><Text style={styles.choiceText}>{size}px</Text></Pressable>)}
+           {[{label:"Left",x:0.2},{label:"Center",x:0.5},{label:"Right",x:0.8}].map(p=><Pressable key={p.label} style={[styles.choice,stickers[stickers.length-1]?.x===p.x&&styles.selected]} onPress={()=>setStickers(prev=>prev.map((s,i)=>i===prev.length-1?{...s,x:p.x}:s))}><Text style={styles.choiceText}>{p.label}</Text></Pressable>)}
+           <Pressable style={styles.small} onPress={()=>setStickers([])}><Text style={styles.choiceText}>Clear</Text></Pressable>
+         </View> : null}
+         <Text style={styles.section}>Sound</Text>
         <Pressable style={styles.soundButton} onPress={chooseSound}><Text style={styles.choiceText}>{soundId ? `♫ ${soundTitle || soundId}` : "Add sound"}</Text></Pressable>
         {soundId ? <Pressable onPress={()=>{setSoundId("");setSoundTitle("");}}><Text style={styles.clearSound}>Remove sound</Text></Pressable> : null}
         <View style={styles.row}><Text style={styles.label}>Original {Math.round(originalVolume*100)}%</Text><Pressable style={styles.small} onPress={()=>setOriginalVolume(v=>v>=1?0:Math.min(1,v+0.25))}><Text style={styles.choiceText}>Adjust</Text></Pressable><Text style={styles.label}>Added {Math.round(addedSoundVolume*100)}%</Text><Pressable style={styles.small} onPress={()=>setAddedSoundVolume(v=>v>=1?0:Math.min(1,v+0.25))}><Text style={styles.choiceText}>Adjust</Text></Pressable></View>
