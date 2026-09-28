@@ -1,6 +1,6 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
