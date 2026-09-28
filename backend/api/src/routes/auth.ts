@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken, verifyUserToken } from "../auth/user.js";
-import { requireUser } from "../auth/middleware.js;
+import { requireUser } from "../auth/middleware.js";
 
 export const authRouter = Router();
 
