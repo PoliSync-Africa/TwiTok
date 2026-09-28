@@ -90,6 +90,19 @@ export default function Home() {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [api]);
 
+  async function openStory(storyId: string) {
+    setStoryOpen(storyId);
+    const token = window.localStorage.getItem("twitok_user_token");
+    if (!token) return;
+    try {
+      await fetch(api + "/stories/" + encodeURIComponent(storyId) + "/view", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token }
+      });
+      setStories(items => items.map(item => item.id === storyId ? { ...item, viewed: true } : item));
+    } catch {}
+  }
+
   async function openNotifications() {
     setNotificationsOpen(true);
     const token = window.localStorage.getItem("twitok_user_token");
