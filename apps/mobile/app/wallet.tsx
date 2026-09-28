@@ -53,13 +53,13 @@ export default function WalletScreen() {
     }catch(e){ Alert.alert("Wallet",e instanceof Error?e.message:"Unable to load wallet"); }
     finally{setLoading(false);}
   }
-  async function loadProviders(nextType:type){
+  async function loadProviders(nextType:"BANK"|"MOBILE_MONEY"){
     const token=await getAuthToken(); if(!token)return;
     setProvidersLoading(true);
     try{const q=nextType==="MOBILE_MONEY"?"mobile_money":"bank";const r=await fetch(API+"/wallet/payout/ghana/options?type="+q,{headers:{Authorization:"Bearer "+token}});const d=await r.json().catch(()=>({}));if(r.ok){const list=(d.providers??[]).filter((p:any)=>p.active!==false);setProviders(list);if(list.length&&!list.some((p:any)=>p.code===code))setCode(list[0].code);}}
     finally{setProvidersLoading(false);}
   }
-  useEffect(()=>{void load();void loadProviders(type);},[]);
+  useEffect(()=>{void load();},[]);
   useEffect(()=>{void loadProviders(type);},[type]);
 
   async function buyCoins(){
