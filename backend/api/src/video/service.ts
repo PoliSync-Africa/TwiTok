@@ -192,7 +192,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     allowComments: input.allowComments !== false,
     allowDuet: input.allowDuet !== false,
     allowStitch: input.allowStitch !== false,
-    coverTimeMs: Number.isFinite(Number(input.coverTimeMs)) ? Math.max(0, Number(input.coverTimeMs)) : 0,
+    coverTimeMs: (() => { const requested = Number(input.coverTimeMs); const start = Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0; const end = Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > start ? Number(input.trimEndMs) : null; return Number.isFinite(requested) ? Math.max(start, Math.min(requested, end ?? Number.MAX_SAFE_INTEGER)) : start; })(),
     trimStartMs: Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0,
     trimEndMs: Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > 0 ? Number(input.trimEndMs) : null,
     speed: [0.5, 0.75, 1, 1.5, 2].includes(Number(input.speed)) ? Number(input.speed) : 1,
