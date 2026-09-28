@@ -4,6 +4,7 @@ import { createGhanaRecipient, initiateGhanaTransfer } from "./providers/paystac
 
 export async function initializeWithdrawalIndexes(db: Db) {
   await db.collection("withdrawal_methods").createIndex({ userId: 1, type: 1 }, { unique: true });
+  await db.collection("payout_webhook_events").createIndex({ eventId: 1 }, { unique: true });
   await db.collection("withdrawals").createIndex({ providerReference: 1 }, { unique: true, sparse: true });
 }
 
@@ -113,4 +114,50 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
     throw error;
   }
   return db.collection("withdrawals").findOne({ withdrawalId });
+}
+
+
+export async function reconcilePaystackTransfer(db: Db, input: {
+  eventId: string;
+  event: "transfer.success" | "transfer.failed" | "transfer.reversed";
+  reference: string;
+  rawStatus?: string;
+}) {
+  const inserted = await db.collection("payout_webhook_events").insertOne({
+    eventId: input.eventId, event: input.event, reference: input.reference, createdAt: new Date()
+  }).catch(() => null);
+  if (!inserted) return { duplicate: true };
+
+  const withdrawal = await db.collection("withdrawals").findOne({ providerReference: input.reference });
+  if (!withdrawal) return { ignored: true };
+
+  if (input.event === "transfer.success") {
+    await db.collection("withdrawals").updateOne(
+      { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } },
+      { $set: { status: "PAID", providerStatus: input.rawStatus ?? "success", paidAt: new Date(), updatedAt: new Date() } }
+    );
+    return { status: "PAID" };
+  }
+
+  const session = db.client?.startSession();
+  if (!session) throw new Error("MongoDB session unavailable");
+  try {
+    await session.withTransaction(async () => {
+      const current = await db.collection("withdrawals").findOne(
+        { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } }, { session }
+      );
+      if (!current) return;
+      await db.collection("wallets").updateOne(
+        { userId: String(current.userId) },
+        { $inc: { cashBalanceUsd: Number(current.amountUsd) }, $set: { updatedAt: new Date() } },
+        { session }
+      );
+      await db.collection("withdrawals").updateOne(
+        { withdrawalId: current.withdrawalId },
+        { $set: { status: "FAILED", failureReason: input.event, updatedAt: new Date() } },
+        { session }
+      );
+    });
+  } finally { await session.endSession(); }
+  return { status: "FAILED" };
 }
