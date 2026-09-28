@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -22,8 +22,12 @@ export default function CreateScreen() {
   const [coverTimeMs, setCoverTimeMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const [soundId, setSoundId] = useState("");
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle } = useLocalSearchParams<{ soundId?: string; soundTitle?: string }>();
+  const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
+  const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   const [overlayText, setOverlayText] = useState("");
+
+  function chooseSound(){ router.push({ pathname:"/sounds", params:{ select:"1" } }); }
 
   async function pickPhotos() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, selectionLimit: 35, quality: 1 });
@@ -163,7 +167,8 @@ export default function CreateScreen() {
         <View style={styles.row}>{["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].map(v=><Pressable key={v} style={[styles.choice,effect===v&&styles.selected]} onPress={()=>setEffect(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
         <TextInput value={overlayText} onChangeText={setOverlayText} placeholder="Add text overlay (optional)" placeholderTextColor="#777" style={styles.input} maxLength={150} />
         <Text style={styles.section}>Sound</Text>
-        <TextInput value={soundId} onChangeText={setSoundId} placeholder="Sound ID (optional)" placeholderTextColor="#777" style={styles.input} />
+        <Pressable style={styles.soundButton} onPress={chooseSound}><Text style={styles.choiceText}>{soundId ? `♫ ${soundTitle || soundId}` : "Add sound"}</Text></Pressable>
+        {soundId ? <Pressable onPress={()=>{setSoundId("");setSoundTitle("");}}><Text style={styles.clearSound}>Remove sound</Text></Pressable> : null}
         <View style={styles.row}><Text style={styles.label}>Original {Math.round(originalVolume*100)}%</Text><Pressable style={styles.small} onPress={()=>setOriginalVolume(v=>v>=1?0:Math.min(1,v+0.25))}><Text style={styles.choiceText}>Adjust</Text></Pressable><Text style={styles.label}>Added {Math.round(addedSoundVolume*100)}%</Text><Pressable style={styles.small} onPress={()=>setAddedSoundVolume(v=>v>=1?0:Math.min(1,v+0.25))}><Text style={styles.choiceText}>Adjust</Text></Pressable></View>
         <Text style={styles.section}>Cover</Text>
         <TextInput value={String(coverTimeMs)} onChangeText={v=>setCoverTimeMs(Math.max(0,Number(v)||0))} keyboardType="numeric" placeholder="Cover time in milliseconds" placeholderTextColor="#777" style={styles.input} />
@@ -176,5 +181,5 @@ export default function CreateScreen() {
   );
 }
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:"#000",paddingTop:48},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"}
+ screen:{flex:1,backgroundColor:"#000",paddingTop:48},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"},soundButton:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",padding:14},clearSound:{color:"#ff2d55",fontWeight:"800",marginHorizontal:16,marginTop:4}
 });
