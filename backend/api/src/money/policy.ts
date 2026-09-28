@@ -1,6 +1,6 @@
 export const PLATFORM_CURRENCY = "USD";
-export const CREATOR_SHARE_BPS = 4000;
-export const PLATFORM_SHARE_BPS = 6000;
+export const CREATOR_SHARE_BPS = 3000;
+export const PLATFORM_SHARE_BPS = 7000;
 
 export const MOBILE_MONEY_COUNTRIES = new Set(["GH", "ZA", "KE", "UG", "NG"]);
 
@@ -16,8 +16,5 @@ export function splitRevenue(amountUsd: number) {
   const cents = Math.round(amountUsd * 100);
   const platformCents = Math.floor(cents * PLATFORM_SHARE_BPS / 10000);
   const creatorCents = cents - platformCents;
-  return {
-    platformUsd: platformCents / 100,
-    creatorUsd: creatorCents / 100
-  };
+  return { platformUsd: platformCents / 100, creatorUsd: creatorCents / 100 };
 }
