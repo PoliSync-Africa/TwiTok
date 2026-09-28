@@ -19,7 +19,9 @@ export async function initializeVideoIndexes(db: Db) {
     db.collection("videos").createIndex({ hashtags: 1, publishedAt: -1 }),
     db.collection("video_uploads").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("video_uploads").createIndex({ uploadId: 1 }, { unique: true }),
-    db.collection("video_processing_jobs").createIndex({ status: 1, createdAt: 1 })
+    db.collection("video_processing_jobs").createIndex({ status: 1, createdAt: 1 }),
+    db.collection("video_remixes").createIndex({ creatorId: 1, createdAt: -1 }),
+    db.collection("video_remixes").createIndex({ sourceVideoId: 1, createdAt: -1 })
   ]);
 }
 
@@ -191,4 +193,36 @@ export async function publishVideo(db: Db, userId: ObjectId, videoId: ObjectId) 
     $set: { status: "PUBLISHED", publishedAt: now, updatedAt: now }
   });
   return { videoId: videoId.toHexString(), status: "PUBLISHED", publishedAt: now };
+}
+
+export async function createVideoRemix(db: Db, userId: ObjectId, sourceVideoId: string, mode: "DUET" | "STITCH") {
+  if (!ObjectId.isValid(sourceVideoId)) throw new Error("Invalid source video id");
+  const source = await db.collection("videos").findOne(
+    { _id: new ObjectId(sourceVideoId), status: "PUBLISHED", visibility: "PUBLIC" },
+    { projection: { _id: 1, ownerId: 1, caption: 1, playback: 1, thumbnail: 1, allowDuet: 1, allowStitch: 1 } }
+  );
+  if (!source) throw new Error("Source video not found");
+  if (mode === "DUET" && source.allowDuet === false) throw new Error("Duet is disabled for this video");
+  if (mode === "STITCH" && source.allowStitch === false) throw new Error("Stitch is disabled for this video");
+  const now = new Date();
+  const result = await db.collection("video_remixes").insertOne({
+    creatorId: userId,
+    sourceVideoId: source._id,
+    mode,
+    status: "DRAFT",
+    sourceOwnerId: source.ownerId ?? null,
+    sourceCaption: source.caption ?? "",
+    sourcePlayback: source.playback ?? null,
+    sourceThumbnail: source.thumbnail ?? null,
+    createdAt: now,
+    updatedAt: now
+  });
+  return {
+    remixId: result.insertedId.toHexString(),
+    mode,
+    status: "DRAFT",
+    sourceVideoId: source._id.toHexString(),
+    sourcePlayback: source.playback ?? null,
+    sourceThumbnail: source.thumbnail ?? null
+  };
 }
