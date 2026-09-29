@@ -343,7 +343,7 @@ walletRouter.post("/coins/paystack/webhook", async (req, res) => {
     const verified = await verifyPaystackTransaction(reference);
     if (verified.status !== "success" || verified.currency !== "GHS") return res.status(400).json({ error: "Payment is not successful" });
     const db = await getDb();
-    const purchase = await db.collection("coin_purchases").findOne({ reference });
+    const purchase = await db.collection("coin_purchases").findOne({ reference, provider: "PAYSTACK" });
     if (!purchase) return res.status(404).json({ error: "Coin purchase not found" });
     const rate = Number(process.env.TWITOK_USD_GHS_RATE);
     const expectedAmount = Math.round(Number(purchase.amountGhs) * 100);
@@ -355,7 +355,7 @@ walletRouter.post("/coins/paystack/webhook", async (req, res) => {
     if (!Number.isFinite(feeBps) || feeBps < 0 || !Number.isFinite(taxBps) || taxBps < 0) return res.status(503).json({ error: "Paystack net-proceeds configuration is required before Coin crediting" });
     const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - (feeBps + taxBps) / 10000)).toFixed(8));
     const result = await creditPurchasedCoins(db, { userId: String(purchase.userId), coins: Number(purchase.coins), provider: "PAYSTACK", providerTransactionId: reference, sku: String(purchase.sku), grossUsd, netProceedsUsd });
-    await db.collection("coin_purchases").updateOne({ reference }, { $set: { status: "CREDITED", creditedAt: new Date() } });
+    await db.collection("coin_purchases").updateOne({ reference, provider: "PAYSTACK" }, { $set: { status: "CREDITED", creditedAt: new Date() } });
     return res.json({ ok: true, duplicate: result.duplicate, coins: purchase.coins });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Coin payment webhook failed" }); }
 });
