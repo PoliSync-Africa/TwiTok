@@ -5,6 +5,7 @@ import { verifyUserToken } from "../auth/user.js";
 type Client = { socket: WebSocket; userId: string };
 const clients = new Map<string, Set<WebSocket>>();
 const authAttempts = new WeakMap<WebSocket, number>();
+const messageWindows = new WeakMap<WebSocket, { startedAt: number; count: number }>();
 
 function allowedOrigins() {
   return (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean);
@@ -41,6 +42,10 @@ export function attachRealtime(server: import("node:http").Server) {
     const timeout = setTimeout(() => { if (!authenticated) socket.close(1008, "Authentication timeout"); }, 10000);
     const heartbeat = setInterval(() => { if (socket.readyState === socket.OPEN) socket.ping(); }, 30000);
     socket.on("message", async raw => {
+      const now = Date.now();
+      const window = messageWindows.get(socket);
+      if (!window || now - window.startedAt >= 10000) messageWindows.set(socket, { startedAt: now, count: 1 });
+      else if (++window.count > 30) return socket.close(1008, "Message rate limit exceeded");
       const rawText = raw.toString();
       if (Buffer.byteLength(rawText, "utf8") > 64 * 1024) return socket.close(1009, "Message too large");
       try {
@@ -50,8 +55,9 @@ export function attachRealtime(server: import("node:http").Server) {
         if (attempts > 3) return socket.close(1008, "Too many authentication attempts");
         const token = verifyUserToken(message.token);
         const db = await getDb();
-        const user = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(token.sub), status: "ACTIVE" }, { projection: { _id: 1 } });
+        const user = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(token.sub), status: "ACTIVE" }, { projection: { _id: 1, sessionVersion: 1 } });
         if (!user) return socket.close(1008, "Account unavailable");
+        if (Number(user.sessionVersion ?? 0) !== Number(token.sv ?? 0)) return socket.close(1008, "Session revoked");
         if (client) removeClient(client.userId, socket);
         client = { socket, userId: token.sub }; authenticated = true; clearTimeout(timeout);
         addClient(client.userId, socket); socket.send(JSON.stringify({ type: "ready" }));
