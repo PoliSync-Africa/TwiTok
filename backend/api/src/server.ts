@@ -48,7 +48,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { (req as any).rawBody = Buffer.from(buf); } }));
 
 app.get("/health", (_req, res) => res.json({ service: "twitok-api", status: "ok", platform: "TwiTok", version: "0.6.0" }));
 app.use("/api/v1", apiRouter);
