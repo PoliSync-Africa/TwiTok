@@ -18,6 +18,7 @@ export async function ensureOwnerAccount(db: Db) {
   if (!email || !passwordHash) return;
   const existing=await db.collection<OwnerAccount>("owner_accounts").findOne({email});
   if (!existing) await db.collection<OwnerAccount>("owner_accounts").insertOne({email,displayName,role:"OWNER",passwordHash,isActive:true,mfaRequired:process.env.TWITOK_OWNER_MFA_ENABLED==="true",createdAt:new Date(),updatedAt:new Date()});
+  else if (process.env.TWITOK_OWNER_MFA_ENABLED === "true" && !existing.mfaRequired) await db.collection<OwnerAccount>("owner_accounts").updateOne({ _id: existing._id }, { $set: { mfaRequired: true, updatedAt: new Date() } });
 }
 export async function verifyOwner(db: Db,email:string,password:string) {
   const owner=await db.collection<OwnerAccount>("owner_accounts").findOne({email:email.trim().toLowerCase(),role:"OWNER",isActive:true});
