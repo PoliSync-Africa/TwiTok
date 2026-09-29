@@ -45,6 +45,16 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const feedback = await db.collection("video_feedback").find({ userId, type: "NOT_INTERESTED" }).project({ videoId: 1 }).limit(5000).toArray();
   const blockedOwnerIds = blockedIds;
   const excludedVideoIds = feedback.map(x => x.videoId);
+  const interestRows = await db.collection("feed_events").aggregate([
+    { $match: { userId, type: { $in: ["VIEW_2S", "VIEW_COMPLETE", "REWATCH", "LIKE", "COMMENT", "SHARE", "SAVE", "FOLLOW"] } } },
+    { $sort: { createdAt: -1 } }, { $limit: 1000 },
+    { $lookup: { from: "videos", localField: "videoId", foreignField: "_id", as: "video" } },
+    { $unwind: "$video" },
+    { $unwind: { path: "$video.hashtags", preserveNullAndEmptyArrays: false } },
+    { $group: { _id: { hashtag: "$video.hashtags", type: "$type" }, weight: { $sum: 1 } } },
+    { $sort: { weight: -1 } }, { $limit: 100 }
+  ]).toArray();
+  const interestHashtags = [...new Set(interestRows.map((x: any) => String(x._id?.hashtag ?? "").toLowerCase()).filter(Boolean))];
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
@@ -78,6 +88,10 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "video_saves", localField: "_id", foreignField: "videoId", as: "_saves" } },
     { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
     { $addFields: {
+      _interest: { $size: { $setIntersection: [
+        { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$tag" } } },
+        interestHashtags
+      ] } },
       _engagement: { $add: [
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
@@ -85,7 +99,8 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         { $multiply: [{ $size: "$_comments" }, 0.25] },
         { $multiply: [{ $size: "$_shares" }, 0.35] },
         { $multiply: [{ $size: "$_saves" }, 0.3] },
-        { $multiply: [{ $size: "$_reposts" }, 0.2] }
+        { $multiply: [{ $size: "$_reposts" }, 0.2] },
+        { $multiply: ["$_interest", 2.5] }
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
