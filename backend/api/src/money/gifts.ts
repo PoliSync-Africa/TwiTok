@@ -1,7 +1,7 @@
 import type { Db } from "mongodb";
 import { ObjectId } from "mongodb";
 import { randomUUID } from "node:crypto";
-import { CREATOR_DIAMONDS_PER_COIN, DIAMOND_CASH_VALUE_USD } from "./wallet.js";
+import { CREATOR_DIAMONDS_PER_COIN } from "./wallet.js";
 
 export const AFRICAN_COUNTRY_CODES = new Set(["DZ","AO","BJ","BW","BF","BI","CV","CM","CF","TD","KM","CG","CD","CI","DJ","EG","GQ","ER","SZ","ET","GA","GM","GH","GN","GW","KE","LS","LR","LY","MG","MW","ML","MR","MU","MA","MZ","NA","NE","NG","RW","ST","SN","SC","SL","SO","ZA","SS","SD","TZ","TG","TN","UG","ZM","ZW"]);
 export const NON_AFRICAN_GIFT_MULTIPLIER = 1.5;
@@ -155,34 +155,42 @@ export async function sendGift(db: Db, input: {
     await session.withTransaction(async () => {
       await db.collection("wallets").updateOne(
         { userId: input.senderId },
-        { $setOnInsert: { userId: input.senderId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, createdAt: now, updatedAt: now } },
+        { $setOnInsert: { userId: input.senderId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, unallocatedNetProceedsUsd: 0, createdAt: now, updatedAt: now } },
         { upsert: true, session }
       );
       await db.collection("wallets").updateOne(
         { userId: input.receiverId },
-        { $setOnInsert: { userId: input.receiverId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, createdAt: now, updatedAt: now } },
+        { $setOnInsert: { userId: input.receiverId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, unallocatedNetProceedsUsd: 0, createdAt: now, updatedAt: now } },
         { upsert: true, session }
       );
+      const senderWallet = await db.collection("wallets").findOne({ userId: input.senderId }, { session });
+      const senderCoins = Number(senderWallet?.coinBalance ?? 0);
+      const senderNetPool = Number(senderWallet?.unallocatedNetProceedsUsd ?? 0);
+      if (senderCoins < coins) throw new Error("Insufficient Coins");
+      if (!Number.isFinite(senderNetPool) || senderNetPool < 0) throw new Error("Invalid Coin funding ledger");
+      const netValueConsumed = senderCoins > 0 ? Number((senderNetPool * (coins / senderCoins)).toFixed(8)) : 0;
+      const creatorEarningsUsd = Number((netValueConsumed * 0.30).toFixed(8));
+      const platformAllocationUsd = Number((netValueConsumed - creatorEarningsUsd).toFixed(8));
       const debit = await db.collection("wallets").updateOne(
-        { userId: input.senderId, coinBalance: { $gte: coins } },
-        { $inc: { coinBalance: -coins }, $set: { updatedAt: now } }, { session }
+        { userId: input.senderId, coinBalance: { $gte: coins }, unallocatedNetProceedsUsd: { $gte: netValueConsumed } },
+        { $inc: { coinBalance: -coins, unallocatedNetProceedsUsd: -netValueConsumed }, $set: { updatedAt: now } }, { session }
       );
-      if (debit.modifiedCount !== 1) throw new Error("Insufficient Coins");
+      if (debit.modifiedCount !== 1) throw new Error("Coin funding ledger changed; retry the Gift");
       await db.collection("wallets").updateOne(
         { userId: input.receiverId },
-        { $inc: { diamondBalance: diamonds, cashBalanceUsd: Number((diamonds * DIAMOND_CASH_VALUE_USD).toFixed(6)) }, $set: { updatedAt: now } }, { session }
+        { $inc: { diamondBalance: diamonds, cashBalanceUsd: creatorEarningsUsd }, $set: { updatedAt: now } }, { session }
       );
       await db.collection("gift_transactions").insertOne({
         transactionId, senderId: input.senderId, receiverId: input.receiverId, idempotencyKey,
         giftId: gift.giftId, giftName: gift.name, quantity, coinsSpent: coins,
-        diamondsAwarded: diamonds, platformSharePercent: 70, creatorSharePercent: 30,
+        diamondsAwarded: diamonds, netProceedsAllocatedUsd: netValueConsumed, creatorEarningsUsd, platformAllocationUsd, platformSharePercent: 70, creatorSharePercent: 30,
         context: input.context, videoId: input.videoId ?? null, createdAt: now
       }, { session });
       await db.collection("wallet_ledger").insertMany([
         { transactionId: randomUUID(), userId: input.senderId, type: "GIFT_SENT", coinsDelta: -coins, diamondsDelta: 0, cashDeltaUsd: 0, referenceId: transactionId, createdAt: now },
-        { transactionId: randomUUID(), userId: input.receiverId, type: "GIFT_RECEIVED", coinsDelta: 0, diamondsDelta: diamonds, cashDeltaUsd: Number((diamonds * DIAMOND_CASH_VALUE_USD).toFixed(6)), referenceId: transactionId, createdAt: now }
+        { transactionId: randomUUID(), userId: input.receiverId, type: "GIFT_RECEIVED", coinsDelta: 0, diamondsDelta: diamonds, cashDeltaUsd: creatorEarningsUsd, referenceId: transactionId, createdAt: now }
       ], { session });
     });
   } finally { await session.endSession(); }
-  return { transactionId, videoId: input.videoId ?? null, gift, quantity, coinsSpent: coins, diamondsAwarded: diamonds, creatorSharePercent: 30, platformSharePercent: 70 };
+  return { transactionId, videoId: input.videoId ?? null, gift, quantity, coinsSpent: coins, diamondsAwarded: diamonds, netProceedsAllocatedUsd: netValueConsumed, creatorEarningsUsd, platformAllocationUsd, creatorSharePercent: 30, platformSharePercent: 70 };
 }
