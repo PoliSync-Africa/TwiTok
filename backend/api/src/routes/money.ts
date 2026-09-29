@@ -34,7 +34,7 @@ moneyRouter.post("/withdrawals", requireUser, rateLimit({ windowMs: 60 * 60 * 10
     if (existing) return res.status(200).json({ status: existing.status, currency: existing.payoutCurrency ?? "USD", idempotent: true });
     await createWithdrawal(db, {
       withdrawalId: idempotencyKey, userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
-      amountUsd: Number(amountUsd), destination
+      amountUsd: Number(amountUsd), destination, idempotencyKey
     });
     return res.status(201).json({ status: "PENDING", currency: "USD" });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
