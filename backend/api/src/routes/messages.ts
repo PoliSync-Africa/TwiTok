@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit } from "../security/rate-limit.js";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
@@ -19,13 +20,15 @@ const VOICE_MIME_TYPES = new Set([
 ]);
 
 export const messagesRouter = Router();
+const userActionLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const messageSendLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 messagesRouter.get("/conversations", requireUser, async (req, res) => {
   try { res.json({ conversations: await listConversations(await getDb(), req.userId!) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load conversations" }); }
 });
 
-messagesRouter.post("/conversations/direct", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/direct", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     let otherUserId: ObjectId;
@@ -51,7 +54,7 @@ messagesRouter.get("/conversations/:conversationId/messages", requireUser, async
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load messages" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/messages", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/messages", requireUser, messageSendLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -63,7 +66,7 @@ messagesRouter.post("/conversations/:conversationId/messages", requireUser, asyn
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to send message" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/voice-upload-url", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/voice-upload-url", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -79,7 +82,7 @@ messagesRouter.post("/conversations/:conversationId/voice-upload-url", requireUs
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign voice upload" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/voice", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/voice", requireUser, messageSendLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
