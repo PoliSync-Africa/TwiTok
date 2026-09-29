@@ -9,7 +9,8 @@ export const PAYSTACK_COLLECTION_COUNTRIES = new Set(["GH", "NG", "KE", "ZA"]);
 export const COUNTRY_CURRENCIES: Record<string, string> = {
   GH: "GHS", NG: "NGN", KE: "KES", UG: "UGX", ZA: "ZAR",
   RW: "RWF", TZ: "TZS", MW: "MWK", ZM: "ZMW", CM: "XAF",
-  CI: "XOF", SN: "XOF", EG: "EGP"
+  CI: "XOF", SN: "XOF", EG: "EGP", SL: "SLL", BF: "XOF", GN: "GNF",
+  GW: "XOF", ML: "XOF", TN: "TND"
 };
 
 export function collectionProviders(countryCode: string): CollectionProvider[] {
