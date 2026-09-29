@@ -137,10 +137,14 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         { $multiply: [{ $size: "$_shares" }, 0.35] },
         { $multiply: [{ $size: "$_saves" }, 0.3] },
         { $multiply: [{ $size: "$_reposts" }, 0.2] },
-        { $multiply: ["$_interest", 2.5] },\n        { $multiply: ["$_velocityScore", 1.5] },\n        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] }
+        { $multiply: ["$_interest", 2.5] },
+        { $multiply: ["$_velocityScore", 1.5] },
+        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] }
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
+    { $addFields: {
+      _engagement: { $add: [
     { $lookup: { from: "video_sounds", localField: "_id", foreignField: "videoId", as: "_soundLink" } },
     { $addFields: { _soundId: { $arrayElemAt: ["$_soundLink.soundId", 0] } } },
     { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
