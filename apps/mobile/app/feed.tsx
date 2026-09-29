@@ -285,6 +285,8 @@ const styles = StyleSheet.create({
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
+  promotedText:{color:"#fff",fontSize:12,fontWeight:"800"},
   tab: { color: "#aaa", fontSize: 13 },
   feedFooter:{height:80,backgroundColor:"#000",alignItems:"center",justifyContent:"center",gap:6},
   center: { flex: 1, minHeight: height, backgroundColor: "#000", alignItems: "center", justifyContent: "center", padding: 24, gap: 10 },
