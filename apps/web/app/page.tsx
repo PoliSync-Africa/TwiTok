@@ -41,7 +41,7 @@ export default function Home() {
   const [feedLoading, setFeedLoading] = useState(false);
   const [muted, setMuted] = useState(true);
   const api = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) { return authFetch(input, { ...init, credentials: "include" }); }
+  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) { return fetch(input, { ...init, credentials: "include" }); }
   const activeRef = useRef<string | null>(null);
   const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
   const [captionLanguage, setCaptionLanguage] = useState<Record<string, string>>({});
@@ -76,7 +76,6 @@ export default function Home() {
 
   async function loadMoreFeed() {
     if (feedLoading || !feedCursor) return;
-    const token = "";
     setFeedLoading(true);
     try {
       const response = await authFetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor), { headers: {}, cache: "no-store" });
@@ -97,7 +96,6 @@ export default function Home() {
   }, [feedCursor, feedLoading, tab]);
 
   useEffect(() => {
-    const token = "";
     let cancelled = false;
     async function loadNotifications() {
       try {
@@ -116,7 +114,6 @@ export default function Home() {
   }, [api]);
 
   useEffect(() => {
-    const token = "";
     const realtimeBase = api.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
     const socket = new WebSocket(realtimeBase.replace(/\/api\/v1\/?$/, "") + "/realtime");
     // Browser authentication is now performed by the HttpOnly session cookie during the WebSocket handshake.
@@ -131,7 +128,6 @@ export default function Home() {
 
   async function openStory(storyId: string) {
     setStoryOpen(storyId);
-    const token = "";
     try {
       await authFetch(api + "/stories/" + encodeURIComponent(storyId) + "/view", {
         method: "POST",
@@ -143,7 +139,6 @@ export default function Home() {
 
   async function openNotifications() {
     setNotificationsOpen(true);
-    const token = "";
     try {
       const response = await authFetch(api + "/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       if (response.ok) { setNotifications(items => items.map(item => ({ ...item, read: true }))); setUnreadNotifications(0); }
@@ -151,7 +146,6 @@ export default function Home() {
   }
 
   useEffect(() => {
-    const token = "";
     let cancelled = false;
     Promise.all(videos.filter(v => !v.id.startsWith("demo-")).map(async v => {
       try { const r = await authFetch(`${api}/music/videos/${v.id}/sound`, { headers: {} }); if (!r.ok) return null; const d = await r.json(); return d.sound ? [v.id, d.sound] as const : null; } catch { return null; }
@@ -160,8 +154,7 @@ export default function Home() {
   }, [videos, api]);
 
   async function track(videoId: string, type: string, watchMs = 0) {
-    const token = "";
-    if (!token || videoId.startsWith("demo-")) return;
+    if (videoId.startsWith("demo-")) return;
     try {
       await authFetch(`${api}/feed/events`, {
         method: "POST",
@@ -181,8 +174,7 @@ export default function Home() {
   }, [videos, captionLanguage]);
 
   async function engage(videoId: string, action: "like" | "save" | "share" | "repost") {
-    const token = "";
-    if (!token || videoId.startsWith("demo-")) return;
+    if (videoId.startsWith("demo-")) return;
     try {
       if (action === "share" && typeof navigator.share === "function") {
         await navigator.share({ title: "TwiTok", text: "Watch this video on TwiTok", url: window.location.origin + "/video/" + videoId });
@@ -201,8 +193,7 @@ export default function Home() {
   }
 
   async function remixVideo(videoId: string, mode: "DUET" | "STITCH") {
-    const token = "";
-    if (!token || videoId.startsWith("demo-")) return;
+    if (videoId.startsWith("demo-")) return;
     try {
       const response = await authFetch(api + "/video/" + encodeURIComponent(videoId) + "/remix", {
         method: "POST",
@@ -218,8 +209,7 @@ export default function Home() {
   }
 
   async function openComments(videoId: string) {
-    const token = "";
-    if (!token || videoId.startsWith("demo-")) return;
+    if (videoId.startsWith("demo-")) return;
     setCommentsVideoId(videoId);
     setCommentsBusy(true);
     try {
@@ -229,8 +219,7 @@ export default function Home() {
   }
 
   async function submitComment() {
-    const token = "";
-    if (!token || !commentsVideoId || !commentDraft.trim()) return;
+    if (!commentsVideoId || !commentDraft.trim()) return;
     const text = commentDraft.trim().slice(0, 500);
     setCommentsBusy(true);
     try {
@@ -246,8 +235,7 @@ export default function Home() {
   }
 
   async function requestTranslation(videoId: string, language: string) {
-    const token = "";
-    if (!token || !language) return;
+    if (!language) return;
     setTranslationBusy(prev => ({ ...prev, [videoId]: true }));
     try {
       const response = await authFetch(`${api}/video/${videoId}/caption-translations`, {
