@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireUser } from "../auth/middleware.js";
 import { createPresignedPlayback, createPresignedUpload, mediaConfigured } from "../media/storage.js";
 import { getDb } from "../db/mongo.js";
+import { ObjectId } from "mongodb";
 
 export const mediaRouter = Router();
 
@@ -28,7 +29,6 @@ mediaRouter.post("/upload-url", requireUser, async (req, res) => {
 
 mediaRouter.get("/playback/:videoId", requireUser, async (req, res) => {
   try {
-    const { ObjectId } = await import("mongodb");
     if (!ObjectId.isValid(String(req.params.videoId))) return res.status(400).json({ error: "Invalid video id" });
     const db = await getDb();
     const video = await db.collection("videos").findOne({ _id: new ObjectId(String(req.params.videoId)) });
