@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ObjectId } from "mongodb";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
@@ -105,6 +105,54 @@ promotionsRouter.post("/:campaignId/pay", requireUser, paymentLimit, async (req,
     await db.collection("promotion_payments").insertOne({ reference, campaignId: campaign._id, userId: req.userId!, amountMinor: amount, currency: campaign.currency, status: "INITIALIZED", provider: "PAYSTACK", createdAt: new Date() });
     return res.json({ reference, authorizationUrl: data.data.authorization_url, accessCode: data.data.access_code });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to initialize payment" }); }
+});
+
+promotionsRouter.post("/payments/webhook", async (req, res) => {
+  try {
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    const signature = String(req.get("x-paystack-signature") ?? "");
+    if (!secret || !rawBody || !signature) return res.status(400).json({ error: "Invalid webhook request" });
+
+    const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
+    const expectedBuf = Buffer.from(expected, "utf8");
+    const receivedBuf = Buffer.from(signature, "utf8");
+    if (expectedBuf.length !== receivedBuf.length || !timingSafeEqual(expectedBuf, receivedBuf)) {
+      return res.status(401).json({ error: "Invalid webhook signature" });
+    }
+
+    const payload = JSON.parse(rawBody.toString("utf8"));
+    if (payload?.event !== "charge.success") return res.json({ received: true });
+
+    const transaction = payload?.data;
+    const reference = String(transaction?.reference ?? "");
+    if (!/^twitok_promo_[A-Za-z0-9]+$/.test(reference)) return res.json({ received: true });
+
+    const db = await getDb();
+    const payment = await db.collection("promotion_payments").findOne({ reference });
+    if (!payment) return res.json({ received: true });
+
+    if (Number(transaction.amount) !== Number(payment.amountMinor) ||
+        String(transaction.currency).toUpperCase() !== String(payment.currency).toUpperCase()) {
+      return res.status(400).json({ error: "Payment amount or currency mismatch" });
+    }
+
+    const campaign = await db.collection("promotion_campaigns").findOne({ _id: payment.campaignId, ownerId: payment.userId });
+    if (!campaign) return res.status(404).json({ error: "Promotion campaign not found" });
+
+    await db.collection("promotion_payments").updateOne(
+      { _id: payment._id, status: { $ne: "PAID" } },
+      { $set: { status: "PAID", verifiedAt: new Date(), providerTransactionId: transaction.id } }
+    );
+    await db.collection("promotion_campaigns").updateOne(
+      { _id: campaign._id, status: { $in: ["DRAFT", "PAID"] } },
+      { $set: { status: "PAID", paidAt: new Date(), updatedAt: new Date() } }
+    );
+
+    return res.json({ received: true });
+  } catch {
+    return res.status(400).json({ error: "Invalid payment webhook" });
+  }
 });
 
 promotionsRouter.post("/payments/verify", requireUser, paymentLimit, async (req, res) => {
