@@ -54,7 +54,23 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
       { $match: { userId } },
       { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
-      { $group: { _id: null, count: { $sum: 1 }, totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }, latest: { $max: "$createdAt" } } }
+      { $group: { _id: null,
+        eventScore: { $sum: { $switch: {
+          branches: [
+            { case: { $eq: ["$type", "VIEW_2S"] }, then: 1 },
+            { case: { $eq: ["$type", "VIEW_COMPLETE"] }, then: 3 },
+            { case: { $eq: ["$type", "REWATCH"] }, then: 4 },
+            { case: { $eq: ["$type", "LIKE"] }, then: 8 },
+            { case: { $eq: ["$type", "COMMENT"] }, then: 7 },
+            { case: { $eq: ["$type", "SHARE"] }, then: 9 },
+            { case: { $eq: ["$type", "SAVE"] }, then: 6 },
+            { case: { $eq: ["$type", "FOLLOW"] }, then: 10 },
+            { case: { $eq: ["$type", "NOT_INTERESTED"] }, then: -50 }
+          ],
+          default: 0
+        } } },
+        totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }
+      } }
     ], as: "viewerEvents" } },
     { $lookup: { from: "video_likes", localField: "_id", foreignField: "videoId", as: "_likes" } },
     { $lookup: { from: "video_comments", localField: "_id", foreignField: "videoId", as: "_comments" } },
@@ -63,8 +79,13 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
     { $addFields: {
       _engagement: { $add: [
-        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.count", 0] }, 0] }, 0.5] },
-        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00005] }
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
+        { $multiply: [{ $size: "$_likes" }, 0.15] },
+        { $multiply: [{ $size: "$_comments" }, 0.25] },
+        { $multiply: [{ $size: "$_shares" }, 0.35] },
+        { $multiply: [{ $size: "$_saves" }, 0.3] },
+        { $multiply: [{ $size: "$_reposts" }, 0.2] }
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
