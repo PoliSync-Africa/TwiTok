@@ -27,7 +27,7 @@ function normalizeMobileMoneyNumber(countryCode: string, value: string) {
 
 
 function key() {
-  const value = process.env.FLUTTERWAVE_SECRET_KEY;
+  const value = process.env.TWITOK_FLUTTERWAVE_SECRET_KEY;
   if (!value) throw new Error("FLUTTERWAVE_SECRET_KEY is not configured");
   return value;
 }
@@ -93,10 +93,18 @@ export async function verifyFlutterwaveTransaction(transactionId: string) {
 }
 
 export function verifyFlutterwaveWebhookSignature(rawBody: string, signature: string | undefined) {
-  const secret = process.env.FLUTTERWAVE_WEBHOOK_SECRET_HASH;
-  if (!secret || !signature) return false;
-  const digest = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
+  const secretHash = process.env.TWITOK_FLUTTERWAVE_WEBHOOK_SECRET;
+  if (!secretHash || !signature) return false;
+
+  // Flutterwave v3 webhooks send the configured secret hash verbatim in
+  // `verif-hash`. Newer Flutterwave webhook signatures use HMAC-SHA256
+  // and the `flutterwave-signature` header. Support both formats.
+  if (signature === secretHash) return true;
+
+  const digest = crypto.createHmac("sha256", secretHash).update(rawBody).digest("base64");
+  const provided = Buffer.from(signature);
+  const expected = Buffer.from(digest);
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
 }
 
 
