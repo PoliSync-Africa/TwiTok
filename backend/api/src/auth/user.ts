@@ -9,10 +9,10 @@ const USER_SECRET = () => {
   return secret;
 };
 
-export type UserToken = { sub: string; role: "USER"; username: string };
+export type UserToken = { sub: string; role: "USER"; username: string; sv?: number };
 
-export function issueUserToken(user: { _id: string; username: string }) {
-  return jwt.sign({ sub: user._id, role: "USER", username: user.username }, USER_SECRET(), { expiresIn: "24h", issuer: "twitok" });
+export function issueUserToken(user: { _id: string; username: string; sessionVersion?: number }) {
+  return jwt.sign({ sub: user._id, role: "USER", username: user.username, sv: Number(user.sessionVersion ?? 0) }, USER_SECRET(), { expiresIn: "24h", issuer: "twitok" });
 }
 
 export function verifyUserToken(token: string): UserToken {
@@ -39,7 +39,7 @@ export async function createUser(db: Db, input: { username?: string; password: s
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
   if (!input.email && !input.phone) throw new Error("Email or phone is required");
   const now = new Date();
-  const user = { username, nickname: username, email: input.email?.trim().toLowerCase(), phone: input.phone?.trim(), dateOfBirth: dob, countryCode: input.countryCode.trim().toUpperCase(), accountType: "PERSONAL", isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
+  const user = { sessionVersion: 0, username, nickname: username, email: input.email?.trim().toLowerCase(), phone: input.phone?.trim(), dateOfBirth: dob, countryCode: input.countryCode.trim().toUpperCase(), accountType: "PERSONAL", isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
   const result = await db.collection("users").insertOne({ ...user, passwordHash: await bcrypt.hash(input.password, 12) });
   return { ...user, _id: result.insertedId.toHexString() };
 }
