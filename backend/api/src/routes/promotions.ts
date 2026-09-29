@@ -85,8 +85,10 @@ promotionsRouter.post("/:campaignId/pay", requireUser, paymentLimit, async (req,
     const db = await getDb();
     const campaign = await db.collection("promotion_campaigns").findOne({ _id: new ObjectId(String(req.params.campaignId)), ownerId: req.userId!, status: "DRAFT" });
     if (!campaign) return res.status(404).json({ error: "Promotion campaign not found" });
-    const email = String(req.body?.email ?? "");
-    if (!email.includes("@") || email.length > 200) return res.status(400).json({ error: "A valid payment email is required" });
+    const requestedEmail = String(req.body?.email ?? "").trim();
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { email: 1 } });
+    const email = requestedEmail || String(user?.email ?? "").trim();
+    if (!email.includes("@") || email.length > 200) return res.status(400).json({ error: "A valid account email is required" });
 
     const secret = process.env.PAYSTACK_SECRET_KEY;
     if (!secret) return res.status(503).json({ error: "TwiTok payments are not configured yet" });
