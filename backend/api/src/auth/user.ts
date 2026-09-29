@@ -12,7 +12,7 @@ const USER_SECRET = () => {
 export type UserToken = { sub: string; role: "USER"; username: string };
 
 export function issueUserToken(user: { _id: string; username: string }) {
-  return jwt.sign({ sub: user._id, role: "USER", username: user.username }, USER_SECRET(), { expiresIn: "15m", issuer: "twitok" });
+  return jwt.sign({ sub: user._id, role: "USER", username: user.username }, USER_SECRET(), { expiresIn: "24h", issuer: "twitok" });
 }
 
 export function verifyUserToken(token: string): UserToken {
