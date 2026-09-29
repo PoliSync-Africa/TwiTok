@@ -30,7 +30,7 @@ adminRouter.post("/auth/login", rateLimit({windowMs:15*60*1000,max:6,key:authRat
 adminRouter.get("/auth/me",requireOwner,async(req,res)=>{
   try {
     const db=await getDb();
-    const owner=await db.collection("owner_accounts").findOne({_id:req.ownerId},{projection:{displayName:1,email:1,role:1,mfaRequired:1}});
+    const owner=await db.collection("owner_accounts").findOne({_id:new ObjectId(req.ownerId!)},{projection:{displayName:1,email:1,role:1,mfaRequired:1}});
     if(!owner) return res.status(401).json({error:"Administrator session expired"});
     return res.json({administrator:{id:String(owner._id),displayName:owner.displayName,email:owner.email,role:owner.role,mfaRequired:owner.mfaRequired}});
   } catch {
