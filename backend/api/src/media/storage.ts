@@ -59,7 +59,19 @@ export async function completeMultipartUpload(input: { objectKey: string; upload
   if (!Array.isArray(input.parts) || input.parts.length < 1 || input.parts.length > 1000) throw new Error("Invalid multipart parts");
   const sorted = [...input.parts].sort((a, b) => a.partNumber - b.partNumber);
   if (sorted.some((part, i) => !Number.isInteger(part.partNumber) || part.partNumber < 1 || part.partNumber > 10000 || !part.etag || (i > 0 && part.partNumber === sorted[i - 1].partNumber))) throw new Error("Invalid multipart part list");
-  const response = await getClient().send(new CompleteMultipartUploadCommand({ Bucket: bucket, Key: input.objectKey, UploadId: input.uploadId, MultipartUpload: { Parts: sorted.map(part => ({ PartNumber: part.partNumber, ETag: part.etag })) } });
+  const response = await getClient().send(
+    new CompleteMultipartUploadCommand({
+      Bucket: bucket,
+      Key: input.objectKey,
+      UploadId: input.uploadId,
+      MultipartUpload: {
+        Parts: sorted.map((part) => ({
+          PartNumber: part.partNumber,
+          ETag: part.etag,
+        })),
+      },
+    }),
+  );
   return { etag: response.ETag ?? null };
 }
 
