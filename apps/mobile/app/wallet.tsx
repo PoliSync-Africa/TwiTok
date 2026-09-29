@@ -21,6 +21,7 @@ export default function WalletScreen() {
   const [name,setName]=useState("");
   const [account,setAccount]=useState("");
   const [code,setCode]=useState("");
+  const [branchCode,setBranchCode]=useState("");
   const [providers,setProviders]=useState<{name:string;code:string;active?:boolean}[]>([]);
   const [payoutProvider,setPayoutProvider]=useState<"PAYSTACK"|"FLUTTERWAVE"|"">("");
   const [availablePayoutProviders,setAvailablePayoutProviders]=useState<("PAYSTACK"|"FLUTTERWAVE")[]>([]);
@@ -118,10 +119,10 @@ export default function WalletScreen() {
   async function withdraw(){
     const token=await getAuthToken(); const value=Number(amount);
     if(!token||!Number.isFinite(value)||value<10){Alert.alert("Withdrawal","Minimum cashout is $10.");return;}
-    if(!name.trim()||!account.trim()||!code.trim()){Alert.alert("Payout details","Choose your provider and complete all payout fields.");return;}
+    if(!name.trim()||!account.trim()||!code.trim()||(type==="BANK"&&payoutProvider==="FLUTTERWAVE"&&countryCode==="GH"&&!branchCode.trim())){Alert.alert("Payout details","Choose your provider and complete all payout fields.");return;}
     setBusy(true);
     try{
-      const r=await fetch(API+"/wallet/withdrawals",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"Idempotency-Key":String(Date.now())+"-"+Math.random().toString(36).slice(2)},body:JSON.stringify({countryCode,type,amountUsd:value,provider:payoutProvider,destination:{name:name.trim(),accountNumber:account.trim(),bankCode:code.trim(),providerCode:code.trim(),currency:payoutCurrency}})});
+      const r=await fetch(API+"/wallet/withdrawals",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"Idempotency-Key":String(Date.now())+"-"+Math.random().toString(36).slice(2)},body:JSON.stringify({countryCode,type,amountUsd:value,provider:payoutProvider,destination:{name:name.trim(),accountNumber:account.trim(),bankCode:code.trim(),providerCode:code.trim(),branchCode:branchCode.trim()||undefined,currency:payoutCurrency}})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Withdrawal failed");
       Alert.alert("Withdrawal submitted","Your payout request is now "+String(d.status??"pending").toLowerCase()+".");
@@ -170,7 +171,7 @@ export default function WalletScreen() {
         <View style={styles.switchRow}><Pressable onPress={()=>setType("MOBILE_MONEY")} style={[styles.switch,type==="MOBILE_MONEY"&&styles.switchActive]}><Text style={styles.switchText}>Mobile Money</Text></Pressable><Pressable onPress={()=>setType("BANK")} style={[styles.switch,type==="BANK"&&styles.switchActive]}><Text style={styles.switchText}>Bank</Text></Pressable></View>
         <Field placeholder="Account name" value={name} onChangeText={setName}/>
         <Field placeholder={type==="MOBILE_MONEY"?"MoMo number":"Bank account number"} value={account} onChangeText={setAccount} keyboardType="phone-pad"/>
-        <Text style={styles.providerLabel}>Country: {countryCode || "—"} · Currency: {payoutCurrency || "—"}</Text><Text style={styles.providerLabel}>Payout provider</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{availablePayoutProviders.map(p=><Pressable key={p} onPress={()=>{setPayoutProvider(p);setCode("");void loadProviders(type)}} style={[styles.provider, payoutProvider===p&&styles.providerActive]}><Text style={styles.providerText}>{p}</Text></Pressable>)}</ScrollView><Text style={styles.providerLabel}>{type==="MOBILE_MONEY"?"Mobile Money provider":"Bank"}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{providersLoading?<ActivityIndicator color="#fff"/>:providers.map(p=><Pressable key={p.code} onPress={()=>setCode(p.code)} style={[styles.provider,code===p.code&&styles.providerActive]}><Text style={styles.providerText}>{p.name}</Text></Pressable>)}</ScrollView><Field placeholder={type==="MOBILE_MONEY"?"Provider code":"Bank code"} value={code} editable={false} onChangeText={setCode}/>
+        <Text style={styles.providerLabel}>Country: {countryCode || "—"} · Currency: {payoutCurrency || "—"}</Text><Text style={styles.providerLabel}>Payout provider</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{availablePayoutProviders.map(p=><Pressable key={p} onPress={()=>{setPayoutProvider(p);setCode("");void loadProviders(type)}} style={[styles.provider, payoutProvider===p&&styles.providerActive]}><Text style={styles.providerText}>{p}</Text></Pressable>)}</ScrollView><Text style={styles.providerLabel}>{type==="MOBILE_MONEY"?"Mobile Money provider":"Bank"}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{providersLoading?<ActivityIndicator color="#fff"/>:providers.map(p=><Pressable key={p.code} onPress={()=>setCode(p.code)} style={[styles.provider,code===p.code&&styles.providerActive]}><Text style={styles.providerText}>{p.name}</Text></Pressable>)}</ScrollView><Field placeholder={type==="MOBILE_MONEY"?"Provider code":"Bank code"} value={code} editable={false} onChangeText={setCode}/>{type==="BANK"&&payoutProvider==="FLUTTERWAVE"&&countryCode==="GH"&&<Field placeholder="Bank branch code" value={branchCode} onChangeText={setBranchCode}/>}
         <Field placeholder="Amount in USD (minimum $10)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad"/>
         <Pressable disabled={busy} onPress={()=>void withdraw()} style={styles.withdraw}><Text style={styles.withdrawText}>{busy?"Submitting…":"Withdraw earnings"}</Text></Pressable>
       </Section>
