@@ -46,7 +46,11 @@ export function attachRealtime(server: import("node:http").Server) {
       const window = messageWindows.get(socket);
       if (!window || now - window.startedAt >= 10000) messageWindows.set(socket, { startedAt: now, count: 1 });
       else if (++window.count > 30) return socket.close(1008, "Message rate limit exceeded");
-      const rawText = typeof raw === "string" ? raw : Buffer.from(raw as Buffer | ArrayBuffer | Buffer[]).toString("utf8");
+      let rawText: string;
+      if (typeof raw === "string") rawText = raw;
+      else if (Buffer.isBuffer(raw)) rawText = raw.toString("utf8");
+      else if (raw instanceof ArrayBuffer) rawText = Buffer.from(new Uint8Array(raw)).toString("utf8");
+      else rawText = Buffer.concat(raw).toString("utf8");
       if (Buffer.byteLength(rawText, "utf8") > 64 * 1024) return socket.close(1009, "Message too large");
       try {
         const message = JSON.parse(rawText);
