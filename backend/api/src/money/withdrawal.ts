@@ -4,6 +4,7 @@ import { withdrawalMethods, PLATFORM_CURRENCY } from "./policy.js";
 export async function initializeWithdrawalIndexes(db: Db) {
   await db.collection("withdrawal_methods").createIndex({ userId: 1, type: 1 }, { unique: true });
   await db.collection("withdrawals").createIndex({ providerReference: 1 }, { unique: true, sparse: true });
+  await db.collection("withdrawals").createIndex({ withdrawalId: 1 }, { unique: true });
 }
 
 export function validateWithdrawalMethod(countryCode: string, type: string) {
@@ -13,13 +14,19 @@ export function validateWithdrawalMethod(countryCode: string, type: string) {
 
 export async function createWithdrawal(
   db: Db,
-  input: { withdrawalId: string; userId: string; countryCode: string; type: "BANK" | "MOBILE_MONEY"; amountUsd: number; exchangeRate: number; destination: Record<string, unknown> }
+  input: { withdrawalId: string; userId: string; countryCode: string; type: "BANK" | "MOBILE_MONEY"; amountUsd: number; destination: Record<string, unknown> }
 ) {
   validateWithdrawalMethod(input.countryCode, input.type);
   if (!Number.isFinite(input.amountUsd) || input.amountUsd <= 0) throw new Error("Withdrawal amount must be positive");
-  if (!Number.isFinite(input.exchangeRate) || input.exchangeRate <= 0) throw new Error("Exchange rate must be positive");
-
   const localCurrency: Record<string,string> = { GH:"GHS", ZA:"ZAR", KE:"KES", UG:"UGX", NG:"NGN" };
+  const payoutCurrency = localCurrency[input.countryCode.toUpperCase()] ?? String(input.destination.currency ?? "").toUpperCase();
+  if (!payoutCurrency) throw new Error("Payout currency is required");
+  let rates: Record<string, number> = {};
+  try { rates = JSON.parse(process.env.TWITOK_FX_RATES_JSON ?? "{}"); } catch { throw new Error("Server FX configuration is invalid"); }
+  const exchangeRate = Number(rates[`${PLATFORM_CURRENCY}_${payoutCurrency}`]);
+  if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) throw new Error("Server FX rate is unavailable");
+
+ Record<string,string> = { GH:"GHS", ZA:"ZAR", KE:"KES", UG:"UGX", NG:"NGN" };
   const payoutCurrency = localCurrency[input.countryCode.toUpperCase()] ?? input.destination.currency;
   if (!payoutCurrency) throw new Error("Payout currency is required");
 
@@ -46,7 +53,7 @@ export async function createWithdrawal(
         type: input.type,
         amountUsd: input.amountUsd,
         sourceCurrency: PLATFORM_CURRENCY,
-        exchangeRate: input.exchangeRate,
+        exchangeRate,
         payoutCurrency,
         payoutAmount: localAmount,
         destination: input.destination,
