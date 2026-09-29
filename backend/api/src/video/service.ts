@@ -59,8 +59,14 @@ export async function createPhotoUploadSession(db: Db, userId: ObjectId, input: 
 export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: string) {
   const upload = await db.collection("photo_uploads").findOne({ uploadId, userId, status: "UPLOADING" });
   if (!upload) throw new Error("Photo upload session not found");
-  await headMediaObject(upload.objectKey);
-  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", updatedAt: new Date() } });
+  const head = await headMediaObject(upload.objectKey);
+  if (head.ContentLength != null && Number(head.ContentLength) !== Number(upload.sizeBytes)) {
+    throw new Error("Uploaded photo size does not match the declared size");
+  }
+  if (head.ContentType && String(head.ContentType).toLowerCase() !== String(upload.mimeType).toLowerCase()) {
+    throw new Error("Uploaded photo type does not match the declared type");
+  }
+  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", verifiedAt: new Date(), updatedAt: new Date() } });
   return { uploadId, status: "READY" };
 }
 
