@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
-import { authenticateUser, createUser, issueUserToken, verifyUserToken } from "../auth/user.js";
+import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 
@@ -16,6 +16,7 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
     const token = issueUserToken(user);
+    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
     res.status(201).json({ token, user });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
