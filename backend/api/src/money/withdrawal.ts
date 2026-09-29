@@ -136,12 +136,12 @@ export async function processFlutterwaveWithdrawal(db: Db, withdrawalId: string)
   const bankCode = String(destination.bankCode ?? destination.providerCode ?? "");
   const beneficiaryName = String(destination.name ?? destination.accountName ?? "");
   const branchCode = String(destination.branchCode ?? destination.destinationBranchCode ?? "");
+  const type = withdrawal.type as "BANK" | "MOBILE_MONEY";
   if (!accountNumber || !bankCode || !beneficiaryName) throw new Error("Payout destination requires name, account/phone number and provider bank code");
   if (type === "BANK" && countryCode === "GH" && !branchCode) throw new Error("Ghana Flutterwave bank payouts require a branch code");
 
   const reference = "TWITOK-FLW-PAYOUT-" + withdrawalId.replace(/-/g, "").slice(0, 24);
   const callbackUrl = process.env.TWITOK_FLUTTERWAVE_PAYOUT_CALLBACK_URL;
-  const type = withdrawal.type as "BANK" | "MOBILE_MONEY";
 
   await db.collection("withdrawals").updateOne(
     { withdrawalId, status: "PENDING" },
