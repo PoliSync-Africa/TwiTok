@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, createVideoRemixUpload, getVideoRemixPlayback, publishVideo, createPhotoUploadSession, completePhotoUpload, createPhotoPost, createTextPost } from "../video/service.js";
-import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload, headMediaObject } from "../media/storage.js";
+import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload, verifyMediaObject } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
 import { listStickers } from "../video/stickers.js";
@@ -86,12 +86,9 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
     const sortedPartNumbers = [...parts].sort((a, b) => a.partNumber - b.partNumber).map(part => part.partNumber);
     if (sortedPartNumbers.some((partNumber, index) => partNumber !== index + 1)) return res.status(400).json({ error: "Multipart parts must be sequential" });
     const result = await completeMultipartUpload({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, parts });
-    const head = await headMediaObject(upload.objectKey);
-    if (head.ContentLength == null || Number(head.ContentLength) !== Number(upload.sizeBytes) || Number(head.ContentLength) > 500 * 1024 * 1024) {
+    const verified = await verifyMediaObject(upload.objectKey, String(upload.mimeType), 500 * 1024 * 1024);
+    if (verified.sizeBytes !== Number(upload.sizeBytes)) {
       return res.status(400).json({ error: "Uploaded video size does not match the declared size" });
-    }
-    if (head.ContentType && String(head.ContentType).toLowerCase() !== String(upload.mimeType).toLowerCase()) {
-      return res.status(400).json({ error: "Uploaded video type does not match the declared type" });
     }
     await db.collection("video_uploads").updateOne({ uploadId, userId: req.userId }, { $set: { multipartCompletedAt: new Date(), updatedAt: new Date(), etag: result.etag } });
     res.json({ uploadId, completed: true, etag: result.etag });
