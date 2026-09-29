@@ -6,6 +6,8 @@ import { giftCatalogForCountry, GIFT_CATALOG, sendGift } from "../money/gifts.js
 import { createWithdrawal, processGhanaWithdrawal, reconcilePaystackTransfer } from "../money/withdrawal.js";
 import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
+import { initializeFlutterwaveCheckout, verifyFlutterwaveTransaction, verifyFlutterwaveWebhookSignature } from "../money/providers/flutterwave.js";
+import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider } from "../money/providers/routing.js";
 import { requireUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
 
@@ -107,6 +109,122 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const result = await creditPurchasedCoins(await getDb(), { userId, coins: pkg.coins, provider: "REVENUECAT", providerTransactionId: transactionId, sku: pkg.sku, grossUsd, netProceedsUsd });
     return res.status(200).json({ ok: true, duplicate: result.duplicate });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" }); }
+});
+
+walletRouter.post("/coins/flutterwave/initialize", requireUser, async (req, res) => {
+  try {
+    const sku = String(req.body?.sku ?? "");
+    const pkg = COIN_PACKAGES.find((item) => item.sku === sku);
+    if (!pkg) return res.status(400).json({ error: "Invalid Coin package" });
+
+    const db = await getDb();
+    const user = await db.collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { email: 1, phoneNumber: 1, name: 1, countryCode: 1, dateOfBirth: 1 } }
+    );
+    if (!user?.email) return res.status(400).json({ error: "An email address is required for Coin purchases" });
+
+    if (user.dateOfBirth) {
+      const dob = new Date(user.dateOfBirth);
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - 18);
+      if (dob > cutoff) return res.status(403).json({ error: "Coin purchases require an adult account" });
+    }
+
+    const countryCode = String(user.countryCode ?? "").toUpperCase();
+    const provider = resolveCollectionProvider(countryCode, req.body?.provider ? String(req.body.provider) : undefined);
+    if (provider !== "FLUTTERWAVE") return res.status(400).json({ error: "Flutterwave is not the selected provider for this country" });
+
+    const currency = currencyForCountry(countryCode);
+    if (!currency) return res.status(400).json({ error: "Unsupported payment currency for this country" });
+    const rate = Number(process.env[exchangeRateEnvName(currency)]);
+    if (!Number.isFinite(rate) || rate <= 0) return res.status(503).json({ error: currency + " exchange rate is not configured" });
+
+    const amountLocal = Number((pkg.priceUsd * rate).toFixed(2));
+    const reference = "TWITOK-FLW-" + randomUUID().replaceAll("-", "").slice(0, 24);
+    const result = await initializeFlutterwaveCheckout({
+      email: user.email,
+      phoneNumber: user.phoneNumber ? String(user.phoneNumber) : undefined,
+      name: user.name ? String(user.name) : undefined,
+      amount: amountLocal,
+      currency,
+      reference,
+      redirectUrl: process.env.TWITOK_FLUTTERWAVE_CALLBACK_URL,
+      paymentOptions: process.env.TWITOK_FLUTTERWAVE_PAYMENT_OPTIONS,
+      userId: req.userId!.toHexString(),
+      sku: pkg.sku,
+      coins: pkg.coins
+    });
+
+    await db.collection("coin_purchases").insertOne({
+      reference,
+      userId: req.userId!.toHexString(),
+      sku: pkg.sku,
+      coins: pkg.coins,
+      priceUsd: pkg.priceUsd,
+      amountLocal,
+      currency,
+      status: "INITIALIZED",
+      provider: "FLUTTERWAVE",
+      createdAt: new Date()
+    });
+
+    return res.status(201).json({ reference, authorizationUrl: result.link, amount: amountLocal, currency, coins: pkg.coins, provider: "FLUTTERWAVE" });
+  } catch (error) {
+    return res.status(502).json({ error: error instanceof Error ? error.message : "Flutterwave Coin purchase initialization failed" });
+  }
+});
+
+walletRouter.post("/coins/flutterwave/webhook", async (req, res) => {
+  try {
+    const rawBody = (req as typeof req & { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
+    const signature = req.header("verif-hash") ?? req.header("x-flutterwave-signature");
+    if (!verifyFlutterwaveWebhookSignature(rawBody, signature)) return res.status(401).json({ error: "Invalid signature" });
+
+    const transactionId = String(req.body?.data?.id ?? "");
+    const reference = String(req.body?.data?.tx_ref ?? "");
+    if (!transactionId || !reference) return res.status(400).json({ error: "Flutterwave transaction identifiers missing" });
+
+    const db = await getDb();
+    const purchase = await db.collection("coin_purchases").findOne({ reference, provider: "FLUTTERWAVE" });
+    if (!purchase) return res.status(404).json({ error: "Coin purchase not found" });
+    if (purchase.status === "CREDITED") return res.json({ ok: true, duplicate: true });
+
+    const verified = await verifyFlutterwaveTransaction(transactionId);
+    if (verified.status !== "successful" || verified.tx_ref !== reference || verified.currency !== String(purchase.currency)) {
+      return res.status(400).json({ error: "Flutterwave payment verification failed" });
+    }
+    if (Number(verified.amount) < Number(purchase.amountLocal)) {
+      return res.status(400).json({ error: "Flutterwave payment amount mismatch" });
+    }
+
+    const currency = String(purchase.currency);
+    const rate = Number(process.env[exchangeRateEnvName(currency)]);
+    if (!Number.isFinite(rate) || rate <= 0) return res.status(503).json({ error: currency + " exchange rate is not configured" });
+
+    const grossUsd = Number(purchase.priceUsd);
+    const feeBps = Number(process.env.TWITOK_FLUTTERWAVE_COLLECTION_FEE_BPS ?? 0);
+    const taxBps = Number(process.env.TWITOK_FLUTTERWAVE_COLLECTION_TAX_BPS ?? 0);
+    if (!Number.isFinite(feeBps) || feeBps < 0 || !Number.isFinite(taxBps) || taxBps < 0) {
+      return res.status(503).json({ error: "Flutterwave net-proceeds configuration is invalid" });
+    }
+    const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - (feeBps + taxBps) / 10000)).toFixed(8));
+    const result = await creditPurchasedCoins(db, {
+      userId: String(purchase.userId),
+      coins: Number(purchase.coins),
+      provider: "WEB",
+      providerTransactionId: "FLUTTERWAVE:" + transactionId,
+      sku: String(purchase.sku),
+      grossUsd,
+      netProceedsUsd
+    });
+    await db.collection("coin_purchases").updateOne({ reference }, {
+      $set: { status: "CREDITED", creditedAt: new Date(), providerTransactionId: transactionId }
+    });
+    return res.json({ ok: true, duplicate: result.duplicate, coins: purchase.coins });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Flutterwave Coin payment webhook failed" });
+  }
 });
 
 walletRouter.post("/coins/paystack/webhook", async (req, res) => {
