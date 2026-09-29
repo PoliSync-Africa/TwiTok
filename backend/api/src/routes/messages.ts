@@ -90,8 +90,8 @@ messagesRouter.post("/conversations/:conversationId/voice", requireUser, async (
     if (!VOICE_MIME_TYPES.has(mimeType)) return res.status(400).json({ error: "Unsupported voice format" });
     if (!objectKey.startsWith(`messages/${req.userId!.toHexString()}/`)) return res.status(403).json({ error: "Invalid voice object" });
 
-    const head = await headMediaObject(objectKey);
-    const sizeBytes = Number(head.ContentLength ?? 0);
+    const verified = await verifyMediaObject(objectKey, mimeType, MAX_VOICE_BYTES);
+    const sizeBytes = verified.sizeBytes;
     if (!sizeBytes || sizeBytes > MAX_VOICE_BYTES) return res.status(400).json({ error: "Voice message is too large" });
     if (!Number.isFinite(durationMs) || durationMs <= 0 || durationMs > MAX_VOICE_DURATION_MS) return res.status(400).json({ error: "Invalid voice duration" });
 
