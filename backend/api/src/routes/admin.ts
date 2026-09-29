@@ -7,6 +7,7 @@ import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 import { verifyTotp } from "../security/totp.js";
 
 export const adminRouter = Router();
+const adminReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.ownerId ?? req.ip ?? "unknown" });
 
 adminRouter.post("/auth/login", rateLimit({windowMs:15*60*1000,max:6,key:authRateLimit}), async (req,res)=>{
   try {
@@ -27,7 +28,7 @@ adminRouter.post("/auth/login", rateLimit({windowMs:15*60*1000,max:6,key:authRat
     return res.json({token,administrator:{id:String(owner._id),displayName:owner.displayName,email:owner.email,role:owner.role,mfaRequired:owner.mfaRequired}});
   } catch { return res.status(500).json({error:"Administrator authentication is unavailable"}); }
 });
-adminRouter.get("/auth/me",requireOwner,async(req,res)=>{
+adminRouter.get("/auth/me",requireOwner,adminReadLimit,async(req,res)=>{
   try {
     const db=await getDb();
     const owner=await db.collection("owner_accounts").findOne({_id:new ObjectId(req.ownerId!)},{projection:{displayName:1,email:1,role:1,mfaRequired:1}});
@@ -37,7 +38,7 @@ adminRouter.get("/auth/me",requireOwner,async(req,res)=>{
     return res.status(500).json({error:"Unable to load administrator session"});
   }
 });
-adminRouter.get("/overview",requireOwner,async(req,res)=>{
+adminRouter.get("/overview",requireOwner,adminReadLimit,async(req,res)=>{
   try {
     const db=await getDb();
     const [users,videos,reports,live,creators,streams,wallets,withdrawals,ledgerTotals]=await Promise.all([
