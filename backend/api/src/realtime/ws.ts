@@ -15,6 +15,11 @@ function originAllowed(origin?: string) {
   if (!origin) return true; // native mobile clients may omit Origin
   return allowed.length > 0 && allowed.includes(origin);
 }
+function readCookie(request: import("node:http").IncomingMessage, name: string) {
+  const header = request.headers.cookie ?? "";
+  const match = header.split(";").map(part => part.trim()).find(part => part.startsWith(name + "="));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
+}
 
 function addClient(userId: string, socket: WebSocket) {
   const set = clients.get(userId) ?? new Set<WebSocket>();
@@ -41,6 +46,20 @@ export function attachRealtime(server: import("node:http").Server) {
     let client: Client | null = null, authenticated = false;
     const timeout = setTimeout(() => { if (!authenticated) socket.close(1008, "Authentication timeout"); }, 10000);
     const heartbeat = setInterval(() => { if (socket.readyState === socket.OPEN) socket.ping(); }, 30000);
+    async function authenticate(token: string) {
+      const claims = verifyUserToken(token);
+      const db = await getDb();
+      const user = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(claims.sub), status: "ACTIVE" }, { projection: { _id: 1, sessionVersion: 1 } });
+      if (!user) throw new Error("Account unavailable");
+      if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) throw new Error("Session revoked");
+      if (client) removeClient(client.userId, socket);
+      client = { socket, userId: claims.sub }; authenticated = true; clearTimeout(timeout);
+      addClient(client.userId, socket); socket.send(JSON.stringify({ type: "ready" }));
+    }
+    const cookieToken = readCookie(request, "twitok_user_session");
+    if (cookieToken) {
+      try { await authenticate(cookieToken); } catch { socket.close(1008, "Unauthorized"); return; }
+    }
     socket.on("message", async raw => {
       const now = Date.now();
       const window = messageWindows.get(socket);
@@ -58,14 +77,7 @@ export function attachRealtime(server: import("node:http").Server) {
         if (message?.type !== "auth" || typeof message.token !== "string") return socket.close(1008, "Authentication required");
         const attempts = (authAttempts.get(socket) ?? 0) + 1; authAttempts.set(socket, attempts);
         if (attempts > 3) return socket.close(1008, "Too many authentication attempts");
-        const token = verifyUserToken(message.token);
-        const db = await getDb();
-        const user = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(token.sub), status: "ACTIVE" }, { projection: { _id: 1, sessionVersion: 1 } });
-        if (!user) return socket.close(1008, "Account unavailable");
-        if (Number(user.sessionVersion ?? 0) !== Number(token.sv ?? 0)) return socket.close(1008, "Session revoked");
-        if (client) removeClient(client.userId, socket);
-        client = { socket, userId: token.sub }; authenticated = true; clearTimeout(timeout);
-        addClient(client.userId, socket); socket.send(JSON.stringify({ type: "ready" }));
+        await authenticate(message.token);
       } catch { socket.close(1008, "Unauthorized"); }
     });
     socket.on("close", () => { clearTimeout(timeout); clearInterval(heartbeat); if (client) removeClient(client.userId, socket); });
