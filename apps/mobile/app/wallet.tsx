@@ -23,6 +23,7 @@ export default function WalletScreen() {
   const [code,setCode]=useState("");
   const [providers,setProviders]=useState<{name:string;code:string;active?:boolean}[]>([]);
   const [payoutProvider,setPayoutProvider]=useState<"PAYSTACK"|"FLUTTERWAVE"|"">("");
+  const [availablePayoutProviders,setAvailablePayoutProviders]=useState<("PAYSTACK"|"FLUTTERWAVE")[]>([]);
   const [countryCode,setCountryCode]=useState("");
   const [payoutCurrency,setPayoutCurrency]=useState("");
   const [providersLoading,setProvidersLoading]=useState(false);
@@ -64,7 +65,8 @@ export default function WalletScreen() {
       const options=await opts.json().catch(()=>({}));
       const cc=String(options.countryCode??"").toUpperCase();
       setCountryCode(cc); setPayoutCurrency(String(options.providers?.[0]?.currency??""));
-      const payoutProviders=(options.payoutProviders??[]) as string[];
+      const payoutProviders=(options.payoutProviders??[]) as ("PAYSTACK"|"FLUTTERWAVE")[];
+      setAvailablePayoutProviders(payoutProviders);
       const preferred=(payoutProvider && payoutProviders.includes(payoutProvider)) ? payoutProvider : (payoutProviders[0] as "PAYSTACK"|"FLUTTERWAVE"|undefined);
       if(preferred) setPayoutProvider(preferred);
       let list:any[]=[];
@@ -168,7 +170,7 @@ export default function WalletScreen() {
         <View style={styles.switchRow}><Pressable onPress={()=>setType("MOBILE_MONEY")} style={[styles.switch,type==="MOBILE_MONEY"&&styles.switchActive]}><Text style={styles.switchText}>Mobile Money</Text></Pressable><Pressable onPress={()=>setType("BANK")} style={[styles.switch,type==="BANK"&&styles.switchActive]}><Text style={styles.switchText}>Bank</Text></Pressable></View>
         <Field placeholder="Account name" value={name} onChangeText={setName}/>
         <Field placeholder={type==="MOBILE_MONEY"?"MoMo number":"Bank account number"} value={account} onChangeText={setAccount} keyboardType="phone-pad"/>
-        <Text style={styles.providerLabel}>Country: {countryCode || "—"} · Currency: {payoutCurrency || "—"}</Text><Text style={styles.providerLabel}>Payout provider</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{(["PAYSTACK","FLUTTERWAVE"] as const).filter(p=>payoutProvider===p || p==="FLUTTERWAVE" || (p==="PAYSTACK"&&countryCode==="GH")).map(p=><Pressable key={p} onPress={()=>{setPayoutProvider(p);setCode("");void loadProviders(type)}} style={[styles.provider, payoutProvider===p&&styles.providerActive]}><Text style={styles.providerText}>{p}</Text></Pressable>)}</ScrollView><Text style={styles.providerLabel}>{type==="MOBILE_MONEY"?"Mobile Money provider":"Bank"}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{providersLoading?<ActivityIndicator color="#fff"/>:providers.map(p=><Pressable key={p.code} onPress={()=>setCode(p.code)} style={[styles.provider,code===p.code&&styles.providerActive]}><Text style={styles.providerText}>{p.name}</Text></Pressable>)}</ScrollView><Field placeholder={type==="MOBILE_MONEY"?"Provider code":"Bank code"} value={code} editable={false} onChangeText={setCode}/>
+        <Text style={styles.providerLabel}>Country: {countryCode || "—"} · Currency: {payoutCurrency || "—"}</Text><Text style={styles.providerLabel}>Payout provider</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{availablePayoutProviders.map(p=><Pressable key={p} onPress={()=>{setPayoutProvider(p);setCode("");void loadProviders(type)}} style={[styles.provider, payoutProvider===p&&styles.providerActive]}><Text style={styles.providerText}>{p}</Text></Pressable>)}</ScrollView><Text style={styles.providerLabel}>{type==="MOBILE_MONEY"?"Mobile Money provider":"Bank"}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{providersLoading?<ActivityIndicator color="#fff"/>:providers.map(p=><Pressable key={p.code} onPress={()=>setCode(p.code)} style={[styles.provider,code===p.code&&styles.providerActive]}><Text style={styles.providerText}>{p.name}</Text></Pressable>)}</ScrollView><Field placeholder={type==="MOBILE_MONEY"?"Provider code":"Bank code"} value={code} editable={false} onChangeText={setCode}/>
         <Field placeholder="Amount in USD (minimum $10)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad"/>
         <Pressable disabled={busy} onPress={()=>void withdraw()} style={styles.withdraw}><Text style={styles.withdrawText}>{busy?"Submitting…":"Withdraw earnings"}</Text></Pressable>
       </Section>
