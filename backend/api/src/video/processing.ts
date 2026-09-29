@@ -23,8 +23,11 @@ export async function verifySourceAndQueue(db: Db, userId: ObjectId, uploadId: s
 
   try {
     const head = await headMediaObject(upload.objectKey);
-    if (head.ContentLength != null && Number(head.ContentLength) !== Number(upload.sizeBytes)) {
+    if (head.ContentLength == null || Number(head.ContentLength) !== Number(upload.sizeBytes)) {
       throw new Error("Uploaded object size does not match the declared size");
+    }
+    if (head.ContentType && String(head.ContentType).toLowerCase() !== String(upload.mimeType).toLowerCase()) {
+      throw new Error("Uploaded object type does not match the declared type");
     }
   } catch (error) {
     throw new Error(`Uploaded media could not be verified: ${error instanceof Error ? error.message : "storage error"}`);
