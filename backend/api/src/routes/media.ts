@@ -7,6 +7,7 @@ import { rateLimit } from "../security/rate-limit.js";
 
 export const mediaRouter = Router();
 const uploadSigningLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const playbackReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 mediaRouter.get("/status", (_req, res) => {
   res.json({ configured: mediaConfigured() });
@@ -29,7 +30,7 @@ mediaRouter.post("/upload-url", requireUser, uploadSigningLimit, async (req, res
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign upload" }); }
 });
 
-mediaRouter.get("/playback/:videoId", requireUser, async (req, res) => {
+mediaRouter.get("/playback/:videoId", requireUser, playbackReadLimit, async (req, res) => {
   try {
     if (!ObjectId.isValid(String(req.params.videoId))) return res.status(400).json({ error: "Invalid video id" });
     const db = await getDb();
