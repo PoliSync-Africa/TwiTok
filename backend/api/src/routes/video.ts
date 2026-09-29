@@ -66,7 +66,10 @@ videoRouter.post("/uploads/:uploadId/multipart/part-url", requireUser, async (re
     const db = await getDb();
     const upload = await db.collection("video_uploads").findOne({ uploadId: String(req.params.uploadId), userId: req.userId });
     if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
-    res.json(await createPresignedUploadPart({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, partNumber: Number(req.body?.partNumber) }));
+    const partNumber = Number(req.body?.partNumber);
+    const maxParts = Math.ceil(Number(upload.sizeBytes) / (10 * 1024 * 1024));
+    if (!Number.isInteger(partNumber) || partNumber < 1 || !Number.isFinite(maxParts) || partNumber > maxParts) return res.status(400).json({ error: "Invalid multipart part number" });
+    res.json(await createPresignedUploadPart({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, partNumber }));
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign multipart part" }); }
 });
 
