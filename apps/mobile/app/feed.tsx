@@ -4,6 +4,7 @@ import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
+import GiftTray from "../components/GiftTray";
 
 type Video = {
   id: string;
@@ -148,6 +149,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
 }
 
 function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+  const [giftOpen,setGiftOpen]=useState(false);
   return (
     <>
       <View style={styles.scrim} />
@@ -157,7 +159,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("repost")}><Text style={[styles.actionIcon, engagement?.reposted && styles.activeIcon]}>↻</Text><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.actionIcon}>♫</Text><Text style={styles.actionLabel}>Sound</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={()=>setGiftOpen(true)}><Text style={styles.actionIcon}>🎁</Text><Text style={styles.actionLabel}>Gift</Text></Pressable><Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
       <View style={styles.meta}>
@@ -165,6 +167,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
+      <GiftTray visible={giftOpen} receiverId={item.ownerId || ""} videoId={item.id} onClose={()=>setGiftOpen(false)} onSent={()=>setGiftOpen(false)} />
       <View style={styles.bottomTabs}><Pressable style={styles.createButton} onPress={() => router.push("/create")}><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
     </>
   );

@@ -1,5 +1,8 @@
 import express from "express";
 import { createServer } from "node:http";
+import type { Request } from "express";
+
+type RequestWithRawBody = Request & { rawBody?: string };
 import { attachRealtime } from "./realtime/ws.js";
 import cors from "cors";
 import helmet from "helmet";
@@ -7,6 +10,8 @@ import { getDb } from "./db/mongo.js";
 import { apiRouter } from "./routes/index.js";
 import { ensureOwnerAccount } from "./auth/owner.js";
 import { initializeMoneyIndexes } from "./money/ledger.js";
+import { initializeWalletIndexes } from "./money/wallet.js";
+import { initializeGiftIndexes } from "./money/gifts.js";
 import { initializeWithdrawalIndexes } from "./money/withdrawal.js";
 import { initializeCreatorIndexes } from "./creator/studio.js";
 import { initializeLiveIndexes } from "./live/service.js";
@@ -34,7 +39,7 @@ const port = Number(process.env.PORT ?? 4000);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.ADMIN_WEB_ORIGIN?.split(",").map((origin) => origin.trim()) ?? true, credentials: true }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { (req as RequestWithRawBody).rawBody = buf.toString("utf8"); } }));
 
 app.get("/health", (_req, res) => {
   res.json({ service: "twitok-api", status: "ok", platform: "TwiTok", version: "0.6.0" });
@@ -47,6 +52,8 @@ async function start() {
     const db = await getDb();
     await ensureOwnerAccount(db);
     await initializeMoneyIndexes(db);
+    await initializeWalletIndexes(db);
+    await initializeGiftIndexes(db);
     await initializeWithdrawalIndexes(db);
     await initializeCreatorIndexes(db);
     await initializeLiveIndexes(db);

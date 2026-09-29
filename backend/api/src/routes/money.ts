@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { allocateQualifyingRevenue } from "../money/ledger.js";
 import { createWithdrawal } from "../money/withdrawal.js";
+import { requireUser } from "../auth/middleware.js";
 
 export const moneyRouter = Router();
 
@@ -17,12 +18,15 @@ moneyRouter.post("/internal/revenue/allocate", async (req, res) => {
   }
 });
 
-moneyRouter.post("/withdrawals", async (req, res) => {
+moneyRouter.post("/withdrawals", requireUser, async (req, res) => {
   try {
-    const { userId, countryCode, type, amountUsd, exchangeRate, destination } = req.body ?? {};
-    if (!userId || !countryCode || !type || !destination) return res.status(400).json({ error: "userId, countryCode, type and destination are required" });
+    const { countryCode, type, amountUsd, exchangeRate, destination } = req.body ?? {};
+    const userId = req.userId!.toHexString();
+    const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
+    if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
+    if (!countryCode || !type || !destination) return res.status(400).json({ error: "userId, countryCode, type and destination are required" });
     await createWithdrawal(await getDb(), {
-      withdrawalId: randomUUID(), userId, countryCode, type, amountUsd: Number(amountUsd), exchangeRate: Number(exchangeRate), destination
+      withdrawalId: randomUUID(), userId, countryCode, type, amountUsd: Number(amountUsd), exchangeRate: Number(exchangeRate), destination, idempotencyKey
     });
     return res.status(201).json({ status: "PENDING", currency: "USD" });
   } catch (error) {
