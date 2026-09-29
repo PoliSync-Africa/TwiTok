@@ -50,7 +50,8 @@ export function attachRealtime(server: import("node:http").Server) {
       if (typeof raw === "string") rawText = raw;
       else if (Buffer.isBuffer(raw)) rawText = raw.toString("utf8");
       else if (raw instanceof ArrayBuffer) rawText = Buffer.from(new Uint8Array(raw)).toString("utf8");
-      else rawText = Buffer.concat(raw).toString("utf8");
+      else if (Array.isArray(raw)) rawText = Buffer.concat(raw).toString("utf8");
+      else rawText = Buffer.from(new Uint8Array(raw)).toString("utf8");
       if (Buffer.byteLength(rawText, "utf8") > 64 * 1024) return socket.close(1009, "Message too large");
       try {
         const message = JSON.parse(rawText);
