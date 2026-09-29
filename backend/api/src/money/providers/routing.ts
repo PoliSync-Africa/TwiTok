@@ -46,3 +46,30 @@ export function resolveCollectionProvider(countryCode: string, requested?: strin
   if (providers.includes("FLUTTERWAVE") && process.env.FLUTTERWAVE_SECRET_KEY) return "FLUTTERWAVE";
   throw new Error("No configured Coin collection provider is available");
 }
+
+
+export type PayoutProvider = "PAYSTACK" | "FLUTTERWAVE";
+
+export const FLUTTERWAVE_PAYOUT_COUNTRIES = new Set([
+  "GH", "NG", "KE", "UG", "ZA", "RW", "TZ", "MW", "ZM", "CM", "CI", "SN", "SL", "BF", "GN", "GW", "ML", "TN"
+]);
+
+export function payoutProviders(countryCode: string): PayoutProvider[] {
+  const country = countryCode.toUpperCase();
+  const providers: PayoutProvider[] = [];
+  if (country === "GH" && process.env.PAYSTACK_SECRET_KEY) providers.push("PAYSTACK");
+  if (FLUTTERWAVE_PAYOUT_COUNTRIES.has(country) && process.env.FLUTTERWAVE_SECRET_KEY) providers.push("FLUTTERWAVE");
+  return providers;
+}
+
+export function resolvePayoutProvider(countryCode: string, requested?: string): PayoutProvider {
+  const providers = payoutProviders(countryCode);
+  if (!providers.length) throw new Error("No configured creator payout provider is available for this country");
+  if (requested) {
+    const normalized = requested.toUpperCase() as PayoutProvider;
+    if (!providers.includes(normalized)) throw new Error("Requested payout provider is not enabled for this country");
+    return normalized;
+  }
+  if (providers.includes("PAYSTACK")) return "PAYSTACK";
+  return "FLUTTERWAVE";
+}
