@@ -121,7 +121,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
     { $addFields: {
       _interest: { $size: { $setIntersection: [
-        { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$tag" } } },
+        { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$$tag" } } },
         interestHashtags
       ] } },
       _velocityScore: { $add: [
@@ -129,6 +129,9 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         { $multiply: [{ $size: { $ifNull: [{ $arrayElemAt: ["$_velocity.recentUsers", 0] }, []] } }, 1.5] },
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_velocity.recentWatchMs", 0] }, 0] }, 0.00001] }
       ] },
+      _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
+    } },
+    { $addFields: {
       _engagement: { $add: [
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
@@ -140,11 +143,8 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         { $multiply: ["$_interest", 2.5] },
         { $multiply: ["$_velocityScore", 1.5] },
         { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] }
-      ] },
-      _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
+      ] }
     } },
-    { $addFields: {
-      _engagement: { $add: [
     { $lookup: { from: "video_sounds", localField: "_id", foreignField: "videoId", as: "_soundLink" } },
     { $addFields: { _soundId: { $arrayElemAt: ["$_soundLink.soundId", 0] } } },
     { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
