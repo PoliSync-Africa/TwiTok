@@ -1,6 +1,8 @@
 import type { Db } from "mongodb";
 import { withdrawalMethods, PLATFORM_CURRENCY } from "./policy.js";
 import { createGhanaRecipient, initiateGhanaTransfer } from "./providers/paystack.js";
+import { initiateFlutterwaveTransfer, getFlutterwaveTransfer } from "./providers/flutterwave.js";
+import { resolvePayoutProvider } from "./providers/routing.js";
 
 export async function initializeWithdrawalIndexes(db: Db) {
   await db.collection("withdrawal_methods").createIndex({ userId: 1, type: 1 }, { unique: true });
@@ -117,6 +119,150 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
     throw error;
   }
   return db.collection("withdrawals").findOne({ withdrawalId });
+}
+
+
+export async function processFlutterwaveWithdrawal(db: Db, withdrawalId: string) {
+  const withdrawal = await db.collection("withdrawals").findOne({ withdrawalId });
+  if (!withdrawal) throw new Error("Withdrawal not found");
+  if (withdrawal.status !== "PENDING") return withdrawal;
+
+  const countryCode = String(withdrawal.countryCode ?? "").toUpperCase();
+  const provider = resolvePayoutProvider(countryCode, "FLUTTERWAVE");
+  if (provider !== "FLUTTERWAVE") throw new Error("Flutterwave payout provider is not enabled for this country");
+
+  const destination = withdrawal.destination as Record<string, unknown>;
+  const accountNumber = String(destination.accountNumber ?? destination.phoneNumber ?? "");
+  const bankCode = String(destination.bankCode ?? destination.providerCode ?? "");
+  const beneficiaryName = String(destination.name ?? destination.accountName ?? "");
+  if (!accountNumber || !bankCode || !beneficiaryName) throw new Error("Payout destination requires name, account/phone number and provider bank code");
+
+  const reference = "TWITOK-FLW-PAYOUT-" + withdrawalId.replace(/-/g, "").slice(0, 24);
+  const callbackUrl = process.env.TWITOK_FLUTTERWAVE_PAYOUT_CALLBACK_URL;
+  const type = withdrawal.type as "BANK" | "MOBILE_MONEY";
+
+  await db.collection("withdrawals").updateOne(
+    { withdrawalId, status: "PENDING" },
+    { $set: { provider: "FLUTTERWAVE", providerReference: reference, status: "PROCESSING", updatedAt: new Date() } }
+  );
+
+  try {
+    const transfer = await initiateFlutterwaveTransfer({
+      amount: Number(withdrawal.payoutAmount),
+      currency: String(withdrawal.payoutCurrency),
+      countryCode,
+      type,
+      accountNumber,
+      bankCode,
+      beneficiaryName,
+      reference,
+      callbackUrl
+    });
+
+    await db.collection("withdrawals").updateOne(
+      { withdrawalId },
+      { $set: {
+          providerTransferId: String(transfer.id),
+          providerStatus: transfer.status,
+          providerFeeLocal: Number(transfer.fee ?? 0),
+          status: String(transfer.status).toUpperCase() === "SUCCESSFUL" ? "PAID" : "PROCESSING",
+          paidAt: String(transfer.status).toUpperCase() === "SUCCESSFUL" ? new Date() : undefined,
+          updatedAt: new Date()
+        } }
+    );
+  } catch (error) {
+    const session = db.client?.startSession();
+    if (!session) throw error;
+    try {
+      await session.withTransaction(async () => {
+        const current = await db.collection("withdrawals").findOne({ withdrawalId, status: "PROCESSING" }, { session });
+        if (!current) return;
+        await db.collection("wallets").updateOne(
+          { userId: String(current.userId) },
+          { $inc: { cashBalanceUsd: Number(current.amountUsd) }, $set: { updatedAt: new Date() } },
+          { session }
+        );
+        await db.collection("withdrawals").updateOne(
+          { withdrawalId },
+          { $set: { status: "FAILED", failureReason: error instanceof Error ? error.message : "Flutterwave transfer failed", updatedAt: new Date() } },
+          { session }
+        );
+      });
+    } finally { await session.endSession(); }
+    throw error;
+  }
+
+  return db.collection("withdrawals").findOne({ withdrawalId });
+}
+
+export async function reconcileFlutterwaveTransfer(db: Db, input: {
+  eventId: string;
+  transferId: string;
+  reference: string;
+  status: string;
+  rawMessage?: string;
+}) {
+  const inserted = await db.collection("payout_webhook_events").insertOne({
+    eventId: input.eventId,
+    provider: "FLUTTERWAVE",
+    transferId: input.transferId,
+    reference: input.reference,
+    createdAt: new Date()
+  }).catch(() => null);
+  if (!inserted) return { duplicate: true };
+
+  const withdrawal = await db.collection("withdrawals").findOne({
+    $or: [{ providerTransferId: input.transferId }, { providerReference: input.reference }]
+  });
+  if (!withdrawal) return { ignored: true };
+
+  const normalized = input.status.toUpperCase();
+  if (normalized === "SUCCESSFUL") {
+    await db.collection("withdrawals").updateOne(
+      { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } },
+      { $set: { status: "PAID", providerStatus: normalized, paidAt: new Date(), updatedAt: new Date() } }
+    );
+    return { status: "PAID" };
+  }
+
+  if (normalized === "FAILED") {
+    const session = db.client?.startSession();
+    if (!session) throw new Error("MongoDB session unavailable");
+    try {
+      await session.withTransaction(async () => {
+        const current = await db.collection("withdrawals").findOne(
+          { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } }, { session }
+        );
+        if (!current) return;
+        await db.collection("wallets").updateOne(
+          { userId: String(current.userId) },
+          { $inc: { cashBalanceUsd: Number(current.amountUsd) }, $set: { updatedAt: new Date() } },
+          { session }
+        );
+        await db.collection("withdrawals").updateOne(
+          { withdrawalId: current.withdrawalId },
+          { $set: { status: "FAILED", providerStatus: normalized, failureReason: input.rawMessage ?? "Flutterwave transfer failed", updatedAt: new Date() } },
+          { session }
+        );
+      });
+    } finally { await session.endSession(); }
+    return { status: "FAILED" };
+  }
+
+  return { status: "PROCESSING" };
+}
+
+export async function refreshFlutterwaveWithdrawal(db: Db, withdrawalId: string) {
+  const withdrawal = await db.collection("withdrawals").findOne({ withdrawalId, provider: "FLUTTERWAVE" });
+  if (!withdrawal?.providerTransferId) throw new Error("Flutterwave transfer is not available for this withdrawal");
+  const transfer = await getFlutterwaveTransfer(String(withdrawal.providerTransferId));
+  return reconcileFlutterwaveTransfer(db, {
+    eventId: "poll:" + String(transfer.id) + ":" + String(transfer.status),
+    transferId: String(transfer.id),
+    reference: String(transfer.reference),
+    status: String(transfer.status),
+    rawMessage: transfer.complete_message
+  });
 }
 
 
