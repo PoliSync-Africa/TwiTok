@@ -4,8 +4,11 @@ import { getDb } from "../db/mongo.js";
 import { evaluateEligibility, getEligibility } from "../monetization/programs.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
+import { rateLimit } from "../security/rate-limit.js";
 
 export const monetizationRouter = Router();
+const eligibilityEvaluateLimit = rateLimit({ windowMs: 60 * 1000, max: 30 });
+const eligibilityReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 function ageFromDob(dob: Date) {
   const now = new Date();
@@ -15,7 +18,7 @@ function ageFromDob(dob: Date) {
   return age;
 }
 
-monetizationRouter.post("/eligibility/evaluate", requireInternalService, async (req, res) => {
+monetizationRouter.post("/eligibility/evaluate", requireInternalService, eligibilityEvaluateLimit, async (req, res) => {
   try {
     const userId = typeof req.body?.userId === "string" ? req.body.userId : "";
     if (!ObjectId.isValid(userId)) return res.status(400).json({ error: "Valid userId is required" });
@@ -65,7 +68,7 @@ monetizationRouter.post("/eligibility/evaluate", requireInternalService, async (
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Eligibility evaluation failed" }); }
 });
 
-monetizationRouter.get("/eligibility/me", requireUser, async (req, res) => {
+monetizationRouter.get("/eligibility/me", requireUser, eligibilityReadLimit, async (req, res) => {
   try { return res.json(await getEligibility(await getDb(), req.userId!.toHexString())); }
   catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Eligibility lookup failed" }); }
 });
