@@ -45,7 +45,8 @@ export default function PromoteScreen() {
         target: { countryCodes: countries.split(",").map(x => x.trim().toUpperCase()).filter(Boolean), interests: interests.split(",").map(x => x.trim()).filter(Boolean) }
       })});
       const payment = await request("/promotions/" + campaign.id + "/pay", { method: "POST", body: JSON.stringify({}) });
-      setReference(payment.reference);\n      await Linking.openURL(payment.authorizationUrl);
+      setReference(payment.reference);
+      await Linking.openURL(payment.authorizationUrl);
       Alert.alert("Payment started", "Complete the secure payment. Then return to TwiTok and verify the promotion payment.");
     } catch (e) { Alert.alert("Promotion", e instanceof Error ? e.message : "Unable to start promotion"); }
     finally { setBusy(false); }
