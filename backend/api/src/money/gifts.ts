@@ -150,6 +150,9 @@ export async function sendGift(db: Db, input: {
   const now = new Date();
   const session = db.client?.startSession();
   if (!session) throw new Error("MongoDB session unavailable");
+  let netValueConsumed = 0;
+  let creatorEarningsUsd = 0;
+  let platformAllocationUsd = 0;
 
   try {
     await session.withTransaction(async () => {
@@ -168,9 +171,9 @@ export async function sendGift(db: Db, input: {
       const senderNetPool = Number(senderWallet?.unallocatedNetProceedsUsd ?? 0);
       if (senderCoins < coins) throw new Error("Insufficient Coins");
       if (!Number.isFinite(senderNetPool) || senderNetPool < 0) throw new Error("Invalid Coin funding ledger");
-      const netValueConsumed = senderCoins > 0 ? Number((senderNetPool * (coins / senderCoins)).toFixed(8)) : 0;
-      const creatorEarningsUsd = Number((netValueConsumed * 0.30).toFixed(8));
-      const platformAllocationUsd = Number((netValueConsumed - creatorEarningsUsd).toFixed(8));
+      netValueConsumed = senderCoins > 0 ? Number((senderNetPool * (coins / senderCoins)).toFixed(8)) : 0;
+      creatorEarningsUsd = Number((netValueConsumed * 0.30).toFixed(8));
+      platformAllocationUsd = Number((netValueConsumed - creatorEarningsUsd).toFixed(8));
       const debit = await db.collection("wallets").updateOne(
         { userId: input.senderId, coinBalance: { $gte: coins }, unallocatedNetProceedsUsd: { $gte: netValueConsumed } },
         { $inc: { coinBalance: -coins, unallocatedNetProceedsUsd: -netValueConsumed }, $set: { updatedAt: now } }, { session }
