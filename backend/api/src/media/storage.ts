@@ -26,11 +26,12 @@ function validateMimeType(mimeType: string) {
   if (!/^(video\/(mp4|quicktime|webm)|image\/(jpeg|png|webp)|audio\/(mpeg|mp4|x-m4a|wav|webm))$/i.test(mimeType)) throw new Error("Unsupported media type");
 }
 
-export async function createPresignedUpload(input: { objectKey: string; mimeType: string; expiresInSeconds?: number }) {
+export async function createPresignedUpload(input: { objectKey: string; mimeType: string; sizeBytes?: number; expiresInSeconds?: number }) {
   validateObjectKey(input.objectKey);
   validateMimeType(input.mimeType);
-  const expires = Math.max(60, Math.min(input.expiresInSeconds ?? 900, 900));
-  const command = new PutObjectCommand({ Bucket: bucket, Key: input.objectKey, ContentType: input.mimeType });
+  if (input.sizeBytes !== undefined && (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > 500 * 1024 * 1024)) throw new Error("Invalid media size");
+  const expires = Math.max(60, Math.min(input.expiresInSeconds ?? 600, 600));
+  const command = new PutObjectCommand({ Bucket: bucket, Key: input.objectKey, ContentType: input.mimeType, ...(input.sizeBytes !== undefined ? { ContentLength: input.sizeBytes } : {}) });
   const url = await getSignedUrl(getClient(), command, { expiresIn: expires });
   return { url, expiresInSeconds: expires };
 }
