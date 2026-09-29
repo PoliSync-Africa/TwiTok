@@ -327,8 +327,8 @@ export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: stri
   if (!uploadId) throw new Error("uploadId is required");
   const remix = await db.collection("video_remixes").findOne({ _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT", uploadId, uploadStatus: "UPLOADING" });
   if (!remix?.objectKey) throw new Error("Remix upload session not found");
-  const head = await headMediaObject(remix.objectKey);
-  if (head.ContentLength != null && Number(head.ContentLength) !== Number(remix.sizeBytes)) throw new Error("Uploaded object size does not match the declared size");
+  const verified = await verifyMediaObject(remix.objectKey, String(remix.mimeType), MAX_BYTES);
+  if (verified.sizeBytes !== Number(remix.sizeBytes)) throw new Error("Uploaded object size does not match the declared size");
   const caption = String(input.caption ?? "").trim().slice(0, 2200);
   const result = await db.collection("video_remixes").findOneAndUpdate(
     { _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT", uploadId },
