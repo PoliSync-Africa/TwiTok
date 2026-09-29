@@ -9,7 +9,7 @@ import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhoo
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
 import { initializeFlutterwaveCheckout, verifyFlutterwaveTransaction, verifyFlutterwaveWebhookSignature, listFlutterwaveBanks } from "../money/providers/flutterwave.js";
 import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider, resolvePayoutProvider, payoutProviders } from "../money/providers/routing.js";
-import { requireUser } from "../auth/middleware.js";
+import { requireUser, requireAdultUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
 
 export const walletRouter = Router();
@@ -18,7 +18,7 @@ walletRouter.get("/revenuecat/config", requireUser, async (req, res) => {
   return res.json({ appUserId: req.userId!.toHexString() });
 });
 
-walletRouter.get("/catalog", requireUser, async (req, res) => {
+walletRouter.get("/catalog", requireAdultUser, async (req, res) => {
   const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { countryCode: 1 } });
   const countryCode = String(user?.countryCode ?? "");
   const { collectionProviders, currencyForCountry } = await import("../money/providers/routing.js");
@@ -65,7 +65,7 @@ walletRouter.get("/me/withdrawals", requireUser, async (req, res) => {
 
 ;
 
-walletRouter.post("/coins/paystack/initialize", requireUser, async (req, res) => {
+walletRouter.post("/coins/paystack/initialize", requireAdultUser, async (req, res) => {
   try {
     const sku = String(req.body?.sku ?? "");
     const pkg = COIN_PACKAGES.find((item) => item.sku === sku);
@@ -217,7 +217,7 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
   }
 });
 
-walletRouter.post("/coins/flutterwave/initialize", requireUser, async (req, res) => {
+walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req, res) => {
   try {
     const sku = String(req.body?.sku ?? "");
     const pkg = COIN_PACKAGES.find((item) => item.sku === sku);
@@ -374,7 +374,7 @@ walletRouter.post("/payout/paystack/webhook", async (req, res) => {
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Payout webhook failed" }); }
 });
 
-walletRouter.post("/gifts", requireUser, async (req, res) => {
+walletRouter.post("/gifts", requireAdultUser, async (req, res) => {
   try {
     const { receiverId, giftId, quantity, context = "VIDEO", videoId } = req.body ?? {};
     const senderId = req.userId!.toHexString();
@@ -454,7 +454,7 @@ walletRouter.get("/withdrawals/:withdrawalId/refresh", requireUser, async (req, 
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal status refresh failed" }); }
 });
 
-walletRouter.post("/withdrawals", requireUser, async (req, res) => {
+walletRouter.post("/withdrawals", requireAdultUser, async (req, res) => {
   try {
     const { countryCode, type, amountUsd, destination, provider: requestedProvider } = req.body ?? {};
     const userId = req.userId!.toHexString();
