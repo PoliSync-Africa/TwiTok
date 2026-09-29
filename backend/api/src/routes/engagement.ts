@@ -9,8 +9,9 @@ import { addComment, deleteComment, getEngagement, listComments, listCommentRepl
 export const engagementRouter = Router();
 const engagementActionLimit = rateLimit({ windowMs: 60 * 1000, max: 90, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const commentLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const engagementReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-engagementRouter.get("/:videoId", requireUser, async (req, res) => {
+engagementRouter.get("/:videoId", requireUser, engagementReadLimit, async (req, res) => {
   try { res.json(await getEngagement(await getDb(), req.userId!, String(req.params.videoId))); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load engagement" }); }
 });
@@ -62,7 +63,7 @@ engagementRouter.post("/:videoId/comments/upload-url", requireUser, commentLimit
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign comment media" }); }
 });
 
-engagementRouter.get("/comments/media", requireUser, async (req, res) => {
+engagementRouter.get("/comments/media", requireUser, engagementReadLimit, async (req, res) => {
   try {
     const objectKey = String(req.query.objectKey ?? "");
     if (!objectKey.startsWith("comment-media/" + req.userId!.toHexString() + "/")) return res.status(403).json({ error: "Forbidden" });
@@ -70,7 +71,7 @@ engagementRouter.get("/comments/media", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create media URL" }); }
 });
 
-engagementRouter.get("/:videoId/comments", requireUser, async (req, res) => {
+engagementRouter.get("/:videoId/comments", requireUser, engagementReadLimit, async (req, res) => {
   try { res.json({ comments: await listComments(await getDb(), req.userId!, String(req.params.videoId), Number(req.query.limit ?? 30)) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load comments" }); }
 });
@@ -81,12 +82,12 @@ engagementRouter.post("/:videoId/comments", requireUser, commentLimit, async (re
 });
 
 
-engagementRouter.delete("/comments/:commentId", requireUser, async (req, res) => {
+engagementRouter.delete("/comments/:commentId", requireUser, engagementActionLimit, async (req, res) => {
   try { res.json(await deleteComment(await getDb(), req.userId!, String(req.params.commentId))); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to delete comment" }); }
 });
 
-engagementRouter.post("/comments/:commentId/pin", requireUser, async (req, res) => {
+engagementRouter.post("/comments/:commentId/pin", requireUser, engagementActionLimit, async (req, res) => {
   try { res.json(await togglePinComment(await getDb(), req.userId!, String(req.params.commentId))); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to pin comment" }); }
 });
