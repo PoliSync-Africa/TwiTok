@@ -87,15 +87,6 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
-  const activePromotionVideos = surface === "FOR_YOU" ? await db.collection("promotion_campaigns").find({
-    status: "ACTIVE", spentMinor: { $lt: 1000000000 },
-    $or: [
-      { "target.countryCodes": { $exists: false } },
-      { "target.countryCodes": { $size: 0 } },
-      ...(countryCode ? [{ "target.countryCodes": String(countryCode).toUpperCase() }] : [])
-    ]
-  }).project({ videoId: 1, objective: 1, budgetMinor: 1, spentMinor: 1, target: 1 }).limit(2000).toArray() : [];
-  const promotedVideoIds = activePromotionVideos.map((x: any) => x.videoId).filter((x: any) => x instanceof ObjectId);
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const videos = await db.collection("videos").aggregate([
     { $match: query },
