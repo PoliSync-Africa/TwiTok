@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -14,6 +14,19 @@ export default function PromoteScreen() {
   const [countries, setCountries] = useState("GH");
   const [interests, setInterests] = useState("");
   const [busy, setBusy] = useState(false);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [reference, setReference] = useState("");
+
+  async function loadCampaigns() {
+    try {
+      const data = await request("/promotions/me");
+      setCampaigns(data.campaigns ?? []);
+    } catch (e) {
+      Alert.alert("Promotions", e instanceof Error ? e.message : "Unable to load campaigns");
+    }
+  }
+
+  useEffect(() => { loadCampaigns(); }, []);
 
   async function request(path: string, options: RequestInit = {}) {
     const token = await getAuthToken();
@@ -32,7 +45,7 @@ export default function PromoteScreen() {
         target: { countryCodes: countries.split(",").map(x => x.trim().toUpperCase()).filter(Boolean), interests: interests.split(",").map(x => x.trim()).filter(Boolean) }
       })});
       const payment = await request("/promotions/" + campaign.id + "/pay", { method: "POST", body: JSON.stringify({}) });
-      await Linking.openURL(payment.authorizationUrl);
+      setReference(payment.reference);\n      await Linking.openURL(payment.authorizationUrl);
       Alert.alert("Payment started", "Complete the secure payment. Then return to TwiTok and verify the promotion payment.");
     } catch (e) { Alert.alert("Promotion", e instanceof Error ? e.message : "Unable to start promotion"); }
     finally { setBusy(false); }
@@ -52,7 +65,28 @@ export default function PromoteScreen() {
     <TextInput style={styles.input} placeholder="GH, NG, KE" value={countries} onChangeText={setCountries} autoCapitalize="characters" />
     <Text style={styles.label}>Interests</Text>
     <TextInput style={styles.input} placeholder="football, comedy, music" value={interests} onChangeText={setInterests} />
-    <Pressable disabled={busy} onPress={promote} style={styles.button}><Text style={styles.buttonText}>{busy ? "Starting..." : "Pay & Promote 🚀"}</Text></Pressable>
+    <Pressable disabled={busy} onPress={promote} style={styles.button}><Text style={styles.buttonText}>{busy ? "Working..." : "Pay & Promote 🚀"}</Text></Pressable>
+    {reference ? <Pressable disabled={busy} onPress={verifyPayment} style={styles.verify}><Text style={styles.verifyText}>Verify Payment ✓</Text></Pressable> : null}
+    <View style={styles.dashboardHeader}>
+      <Text style={styles.dashboardTitle}>Your promotions</Text>
+      <Pressable onPress={loadCampaigns}><Text style={styles.refresh}>Refresh</Text></Pressable>
+    </View>
+    {campaigns.length === 0 ? <Text style={styles.empty}>No promotion campaigns yet.</Text> : campaigns.map((campaign) => (
+      <View key={campaign.id} style={styles.card}>
+        <View style={styles.cardTop}>
+          <Text style={styles.objective}>{String(campaign.objective).replaceAll("_"," ")}</Text>
+          <Text style={styles.status}>{campaign.status}</Text>
+        </View>
+        <Text style={styles.budget}>{campaign.currency} {(Number(campaign.spentMinor ?? 0) / 100).toFixed(2)} spent / {(Number(campaign.budgetMinor ?? 0) / 100).toFixed(2)} budget</Text>
+        <View style={styles.metrics}>
+          <Text>👁 {campaign.metrics?.impressions ?? 0} impressions</Text>
+          <Text>▶️ {campaign.metrics?.views ?? 0} views</Text>
+          <Text>👥 {campaign.metrics?.follows ?? 0} follows</Text>
+        </View>
+        {campaign.status === "PAID" ? <Pressable disabled={busy} onPress={() => startCampaign(campaign.id)} style={styles.smallButton}><Text style={styles.smallButtonText}>Start Campaign</Text></Pressable> : null}
+        {campaign.status === "ACTIVE" ? <Pressable disabled={busy} onPress={() => pauseCampaign(campaign.id)} style={styles.pauseButton}><Text style={styles.pauseText}>Pause Campaign</Text></Pressable> : null}
+      </View>
+    ))}
     <Text style={styles.note}>TwiTok sells distribution, not fake views or guaranteed followers. Results depend on how viewers respond to the promoted content.</Text>
   </ScrollView>;
 }
@@ -68,5 +102,21 @@ const styles = StyleSheet.create({
   active:{borderColor:"#111",backgroundColor:"#eee"},
   button:{backgroundColor:"#111",padding:16,borderRadius:14,alignItems:"center",marginTop:12},
   buttonText:{color:"#fff",fontSize:17,fontWeight:"800"},
+  verify:{borderWidth:1,borderColor:"#111",padding:15,borderRadius:14,alignItems:"center"},
+  verifyText:{fontSize:16,fontWeight:"800"},
+  dashboardHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginTop:18},
+  dashboardTitle:{fontSize:21,fontWeight:"800"},
+  refresh:{fontWeight:"700"},
+  empty:{color:"#666",paddingVertical:8},
+  card:{borderWidth:1,borderColor:"#ddd",borderRadius:16,padding:15,gap:10,backgroundColor:"#fafafa"},
+  cardTop:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},
+  objective:{fontWeight:"800"},
+  status:{fontWeight:"800"},
+  budget:{fontSize:15,fontWeight:"700"},
+  metrics:{gap:5},
+  smallButton:{backgroundColor:"#111",padding:12,borderRadius:10,alignItems:"center"},
+  smallButtonText:{color:"#fff",fontWeight:"800"},
+  pauseButton:{borderWidth:1,borderColor:"#999",padding:12,borderRadius:10,alignItems:"center"},
+  pauseText:{fontWeight:"800"},
   note:{fontSize:12,color:"#666",lineHeight:18,marginTop:8}
 });
