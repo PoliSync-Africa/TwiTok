@@ -14,7 +14,9 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     const { username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
     if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
-    const token = issueUserToken(user);\n    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);\n    res.status(201).json({ token, user });
+    const token = issueUserToken(user);
+    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
+    res.status(201).json({ token, user });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
     res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
@@ -26,14 +28,17 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const { identifier, password } = req.body ?? {};
     if (!identifier || !password) return res.status(400).json({ error: "identifier and password are required" });
     const user = await authenticateUser(await getDb(), identifier, password);
-    const token = issueUserToken(user);\n    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);\n    res.json({ token, user });
+    const token = issueUserToken(user);
+    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
+    res.json({ token, user });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
 authRouter.post("/logout", requireUser, async (req, res) => {
   try {
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
-    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });\n    return res.status(204).send();
+    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    return res.status(204).send();
   } catch { return res.status(500).json({ error: "Unable to end session" }); }
 });
 
