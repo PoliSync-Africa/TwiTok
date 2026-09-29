@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
 import { getSticker } from "./stickers.js";
-import { createPresignedPlayback, createPresignedUpload, headMediaObject, mediaConfigured } from "../media/storage.js";
+import { createPresignedPlayback, createPresignedUpload, headMediaObject, mediaConfigured, verifyMediaObject } from "../media/storage.js";
 import { verifySourceAndQueue } from "./processing.js";
 
 export type VideoVisibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
