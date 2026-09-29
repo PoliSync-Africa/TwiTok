@@ -142,16 +142,42 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       } catch { return []; }
     })() : []),
     { $sort: { _engagement: -1, _freshness: 1, publishedAt: -1, _id: -1 } },
-    { $limit: safeLimit }
+    { $limit: Math.min(safeLimit * 4, 80) }
   ]).toArray();
-  const next = videos.length === safeLimit && videos.length > 0 ? (() => {
-    const last: any = videos[videos.length - 1];
+  // Diversify the candidate pool so a strong creator/sound does not monopolize the For You feed.
+  // Keep the ranking score primary, while enforcing light creator/sound exploration constraints.
+  const diversified: any[] = [];
+  const creatorCounts = new Map<string, number>();
+  const soundCounts = new Map<string, number>();
+  for (const video of videos) {
+    const creatorId = video.ownerId?.toHexString?.() ?? String(video.ownerId ?? "unknown");
+    const soundId = video.soundId?.toHexString?.() ?? String(video.soundId ?? "");
+    const creatorCount = creatorCounts.get(creatorId) ?? 0;
+    const soundCount = soundId ? (soundCounts.get(soundId) ?? 0) : 0;
+    if (creatorCount >= 2) continue;
+    if (soundId && soundCount >= 3) continue;
+    diversified.push(video);
+    creatorCounts.set(creatorId, creatorCount + 1);
+    if (soundId) soundCounts.set(soundId, soundCount + 1);
+    if (diversified.length >= safeLimit) break;
+  }
+  // If diversity constraints were too strict for a small feed, fill remaining slots by rank.
+  if (diversified.length < safeLimit) {
+    for (const video of videos) {
+      if (diversified.some((x: any) => x._id.equals(video._id))) continue;
+      diversified.push(video);
+      if (diversified.length >= safeLimit) break;
+    }
+  }
+  const selectedVideos = diversified;
+  const next = selectedVideos.length === safeLimit && selectedVideos.length > 0 ? (() => {
+    const last: any = selectedVideos[selectedVideos.length - 1];
     return Buffer.from(JSON.stringify({
       score: Number(last._engagement ?? 0), freshness: Number(last._freshness ?? 0),
       publishedAt: (last.publishedAt ?? new Date(0)).toISOString(), id: last._id.toHexString()
     })).toString("base64url");
   })() : null;
-  const hydrated = await Promise.all(videos.map(async (v: any) => {
+  const hydrated = await Promise.all(selectedVideos.map(async (v: any) => {
     const photoKeys = Array.isArray(v.photoObjectKeys) ? v.photoObjectKeys : [];
     const soundLink = await db.collection("video_sounds").findOne({ videoId: v._id });
     const sound = soundLink ? await db.collection("sounds").findOne({ _id: soundLink.soundId, status: "ACTIVE" }, { projection: { _id: 1, title: 1, artist: 1, coverUrl: 1 } }) : null;
