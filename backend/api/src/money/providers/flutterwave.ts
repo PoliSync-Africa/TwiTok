@@ -85,6 +85,7 @@ export async function initiateFlutterwaveTransfer(input: {
   type: "BANK" | "MOBILE_MONEY";
   accountNumber: string;
   bankCode: string;
+  branchCode?: string;
   beneficiaryName: string;
   reference: string;
   callbackUrl?: string;
@@ -92,6 +93,9 @@ export async function initiateFlutterwaveTransfer(input: {
   const amount = Math.floor(input.amount);
   if (!Number.isInteger(amount) || amount <= 0) throw new Error("Flutterwave transfer amount must be a positive integer");
   if (!input.accountNumber || !input.bankCode || !input.beneficiaryName) throw new Error("Flutterwave payout destination is incomplete");
+  if (input.type === "BANK" && input.countryCode === "GH" && !input.branchCode) {
+    throw new Error("Ghana Flutterwave bank payouts require a destination branch code");
+  }
 
   const meta = input.type === "MOBILE_MONEY"
     ? {
@@ -118,6 +122,7 @@ export async function initiateFlutterwaveTransfer(input: {
     body: JSON.stringify({
       account_bank: input.bankCode,
       account_number: input.accountNumber,
+      ...(input.type === "BANK" && input.countryCode === "GH" && input.branchCode ? { destination_branch_code: input.branchCode } : {}),
       amount,
       currency: input.currency,
       beneficiary_name: input.beneficiaryName,
