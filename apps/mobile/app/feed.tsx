@@ -16,6 +16,8 @@ type Video = {
   photos?: string[];
   textBody?: string;
   sound?: { id: string; title?: string; artist?: string; coverUrl?: string | null } | null;
+  promoted?: boolean;
+  promotionObjective?: string | null;
 };
 
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
@@ -128,7 +130,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   }, [active, player, source]);
 
   if (item.mediaType === "PHOTO") {
-    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFillObject} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
+    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFill} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
   }
 
   if (item.mediaType === "TEXT") {
@@ -136,7 +138,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   }
 
   if (!source) {
-    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Pressable style={styles.doubleTapZone} onPress={handleTap} accessibilityLabel="Double tap to like"><View pointerEvents="none" style={StyleSheet.absoluteFillObject} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} onNotInterested={onNotInterested} /></View>;
+    return <View style={styles.video}><Text style={styles.unavailable}>Video playback unavailable</Text><Pressable style={styles.doubleTapZone} onPress={handleTap} accessibilityLabel="Double tap to like"><View pointerEvents="none" style={StyleSheet.absoluteFill} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname: "/comments", params: { videoId: item.id } })} onNotInterested={onNotInterested} /></View>;
   }
 
   return (
@@ -161,6 +163,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
       <View style={styles.meta}>
+        {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
@@ -261,7 +264,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   video: { height, width, backgroundColor: "#050505", justifyContent: "flex-end" },
   photoStrip:{position:"absolute",top:70,left:12,right:12,flexDirection:"row",gap:6},photoThumb:{width:48,height:64,borderRadius:6},textPost:{height,width,backgroundColor:"#171717",justifyContent:"center",alignItems:"center",padding:40},textBody:{color:"#fff",fontSize:28,lineHeight:36,textAlign:"center",fontWeight:"700"} ,
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.18)" },
   doubleTapZone: { position: "absolute", left: 0, right: 82, top: 45, bottom: 125, alignItems: "center", justifyContent: "center", zIndex: 5 },
   heartBurst: { color: "#fff", fontSize: 92, fontWeight: "900", textShadowColor: "#ff2d55", textShadowRadius: 16, opacity: 0.95 },
   speedBadge: { backgroundColor: "rgba(0,0,0,0.68)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22 },
@@ -282,6 +285,8 @@ const styles = StyleSheet.create({
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
+  promotedText:{color:"#fff",fontSize:12,fontWeight:"800"},
   tab: { color: "#aaa", fontSize: 13 },
   feedFooter:{height:80,backgroundColor:"#000",alignItems:"center",justifyContent:"center",gap:6},
   center: { flex: 1, minHeight: height, backgroundColor: "#000", alignItems: "center", justifyContent: "center", padding: 24, gap: 10 },

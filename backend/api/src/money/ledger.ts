@@ -19,7 +19,10 @@ export async function allocateQualifyingRevenue(
   const now = new Date();
 
   const existing = await db.collection("financial_ledger").findOne({ transactionId: input.transactionId });
-  if (existing) return existing;
+  if (existing) {
+    if (String(existing.userId) !== String(input.userId) || Number(existing.grossUsd) !== Number(input.grossUsd) || String(existing.source) !== String(input.source)) throw new Error("Transaction idempotency key conflicts with existing transaction");
+    return existing;
+  }
 
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error("MONGODB_URI is not configured");

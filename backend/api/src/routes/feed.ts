@@ -2,11 +2,14 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
+import { rateLimit } from "../security/rate-limit.js";
 import { getFeed, recordFeedEvent } from "../feed/service.js";
 
 export const feedRouter = Router();
+const feedEventLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const feedReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-feedRouter.get("/:surface", requireUser, async (req, res) => {
+feedRouter.get("/:surface", requireUser, feedReadLimit, async (req, res) => {
   try {
     const surface = String(req.params.surface).toUpperCase() as "FOR_YOU" | "FOLLOWING" | "AFRICA";
     if (!["FOR_YOU","FOLLOWING","AFRICA"].includes(surface)) return res.status(400).json({ error: "Invalid feed surface" });
@@ -15,7 +18,7 @@ feedRouter.get("/:surface", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load feed" }); }
 });
 
-feedRouter.post("/events", requireUser, async (req, res) => {
+feedRouter.post("/events", requireUser, feedEventLimit, async (req, res) => {
   try {
     const type = String(req.body?.type) as any;
     const allowed = ["IMPRESSION","VIEW_START","VIEW_2S","VIEW_COMPLETE","REWATCH","LIKE","COMMENT","SHARE","SAVE","FOLLOW","NOT_INTERESTED"];

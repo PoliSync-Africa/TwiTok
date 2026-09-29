@@ -1,6 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { createNotification } from "./notifications.js";
-import { createPresignedPlayback } from "../media/storage.js";
+import { createPresignedPlayback, verifyMediaObject } from "../media/storage.js";
 
 function videoObjectId(videoId: string) {
   if (!ObjectId.isValid(videoId)) throw new Error("Invalid video id");
@@ -92,6 +92,8 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
   for (const a of attachments) {
     if (!a.objectKey.startsWith("comment-media/" + userId.toHexString() + "/")) throw new Error("Invalid comment attachment");
     if (!new RegExp("^(image/(jpeg|png|webp|gif)|video/(mp4|quicktime|webm)|audio/(mpeg|mp4|x-m4a|wav|webm))$", "i").test(a.mimeType)) throw new Error("Unsupported comment media type");
+    const maxBytes = a.mimeType.toLowerCase().startsWith("image/") ? 20 * 1024 * 1024 : a.mimeType.toLowerCase().startsWith("video/") ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
+    await verifyMediaObject(a.objectKey, a.mimeType, maxBytes);
   }
   let parentObjectId: ObjectId | undefined;
   if (parentId) {

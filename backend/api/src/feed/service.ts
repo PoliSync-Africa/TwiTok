@@ -8,6 +8,7 @@ export async function initializeFeedIndexes(db: Db) {
   await Promise.all([
     db.collection("feed_events").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("feed_events").createIndex({ videoId: 1, createdAt: -1 }),
+    db.collection("feed_events").createIndex({ videoId: 1, type: 1, createdAt: -1 }),
     db.collection("video_feedback").createIndex({ userId: 1, videoId: 1, type: 1 }, { unique: true }),
     db.collection("feed_caches").createIndex({ userId: 1, surface: 1 }, { unique: true }),
     db.collection("feed_caches").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
@@ -17,10 +18,35 @@ export async function initializeFeedIndexes(db: Db) {
 export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId: string; type: FeedEventType; watchMs?: number; sessionId?: string }) {
   if (!ObjectId.isValid(input.videoId)) throw new Error("Invalid video id");
   const videoId = new ObjectId(input.videoId);
+  const video = await db.collection("videos").findOne(
+    { _id: videoId, status: "PUBLISHED", visibility: "PUBLIC" },
+    { projection: { _id: 1 } }
+  );
+  if (!video) throw new Error("Video not found");
+  const watchMs = Number(input.watchMs ?? 0);
+  if (!Number.isFinite(watchMs) || watchMs < 0 || watchMs > 24 * 60 * 60 * 1000) throw new Error("Invalid watch duration");
   await db.collection("feed_events").insertOne({
-    userId, videoId, type: input.type, watchMs: Math.max(0, Number(input.watchMs ?? 0)),
+    userId, videoId, type: input.type, watchMs,
     sessionId: input.sessionId ? String(input.sessionId).slice(0, 128) : null, createdAt: new Date()
   });
+  if (input.type === "IMPRESSION") {
+    await db.collection("promotion_campaigns").updateOne(
+      { videoId, status: "ACTIVE", $expr: { $lt: ["$spentMinor", "$budgetMinor"] } },
+      { $inc: { spentMinor: 1, "metrics.impressions": 1 }, $set: { updatedAt: new Date() } }
+    );
+  }
+  if (input.type === "VIEW_2S") {
+    await db.collection("promotion_campaigns").updateOne(
+      { videoId, status: "ACTIVE", $expr: { $lt: ["$spentMinor", "$budgetMinor"] } },
+      { $inc: { "metrics.views": 1 }, $set: { updatedAt: new Date() } }
+    );
+  }
+  if (input.type === "FOLLOW") {
+    await db.collection("promotion_campaigns").updateOne(
+      { videoId, status: "ACTIVE" },
+      { $inc: { "metrics.follows": 1 }, $set: { updatedAt: new Date() } }
+    );
+  }
   if (["LIKE","SAVE","NOT_INTERESTED"].includes(input.type)) {
     await db.collection("video_feedback").updateOne(
       { userId, videoId, type: input.type },
@@ -31,6 +57,8 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
 }
 
 export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string) {
+  const viewer = await db.collection("users").findOne({ _id: userId }, { projection: { countryCode: 1 } });
+  const viewerCountryCode = String(countryCode ?? viewer?.countryCode ?? "").toUpperCase();
   const following = await db.collection("follows").find({ followerId: userId }).project({ followingId: 1 }).limit(5000).toArray();
   const followingIds = following.map(x => x.followingId);
   const blocked = await db.collection("blocks").find({ $or: [{ blockerId: userId }, { blockedId: userId }] }).limit(5000).toArray();
@@ -38,6 +66,27 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const feedback = await db.collection("video_feedback").find({ userId, type: "NOT_INTERESTED" }).project({ videoId: 1 }).limit(5000).toArray();
   const blockedOwnerIds = blockedIds;
   const excludedVideoIds = feedback.map(x => x.videoId);
+  const interestRows = await db.collection("feed_events").aggregate([
+    { $match: { userId, type: { $in: ["VIEW_2S", "VIEW_COMPLETE", "REWATCH", "LIKE", "COMMENT", "SHARE", "SAVE", "FOLLOW"] } } },
+    { $sort: { createdAt: -1 } }, { $limit: 1000 },
+    { $set: { eventWeight: { $switch: { branches: [
+      { case: { $eq: ["$type", "FOLLOW"] }, then: 3 },
+      { case: { $eq: ["$type", "SHARE"] }, then: 2.5 },
+      { case: { $eq: ["$type", "LIKE"] }, then: 2 },
+      { case: { $eq: ["$type", "SAVE"] }, then: 2.25 },
+      { case: { $eq: ["$type", "COMMENT"] }, then: 2 },
+      { case: { $eq: ["$type", "REWATCH"] }, then: 1.75 },
+      { case: { $eq: ["$type", "VIEW_COMPLETE"] }, then: 1.5 },
+      { case: { $eq: ["$type", "VIEW_2S"] }, then: 0.75 }
+    ], default: 0 } } } },
+    { $set: { recencyWeight: { $exp: { $multiply: [ -0.04, { $divide: [ { $subtract: [ new Date(), "$createdAt" ] }, 86400000 ] } ] } } } },
+    { $lookup: { from: "videos", localField: "videoId", foreignField: "_id", as: "video" } },
+    { $unwind: "$video" },
+    { $unwind: { path: "$video.hashtags", preserveNullAndEmptyArrays: false } },
+    { $group: { _id: "$video.hashtags", weight: { $sum: { $multiply: ["$eventWeight", "$recencyWeight"] } } } },
+    { $sort: { weight: -1 } }, { $limit: 100 }
+  ]).toArray();
+  const interestHashtags = [...new Set(interestRows.map((x: any) => String(x._id ?? "").toLowerCase()).filter(Boolean))];
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
@@ -47,20 +96,114 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
       { $match: { userId } },
       { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
-      { $group: { _id: null, count: { $sum: 1 }, totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }, latest: { $max: "$createdAt" } } }
+      { $group: { _id: null,
+        eventScore: { $sum: { $switch: {
+          branches: [
+            { case: { $eq: ["$type", "VIEW_2S"] }, then: 1 },
+            { case: { $eq: ["$type", "VIEW_COMPLETE"] }, then: 3 },
+            { case: { $eq: ["$type", "REWATCH"] }, then: 4 },
+            { case: { $eq: ["$type", "LIKE"] }, then: 8 },
+            { case: { $eq: ["$type", "COMMENT"] }, then: 7 },
+            { case: { $eq: ["$type", "SHARE"] }, then: 9 },
+            { case: { $eq: ["$type", "SAVE"] }, then: 6 },
+            { case: { $eq: ["$type", "FOLLOW"] }, then: 10 },
+            { case: { $eq: ["$type", "NOT_INTERESTED"] }, then: -50 }
+          ],
+          default: 0
+        } } },
+        totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }
+      } }
     ], as: "viewerEvents" } },
-    { $addFields: {
-      _engagement: { $add: [
-        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.count", 0] }, 0] }, 0.5] },
-        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00005] }
-      ] },
-      _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
-    } },
+    { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $and: [
+        { $eq: ["$videoId", "$videoId"] },
+        { $gte: ["$createdAt", new Date(Date.now() - 24 * 60 * 60 * 1000)] },
+        { $in: ["$type", ["VIEW_2S", "VIEW_COMPLETE", "REWATCH", "LIKE", "COMMENT", "SHARE", "SAVE", "FOLLOW"]] }
+      ] } } },
+      { $group: { _id: null,
+        recentScore: { $sum: { $switch: { branches: [
+          { case: { $eq: ["$type", "VIEW_2S"] }, then: 0.5 },
+          { case: { $eq: ["$type", "VIEW_COMPLETE"] }, then: 2 },
+          { case: { $eq: ["$type", "REWATCH"] }, then: 3 },
+          { case: { $eq: ["$type", "LIKE"] }, then: 5 },
+          { case: { $eq: ["$type", "COMMENT"] }, then: 6 },
+          { case: { $eq: ["$type", "SHARE"] }, then: 8 },
+          { case: { $eq: ["$type", "SAVE"] }, then: 6 },
+          { case: { $eq: ["$type", "FOLLOW"] }, then: 7 }
+        ], default: 0 } } },
+        recentUsers: { $addToSet: "$userId" },
+        recentWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }
+      } }
+    ], as: "_velocity" } },
     { $lookup: { from: "video_likes", localField: "_id", foreignField: "videoId", as: "_likes" } },
     { $lookup: { from: "video_comments", localField: "_id", foreignField: "videoId", as: "_comments" } },
     { $lookup: { from: "video_shares", localField: "_id", foreignField: "videoId", as: "_shares" } },
     { $lookup: { from: "video_saves", localField: "_id", foreignField: "videoId", as: "_saves" } },
     { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
+    { $addFields: {
+      _interest: { $size: { $setIntersection: [
+        { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$$tag" } } },
+        interestHashtags
+      ] } },
+      _velocityScore: { $add: [
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_velocity.recentScore", 0] }, 0] }, 0.75] },
+        { $multiply: [{ $size: { $ifNull: [{ $arrayElemAt: ["$_velocity.recentUsers", 0] }, []] } }, 1.5] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_velocity.recentWatchMs", 0] }, 0] }, 0.00001] }
+      ] },
+      _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
+    } },
+        { $lookup: { from: "promotion_campaigns", let: { videoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $and: [
+        { $eq: ["$videoId", "$videoId"] },
+        { $eq: ["$status", "ACTIVE"] },
+        { $lt: ["$spentMinor", "$budgetMinor"] },
+        { $or: [
+          { $eq: [{ $size: { $ifNull: ["$target.countryCodes", []] } }, 0] },
+          { $in: [viewerCountryCode, { $ifNull: ["$target.countryCodes", []] }] }
+        ] },
+        { $or: [
+          { $eq: [{ $size: { $ifNull: ["$target.interests", []] } }, 0] },
+          { $gt: [
+            { $size: { $setIntersection: [
+              { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$tag" } } },
+              { $ifNull: ["$target.interests", []] }
+            ] } },
+            0
+          ] }
+        ] }
+      ] } } },
+      { $project: { _id: 1, objective: 1, budgetMinor: 1, spentMinor: 1 } },
+      { $limit: 1 }
+    ], as: "_promotion" } },
+    { $addFields: {
+      _promotionScore: { $cond: [
+        { $gt: [{ $size: "$_promotion" }, 0] },
+        { $switch: { branches: [
+          { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "MORE_FOLLOWERS"] }, then: 7 },
+          { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "LIVE_AUDIENCE"] }, then: 6 },
+          { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "WEBSITE_TRAFFIC"] }, then: 5 }
+        ], default: 8 } },
+        0
+      ] }
+    } },
+
+    { $addFields: {
+      _engagement: { $add: [
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
+        { $multiply: [{ $size: "$_likes" }, 0.15] },
+        { $multiply: [{ $size: "$_comments" }, 0.25] },
+        { $multiply: [{ $size: "$_shares" }, 0.35] },
+        { $multiply: [{ $size: "$_saves" }, 0.3] },
+        { $multiply: [{ $size: "$_reposts" }, 0.2] },
+        { $multiply: ["$_interest", 2.5] },
+        { $multiply: ["$_velocityScore", 1.5] },
+        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] },
+        { $multiply: ["$_promotionScore", 1] }
+      ] }
+    } },
+    { $lookup: { from: "video_sounds", localField: "_id", foreignField: "videoId", as: "_soundLink" } },
+    { $addFields: { _soundId: { $arrayElemAt: ["$_soundLink.soundId", 0] } } },
     { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
     { $addFields: {
       engagement: {
@@ -88,21 +231,47 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       } catch { return []; }
     })() : []),
     { $sort: { _engagement: -1, _freshness: 1, publishedAt: -1, _id: -1 } },
-    { $limit: safeLimit }
+    { $limit: Math.min(safeLimit * 8, 160) }
   ]).toArray();
-  const next = videos.length === safeLimit && videos.length > 0 ? (() => {
-    const last: any = videos[videos.length - 1];
+  // Diversify the candidate pool so a strong creator/sound does not monopolize the For You feed.
+  // Keep the ranking score primary, while enforcing light creator/sound exploration constraints.
+  const diversified: any[] = [];
+  const creatorCounts = new Map<string, number>();
+  const soundCounts = new Map<string, number>();
+  for (const video of videos) {
+    const creatorId = video.ownerId?.toHexString?.() ?? String(video.ownerId ?? "unknown");
+    const soundId = video._soundId?.toHexString?.() ?? String(video._soundId ?? "");
+    const creatorCount = creatorCounts.get(creatorId) ?? 0;
+    const soundCount = soundId ? (soundCounts.get(soundId) ?? 0) : 0;
+    if (creatorCount >= 2) continue;
+    if (soundId && soundCount >= 3) continue;
+    diversified.push(video);
+    creatorCounts.set(creatorId, creatorCount + 1);
+    if (soundId) soundCounts.set(soundId, soundCount + 1);
+    if (diversified.length >= safeLimit) break;
+  }
+  // If diversity constraints were too strict for a small feed, fill remaining slots by rank.
+  if (diversified.length < safeLimit) {
+    for (const video of videos) {
+      if (diversified.some((x: any) => x._id.equals(video._id))) continue;
+      diversified.push(video);
+      if (diversified.length >= safeLimit) break;
+    }
+  }
+  const selectedVideos = diversified;
+  const next = selectedVideos.length === safeLimit && selectedVideos.length > 0 ? (() => {
+    const last: any = selectedVideos[selectedVideos.length - 1];
     return Buffer.from(JSON.stringify({
       score: Number(last._engagement ?? 0), freshness: Number(last._freshness ?? 0),
       publishedAt: (last.publishedAt ?? new Date(0)).toISOString(), id: last._id.toHexString()
     })).toString("base64url");
   })() : null;
-  const hydrated = await Promise.all(videos.map(async (v: any) => {
+  const hydrated = await Promise.all(selectedVideos.map(async (v: any) => {
     const photoKeys = Array.isArray(v.photoObjectKeys) ? v.photoObjectKeys : [];
     const soundLink = await db.collection("video_sounds").findOne({ videoId: v._id });
     const sound = soundLink ? await db.collection("sounds").findOne({ _id: soundLink.soundId, status: "ACTIVE" }, { projection: { _id: 1, title: 1, artist: 1, coverUrl: 1 } }) : null;
     const photos = mediaConfigured() ? (await Promise.all(photoKeys.map((key: string) => createPresignedPlayback(key, 3600).catch(() => null)))).filter(Boolean).map((x: any) => x.url) : [];
-    return { id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], sound: sound ? { id: sound._id.toHexString(), title: sound.title ?? "", artist: sound.artist ?? "", coverUrl: sound.coverUrl ?? null } : null, playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
+    return { id: v._id.toHexString(), promoted: Boolean(v._promotion?.length), promotionObjective: v._promotion?.[0]?.objective ?? null, ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], sound: sound ? { id: sound._id.toHexString(), title: sound.title ?? "", artist: sound.artist ?? "", coverUrl: sound.coverUrl ?? null } : null, playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
   }));
   return { videos: hydrated, nextCursor: next };
 }

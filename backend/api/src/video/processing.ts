@@ -1,5 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
-import { headMediaObject } from "../media/storage.js";
+import { verifyMediaObject } from "../media/storage.js";
 
 export type VideoProcessingState =
   | "QUEUED"
@@ -22,10 +22,8 @@ export async function verifySourceAndQueue(db: Db, userId: ObjectId, uploadId: s
   if (!upload) throw new Error("Upload session not found");
 
   try {
-    const head = await headMediaObject(upload.objectKey);
-    if (head.ContentLength != null && Number(head.ContentLength) !== Number(upload.sizeBytes)) {
-      throw new Error("Uploaded object size does not match the declared size");
-    }
+    const verified = await verifyMediaObject(upload.objectKey, String(upload.mimeType), 500 * 1024 * 1024);
+    if (verified.sizeBytes !== Number(upload.sizeBytes)) throw new Error("Uploaded object size does not match the declared size");
   } catch (error) {
     throw new Error(`Uploaded media could not be verified: ${error instanceof Error ? error.message : "storage error"}`);
   }

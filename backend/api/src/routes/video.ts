@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, createVideoRemixUpload, getVideoRemixPlayback, publishVideo, createPhotoUploadSession, completePhotoUpload, createPhotoPost, createTextPost } from "../video/service.js";
-import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload } from "../media/storage.js";
+import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload, verifyMediaObject } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
 import { listStickers } from "../video/stickers.js";
@@ -66,7 +66,10 @@ videoRouter.post("/uploads/:uploadId/multipart/part-url", requireUser, async (re
     const db = await getDb();
     const upload = await db.collection("video_uploads").findOne({ uploadId: String(req.params.uploadId), userId: req.userId });
     if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
-    res.json(await createPresignedUploadPart({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, partNumber: Number(req.body?.partNumber) }));
+    const partNumber = Number(req.body?.partNumber);
+    const maxParts = Math.ceil(Number(upload.sizeBytes) / (10 * 1024 * 1024));
+    if (!Number.isInteger(partNumber) || partNumber < 1 || !Number.isFinite(maxParts) || partNumber > maxParts) return res.status(400).json({ error: "Invalid multipart part number" });
+    res.json(await createPresignedUploadPart({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, partNumber }));
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign multipart part" }); }
 });
 
@@ -76,9 +79,17 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
     const uploadId = String(req.params.uploadId);
     const upload = await db.collection("video_uploads").findOne({ uploadId, userId: req.userId });
     if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
+    const partSizeBytes = 10 * 1024 * 1024;
     const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({ partNumber: Number(part.partNumber), etag: String(part.etag) })) : [];
-    if (!parts.length) return res.status(400).json({ error: "parts are required" });
+    const maxParts = Math.ceil(Number(upload.sizeBytes) / partSizeBytes);
+    if (!parts.length || !Number.isFinite(maxParts) || maxParts < 1 || parts.length > maxParts) return res.status(400).json({ error: "Invalid multipart part count" });
+    const sortedPartNumbers = [...parts].sort((a, b) => a.partNumber - b.partNumber).map(part => part.partNumber);
+    if (sortedPartNumbers.some((partNumber, index) => partNumber !== index + 1)) return res.status(400).json({ error: "Multipart parts must be sequential" });
     const result = await completeMultipartUpload({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, parts });
+    const verified = await verifyMediaObject(upload.objectKey, String(upload.mimeType), 500 * 1024 * 1024);
+    if (verified.sizeBytes !== Number(upload.sizeBytes)) {
+      return res.status(400).json({ error: "Uploaded video size does not match the declared size" });
+    }
     await db.collection("video_uploads").updateOne({ uploadId, userId: req.userId }, { $set: { multipartCompletedAt: new Date(), updatedAt: new Date(), etag: result.etag } });
     res.json({ uploadId, completed: true, etag: result.etag });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete multipart upload" }); }

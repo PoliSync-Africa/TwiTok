@@ -21,9 +21,18 @@ export async function getCreatorStudio(db: Db, userId: string) {
 
 export async function upsertCreatorProfile(db: Db, userId: string, input: Record<string, unknown>) {
   const now = new Date();
+  const allowed = new Set(["displayName", "bio", "category", "niche", "website", "avatarUrl", "coverUrl", "socialLinks"]);
+  const profile: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input ?? {})) {
+    if (!allowed.has(key)) continue;
+    if (typeof value === "string") profile[key] = value.slice(0, 500);
+    else if (key === "socialLinks" && value && typeof value === "object" && !Array.isArray(value)) {
+      profile[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).slice(0, 10).map(([k, v]) => [k, typeof v === "string" ? v.slice(0, 300) : ""]));
+    }
+  }
   await db.collection("creator_profiles").updateOne(
     { userId },
-    { $set: { ...input, userId, updatedAt: now }, $setOnInsert: { createdAt: now } },
+    { $set: { ...profile, userId, updatedAt: now }, $setOnInsert: { createdAt: now } },
     { upsert: true }
   );
   return db.collection("creator_profiles").findOne({ userId });

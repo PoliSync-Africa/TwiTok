@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
 import { getSticker } from "./stickers.js";
-import { createPresignedPlayback, createPresignedUpload, headMediaObject, mediaConfigured } from "../media/storage.js";
+import { createPresignedPlayback, createPresignedUpload, headMediaObject, mediaConfigured, verifyMediaObject } from "../media/storage.js";
 import { verifySourceAndQueue } from "./processing.js";
 
 export type VideoVisibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
@@ -52,15 +52,16 @@ export async function createPhotoUploadSession(db: Db, userId: ObjectId, input: 
   const now = new Date();
   await db.collection("photo_uploads").insertOne({ uploadId, userId, objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "UPLOADING", createdAt: now, updatedAt: now });
   if (!mediaConfigured()) return { uploadId, objectKey, uploadUrl: null, storageConfigured: false };
-  const signed = await createPresignedUpload({ objectKey, mimeType: input.mimeType, expiresInSeconds: 900 });
+  const signed = await createPresignedUpload({ objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes, expiresInSeconds: 600 });
   return { uploadId, objectKey, uploadUrl: signed.url, expiresInSeconds: signed.expiresInSeconds, storageConfigured: true };
 }
 
 export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: string) {
   const upload = await db.collection("photo_uploads").findOne({ uploadId, userId, status: "UPLOADING" });
   if (!upload) throw new Error("Photo upload session not found");
-  await headMediaObject(upload.objectKey);
-  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", updatedAt: new Date() } });
+  const verified = await verifyMediaObject(upload.objectKey, String(upload.mimeType), PHOTO_MAX_BYTES);
+  if (verified.sizeBytes !== Number(upload.sizeBytes)) throw new Error("Uploaded photo size does not match the declared size");
+  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", verifiedAt: new Date(), updatedAt: new Date() } });
   return { uploadId, status: "READY" };
 }
 
@@ -326,8 +327,8 @@ export async function completeVideoRemix(db: Db, userId: ObjectId, remixId: stri
   if (!uploadId) throw new Error("uploadId is required");
   const remix = await db.collection("video_remixes").findOne({ _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT", uploadId, uploadStatus: "UPLOADING" });
   if (!remix?.objectKey) throw new Error("Remix upload session not found");
-  const head = await headMediaObject(remix.objectKey);
-  if (head.ContentLength != null && Number(head.ContentLength) !== Number(remix.sizeBytes)) throw new Error("Uploaded object size does not match the declared size");
+  const verified = await verifyMediaObject(remix.objectKey, String(remix.mimeType), MAX_BYTES);
+  if (verified.sizeBytes !== Number(remix.sizeBytes)) throw new Error("Uploaded object size does not match the declared size");
   const caption = String(input.caption ?? "").trim().slice(0, 2200);
   const result = await db.collection("video_remixes").findOneAndUpdate(
     { _id: new ObjectId(remixId), creatorId: userId, status: "DRAFT", uploadId },

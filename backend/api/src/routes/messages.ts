@@ -1,8 +1,9 @@
 import { Router } from "express";
+import { rateLimit } from "../security/rate-limit.js";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { createPresignedPlayback, createPresignedUpload, headMediaObject, newMediaJobId } from "../media/storage.js";
+import { createPresignedPlayback, createPresignedUpload, headMediaObject, newMediaJobId, verifyMediaObject } from "../media/storage.js";
 import { createTextMessage, createVoiceMessage, getOrCreateDirectConversation, listConversations, listMessages, markMessagesDelivered, markMessagesRead } from "../social/messaging.js";
 import { broadcastToUser } from "../realtime/ws.js";
 
@@ -19,13 +20,16 @@ const VOICE_MIME_TYPES = new Set([
 ]);
 
 export const messagesRouter = Router();
+const userActionLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const messageSendLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const messageReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-messagesRouter.get("/conversations", requireUser, async (req, res) => {
+messagesRouter.get("/conversations", requireUser, messageReadLimit, async (req, res) => {
   try { res.json({ conversations: await listConversations(await getDb(), req.userId!) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load conversations" }); }
 });
 
-messagesRouter.post("/conversations/direct", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/direct", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     let otherUserId: ObjectId;
@@ -43,7 +47,7 @@ messagesRouter.post("/conversations/direct", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create conversation" }); }
 });
 
-messagesRouter.get("/conversations/:conversationId/messages", requireUser, async (req, res) => {
+messagesRouter.get("/conversations/:conversationId/messages", requireUser, messageReadLimit, async (req, res) => {
   try {
     const conversationId = new ObjectId(String(req.params.conversationId));
     const before = req.query.before ? new Date(String(req.query.before)) : undefined;
@@ -51,7 +55,7 @@ messagesRouter.get("/conversations/:conversationId/messages", requireUser, async
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load messages" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/messages", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/messages", requireUser, messageSendLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -63,7 +67,7 @@ messagesRouter.post("/conversations/:conversationId/messages", requireUser, asyn
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to send message" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/voice-upload-url", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/voice-upload-url", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -79,7 +83,7 @@ messagesRouter.post("/conversations/:conversationId/voice-upload-url", requireUs
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign voice upload" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/voice", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/voice", requireUser, messageSendLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -90,8 +94,8 @@ messagesRouter.post("/conversations/:conversationId/voice", requireUser, async (
     if (!VOICE_MIME_TYPES.has(mimeType)) return res.status(400).json({ error: "Unsupported voice format" });
     if (!objectKey.startsWith(`messages/${req.userId!.toHexString()}/`)) return res.status(403).json({ error: "Invalid voice object" });
 
-    const head = await headMediaObject(objectKey);
-    const sizeBytes = Number(head.ContentLength ?? 0);
+    const verified = await verifyMediaObject(objectKey, mimeType, MAX_VOICE_BYTES);
+    const sizeBytes = verified.sizeBytes;
     if (!sizeBytes || sizeBytes > MAX_VOICE_BYTES) return res.status(400).json({ error: "Voice message is too large" });
     if (!Number.isFinite(durationMs) || durationMs <= 0 || durationMs > MAX_VOICE_DURATION_MS) return res.status(400).json({ error: "Invalid voice duration" });
 
@@ -103,7 +107,7 @@ messagesRouter.post("/conversations/:conversationId/voice", requireUser, async (
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to send voice message" }); }
 });
 
-messagesRouter.get("/messages/:messageId/audio", requireUser, async (req, res) => {
+messagesRouter.get("/messages/:messageId/audio", requireUser, messageReadLimit, async (req, res) => {
   try {
     const db = await getDb();
     const messageId = new ObjectId(String(req.params.messageId));
@@ -113,7 +117,7 @@ messagesRouter.get("/messages/:messageId/audio", requireUser, async (req, res) =
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create voice playback URL" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/delivered", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/delivered", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -125,7 +129,7 @@ messagesRouter.post("/conversations/:conversationId/delivered", requireUser, asy
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update delivery status" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/read", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/read", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));

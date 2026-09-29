@@ -7,6 +7,7 @@ export default function OwnerLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,7 @@ export default function OwnerLogin() {
       const response = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, mfaCode: mfaCode.trim() || undefined })
       });
 
       const data = await response.json();
@@ -49,6 +50,7 @@ export default function OwnerLogin() {
         <form onSubmit={submit}>
           <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
           <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+          <label>MFA code <span className="muted">(if enabled)</span><input inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\\D/g, "").slice(0, 6))} placeholder="6-digit code" /></label>
           {error && <div className="login-error">{error}</div>}
           <button disabled={loading}>{loading ? "Signing in…" : "Sign in as Owner"}</button>
         </form>
