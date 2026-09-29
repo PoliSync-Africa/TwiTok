@@ -52,7 +52,7 @@ export async function createPhotoUploadSession(db: Db, userId: ObjectId, input: 
   const now = new Date();
   await db.collection("photo_uploads").insertOne({ uploadId, userId, objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "UPLOADING", createdAt: now, updatedAt: now });
   if (!mediaConfigured()) return { uploadId, objectKey, uploadUrl: null, storageConfigured: false };
-  const signed = await createPresignedUpload({ objectKey, mimeType: input.mimeType, expiresInSeconds: 900 });
+  const signed = await createPresignedUpload({ objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes, expiresInSeconds: 600 });
   return { uploadId, objectKey, uploadUrl: signed.url, expiresInSeconds: signed.expiresInSeconds, storageConfigured: true };
 }
 
