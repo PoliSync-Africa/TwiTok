@@ -546,7 +546,14 @@ function giftEmoji(animation: string) {
     uganda_flag: "🇺🇬",
     zambia_flag: "🇿🇲",
     zimbabwe_flag: "🇿🇼",
-    twitok_cap: "🧢", money_gun: "💸🔫", wedding_rings: "💍", flying_angels: "👼✨"
+    africa_flag: "🌍", france_flag: "🇫🇷", italy_flag: "🇮🇹", japan_flag: "🇯🇵", china_flag: "🇨🇳",
+    twitok_cap: "🧢", money_gun: "💸🔫", wedding_rings: "💍", flying_angel: "👼✨",
+    luxury_yacht: "🛥️", private_jet: "✈️", luxury_mansion: "🏰", super_car: "🏎️",
+    cash_bundle: "💵", money_bag: "💰", gold_bars: "🪙", treasure_chest: "🧰", diamond_vault: "💎",
+    money_rain: "💸", golden_tree: "🌳", fortune_dragon: "🐉", fireworks: "🎆", birthday_cake: "🎂",
+    champagne: "🥂", confetti: "🎉", love_carriage: "🎠", sky_lantern: "🏮", stage_show: "🎤",
+    festival_parade: "🎊", galaxy: "🌌", universe: "🌌✨", heavens_gate: "🚪✨", atlantis: "🏛️",
+    phoenix: "🔥🦅", time_castle: "🏰⏳", eternal_love: "💖✨", twitok_legend: "👑✨"
   };
   return icons[animation] ?? "🎁";
 }
