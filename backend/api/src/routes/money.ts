@@ -21,11 +21,16 @@ moneyRouter.post("/internal/revenue/allocate", requireInternalService, async (re
 
 moneyRouter.post("/withdrawals", requireUser, async (req, res) => {
   try {
-    const { countryCode, type, amountUsd, exchangeRate, destination } = req.body ?? {};
-    if (!countryCode || !type || !destination || typeof destination !== "object") return res.status(400).json({ error: "countryCode, type and destination are required" });
-    await createWithdrawal(await getDb(), {
-      withdrawalId: randomUUID(), userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
-      amountUsd: Number(amountUsd), exchangeRate: Number(exchangeRate), destination
+    const { countryCode, type, amountUsd, destination } = req.body ?? {};
+    if (!countryCode || !type || !destination || typeof destination !== "object" || Array.isArray(destination)) return res.status(400).json({ error: "countryCode, type and destination are required" });
+    const idempotencyKey = String(req.header("Idempotency-Key") ?? randomUUID()).trim();
+    if (!/^[A-Za-z0-9._:-]{16,100}$/.test(idempotencyKey)) return res.status(400).json({ error: "A valid Idempotency-Key is required" });
+    const db = await getDb();
+    const existing = await db.collection("withdrawals").findOne({ withdrawalId: idempotencyKey, userId: req.userId!.toHexString() }, { projection: { status: 1, payoutCurrency: 1 } });
+    if (existing) return res.status(200).json({ status: existing.status, currency: existing.payoutCurrency ?? "USD", idempotent: true });
+    await createWithdrawal(db, {
+      withdrawalId: idempotencyKey, userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
+      amountUsd: Number(amountUsd), destination
     });
     return res.status(201).json({ status: "PENDING", currency: "USD" });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
