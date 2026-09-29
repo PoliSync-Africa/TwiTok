@@ -28,7 +28,7 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
     const db = await getDb();
     const user = await db.collection("users").findOne({ _id: userId }, { projection: { status: 1, sessionVersion: 1 } });
     if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
-    if (Number(user.sessionVersion ?? 0) !== Number(token.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
+    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
     req.userId = userId;
     req.userToken = claims;
     next();
