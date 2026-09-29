@@ -93,19 +93,75 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
   try {
     const expected = process.env.REVENUECAT_WEBHOOK_AUTH;
     if (!expected || req.header("Authorization") !== expected) return res.status(401).json({ error: "Unauthorized" });
+
     const event = req.body?.event ?? req.body;
-    const userId = String(event?.app_user_id ?? "");
-    const transactionId = String(event?.transaction_id ?? event?.original_transaction_id ?? "");
-    const productId = String(event?.product_id ?? "");
+    const eventId = String(event?.id ?? "").trim();
+    const eventType = String(event?.type ?? "").trim().toUpperCase();
+    const userId = String(event?.app_user_id ?? "").trim();
+    const transactionId = String(event?.transaction_id ?? event?.original_transaction_id ?? "").trim();
+    const productId = String(event?.product_id ?? "").trim();
+    const store = String(event?.store ?? "").trim().toUpperCase();
     const pkg = COIN_PACKAGES.find((p) => p.sku === productId);
-    if (!userId || !transactionId || !pkg) return res.status(400).json({ error: "Invalid RevenueCat coin purchase event" });
-    const grossUsd = Number(event?.price ?? pkg.priceUsd);
-    const taxPct = Number(event?.tax_percentage ?? 0);
-    const commissionPct = Number(event?.commission_percentage ?? 0);
-    const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - Math.max(0, taxPct) - Math.max(0, commissionPct))).toFixed(8));
-    const result = await creditPurchasedCoins(await getDb(), { userId, coins: pkg.coins, provider: "REVENUECAT", providerTransactionId: transactionId, sku: pkg.sku, grossUsd, netProceedsUsd });
-    return res.status(200).json({ ok: true, duplicate: result.duplicate });
-  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" }); }
+
+    if (!eventId || !eventType) return res.status(400).json({ error: "RevenueCat event id and type are required" });
+    if (!userId || !transactionId) return res.status(400).json({ error: "RevenueCat user and transaction identifiers are required" });
+    if (!pkg) return res.status(400).json({ error: "Unknown RevenueCat Coin product" });
+
+    const allowedStores = new Set(["APP_STORE", "PLAY_STORE"]);
+    if (!allowedStores.has(store)) return res.status(400).json({ error: "Unsupported RevenueCat store" });
+
+    const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
+    const refundEvents = new Set(["CANCELLATION"]);
+    const db = await getDb();
+
+    try {
+      await db.collection("revenuecat_webhook_events").insertOne({
+        eventId, eventType, userId, transactionId, productId, store,
+        createdAt: new Date(),
+        payload: req.body
+      });
+    } catch (error) {
+      if ((error as { code?: number })?.code === 11000) return res.status(200).json({ ok: true, duplicate: true });
+      throw error;
+    }
+
+    if (purchaseEvents.has(eventType)) {
+      const grossUsd = Number(event?.price);
+      const taxPct = Number(event?.tax_percentage ?? 0);
+      const commissionPct = Number(event?.commission_percentage ?? 0);
+
+      if (!Number.isFinite(grossUsd) || grossUsd <= 0) {
+        return res.status(400).json({ error: "RevenueCat purchase price is invalid" });
+      }
+      if (!Number.isFinite(taxPct) || taxPct < 0 || taxPct > 1 || !Number.isFinite(commissionPct) || commissionPct < 0 || commissionPct > 1) {
+        return res.status(400).json({ error: "RevenueCat tax or commission percentage is invalid" });
+      }
+
+      const netProceedsUsd = Number((grossUsd * (1 - taxPct - commissionPct)).toFixed(8));
+      const result = await creditPurchasedCoins(db, {
+        userId,
+        coins: pkg.coins,
+        provider: "REVENUECAT",
+        providerTransactionId: "REVENUECAT:" + store + ":" + transactionId,
+        sku: pkg.sku,
+        grossUsd,
+        netProceedsUsd
+      });
+      return res.status(200).json({ ok: true, duplicate: result.duplicate });
+    }
+
+    if (refundEvents.has(eventType) && String(event?.cancel_reason ?? "").toUpperCase() === "CUSTOMER_SUPPORT") {
+      await db.collection("iap_transactions").updateOne(
+        { providerTransactionId: "REVENUECAT:" + store + ":" + transactionId },
+        { $set: { status: "REFUNDED", settlementStatus: "REFUNDED", refundedAt: new Date(), refundEventId: eventId } }
+      );
+      return res.status(200).json({ ok: true, refunded: true });
+    }
+
+    return res.status(200).json({ ok: true, ignored: true, eventType });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" });
+  }
 });
 
 walletRouter.post("/coins/flutterwave/initialize", requireUser, async (req, res) => {
