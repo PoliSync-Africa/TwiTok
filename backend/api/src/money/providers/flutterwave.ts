@@ -3,6 +3,28 @@ import crypto from "node:crypto";
 type FlutterwaveResponse<T> = { status: string; message: string; data: T };
 
 const baseUrl = "https://api.flutterwave.com/v3";
+const MOBILE_DIALING_CODES: Record<string, string> = {
+  GH: "233", NG: "234", KE: "254", UG: "256", ZA: "27", RW: "250",
+  TZ: "255", MW: "265", ZM: "260", CM: "237", CI: "225", SN: "221",
+  EG: "20", SL: "232", BF: "226", GN: "224", GW: "245", ML: "223",
+  TN: "216", BJ: "229", TG: "228"
+};
+
+function normalizeMobileMoneyNumber(countryCode: string, value: string) {
+  const code = String(countryCode ?? "").toUpperCase();
+  const dialingCode = MOBILE_DIALING_CODES[code];
+  let digits = String(value ?? "").trim().replace(/[^0-9+]/g, "");
+  if (digits.startsWith("+")) digits = digits.slice(1);
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (!digits) throw new Error("Mobile Money number is required");
+  if (dialingCode) {
+    if (digits.startsWith("0")) digits = dialingCode + digits.slice(1);
+    else if (!digits.startsWith(dialingCode)) digits = dialingCode + digits;
+  }
+  if (!/^\\d{8,15}$/.test(digits)) throw new Error("Invalid Mobile Money number");
+  return digits;
+}
+
 
 function key() {
   const value = process.env.FLUTTERWAVE_SECRET_KEY;
@@ -93,6 +115,9 @@ export async function initiateFlutterwaveTransfer(input: {
   const amount = Math.floor(input.amount);
   if (!Number.isInteger(amount) || amount <= 0) throw new Error("Flutterwave transfer amount must be a positive integer");
   if (!input.accountNumber || !input.bankCode || !input.beneficiaryName) throw new Error("Flutterwave payout destination is incomplete");
+  const accountNumber = input.type === "MOBILE_MONEY"
+    ? normalizeMobileMoneyNumber(input.countryCode, input.accountNumber)
+    : input.accountNumber.trim();
   if (input.type === "BANK" && input.countryCode === "GH" && !input.branchCode) {
     throw new Error("Ghana Flutterwave bank payouts require a destination branch code");
   }
@@ -121,7 +146,7 @@ export async function initiateFlutterwaveTransfer(input: {
     method: "POST",
     body: JSON.stringify({
       account_bank: input.bankCode,
-      account_number: input.accountNumber,
+      account_number: accountNumber,
       ...(input.type === "BANK" && input.countryCode === "GH" && input.branchCode ? { destination_branch_code: input.branchCode } : {}),
       amount,
       currency: input.currency,
