@@ -9,6 +9,8 @@ export const promotionsRouter = Router();
 
 const createLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const paymentLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const campaignReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const campaignActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 const OBJECTIVES = ["MORE_VIEWS", "MORE_FOLLOWERS", "WEBSITE_TRAFFIC", "LIVE_AUDIENCE"] as const;
 const CURRENCIES = ["GHS", "USD"] as const;
@@ -72,7 +74,7 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
   }
 });
 
-promotionsRouter.get("/me", requireUser, async (req, res) => {
+promotionsRouter.get("/me", requireUser, campaignReadLimit, async (req, res) => {
   try {
     const rows = await (await getDb()).collection("promotion_campaigns").find({ ownerId: req.userId! }).sort({ createdAt: -1 }).limit(50).toArray();
     return res.json({ campaigns: rows.map(publicCampaign) });
@@ -179,7 +181,7 @@ promotionsRouter.post("/payments/verify", requireUser, paymentLimit, async (req,
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Payment verification failed" }); }
 });
 
-promotionsRouter.post("/:campaignId/start", requireUser, async (req, res) => {
+promotionsRouter.post("/:campaignId/start", requireUser, campaignActionLimit, async (req, res) => {
   try {
     if (!ObjectId.isValid(String(req.params.campaignId))) return res.status(400).json({ error: "Invalid campaign id" });
     const db = await getDb();
@@ -189,7 +191,7 @@ promotionsRouter.post("/:campaignId/start", requireUser, async (req, res) => {
   } catch { return res.status(400).json({ error: "Unable to start promotion" }); }
 });
 
-promotionsRouter.post("/:campaignId/pause", requireUser, async (req, res) => {
+promotionsRouter.post("/:campaignId/pause", requireUser, campaignActionLimit, async (req, res) => {
   try {
     if (!ObjectId.isValid(String(req.params.campaignId))) return res.status(400).json({ error: "Invalid campaign id" });
     const result = await (await getDb()).collection("promotion_campaigns").updateOne({ _id: new ObjectId(String(req.params.campaignId)), ownerId: req.userId!, status: "ACTIVE" }, { $set: { status: "PAUSED", updatedAt: new Date() } });
