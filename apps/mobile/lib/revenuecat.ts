@@ -13,10 +13,21 @@ export function configureRevenueCat(appUserId: string) {
   configured = true;
 }
 
+export const COIN_SKUS = [
+  "100_twitok_coins",
+  "500_twitok_coins",
+  "1000_twitok_coins",
+  "5000_twitok_coins",
+  "10000_twitok_coins"
+] as const;
+
 export async function getCoinPackages(): Promise<PurchasesPackage[]> {
   if (!configured) return [];
   const offerings = await Purchases.getOfferings();
-  return offerings.current?.availablePackages ?? [];
+  const packages = offerings.current?.availablePackages ?? [];
+  return packages
+    .filter((pkg) => COIN_SKUS.includes(pkg.product.identifier as (typeof COIN_SKUS)[number]))
+    .sort((a, b) => COIN_SKUS.indexOf(a.product.identifier as (typeof COIN_SKUS)[number]) - COIN_SKUS.indexOf(b.product.identifier as (typeof COIN_SKUS)[number]));
 }
 
 export async function purchaseCoinPackage(pkg: PurchasesPackage): Promise<CustomerInfo> {
