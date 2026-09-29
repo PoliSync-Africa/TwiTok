@@ -6,7 +6,7 @@ import { requireUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 
 const WEB_SESSION_COOKIE = "twitok_user_session";
-const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 };
+const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
 
 export const authRouter = Router();
 
