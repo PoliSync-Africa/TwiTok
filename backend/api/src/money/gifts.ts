@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { CREATOR_DIAMONDS_PER_COIN, DIAMOND_CASH_VALUE_USD } from "./wallet.js";
 
 export const GIFT_CATALOG = [
-  { giftId: "rose", name: "Rose", coins: 1, animation: "rose" },
+  { giftId: "rose", name: "Rose", coins: 3, animation: "rose" },
   { giftId: "heart", name: "Heart", coins: 4, animation: "heart" },
   { giftId: "clap", name: "Clap", coins: 8, animation: "clap" },
   { giftId: "kente", name: "Kente", coins: 24, animation: "kente" },
@@ -11,7 +11,7 @@ export const GIFT_CATALOG = [
   { giftId: "royal_crown", name: "Royal Crown", coins: 240, animation: "crown" },
   { giftId: "golden_lion", name: "Golden Lion", coins: 400, animation: "lion" },
   { giftId: "diamond_kingdom", name: "Diamond Kingdom", coins: 1200, animation: "diamond" },
-  { giftId: "usa_flag", name: "USA Flag", coins: 80, animation: "usa_flag" },
+  { giftId: "usa_flag", name: "USA Flag", coins: 100, animation: "usa_flag" },
   { giftId: "germany_flag", name: "Germany Flag", coins: 80, animation: "germany_flag" },
   { giftId: "canada_flag", name: "Canada Flag", coins: 80, animation: "canada_flag" },
   { giftId: "uk_flag", name: "UK Flag", coins: 80, animation: "uk_flag" },
@@ -70,7 +70,7 @@ export const GIFT_CATALOG = [
   { giftId: "zambia_flag", name: "Zambia Flag", coins: 100, animation: "zambia_flag" },
   { giftId: "zimbabwe_flag", name: "Zimbabwe Flag", coins: 100, animation: "zimbabwe_flag" },
   { giftId: "twitok_cap", name: "TwiTok Cap", coins: 100, animation: "twitok_cap" },
-  { giftId: "money_gun", name: "Money Gun", coins: 400, animation: "money_gun" },
+  { giftId: "money_gun", name: "Money Gun", coins: 500, animation: "money_gun" },
   { giftId: "wedding_rings", name: "Wedding Rings", coins: 800, animation: "wedding_rings" },
   { giftId: "flying_angels", name: "Flying Angels", coins: 1200, animation: "flying_angels" }
 ] as const;
