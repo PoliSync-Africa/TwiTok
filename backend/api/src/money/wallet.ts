@@ -93,7 +93,7 @@ export async function recordPurchasedCoinRefund(db: Db, input: {
         { session }
       );
       if (!iap) throw new Error("Original Coin purchase not found");
-      if (iap.status === "REFUNDED" && iap.refundEventId === input.refundEventId) {
+      if (iap.status === "REFUNDED") {
         return { duplicate: true, userId: String(iap.userId), adjustedUnallocatedUsd: 0, refundLiabilityUsd: Number(iap.refundLiabilityUsd ?? 0) };
       }
 
