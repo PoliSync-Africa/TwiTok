@@ -48,13 +48,24 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const interestRows = await db.collection("feed_events").aggregate([
     { $match: { userId, type: { $in: ["VIEW_2S", "VIEW_COMPLETE", "REWATCH", "LIKE", "COMMENT", "SHARE", "SAVE", "FOLLOW"] } } },
     { $sort: { createdAt: -1 } }, { $limit: 1000 },
+    { $set: { eventWeight: { $switch: { branches: [
+      { case: { $eq: ["$type", "FOLLOW"] }, then: 3 },
+      { case: { $eq: ["$type", "SHARE"] }, then: 2.5 },
+      { case: { $eq: ["$type", "LIKE"] }, then: 2 },
+      { case: { $eq: ["$type", "SAVE"] }, then: 2.25 },
+      { case: { $eq: ["$type", "COMMENT"] }, then: 2 },
+      { case: { $eq: ["$type", "REWATCH"] }, then: 1.75 },
+      { case: { $eq: ["$type", "VIEW_COMPLETE"] }, then: 1.5 },
+      { case: { $eq: ["$type", "VIEW_2S"] }, then: 0.75 }
+    ], default: 0 } } } },
+    { $set: { recencyWeight: { $exp: { $multiply: [ -0.04, { $divide: [ { $subtract: [ new Date(), "$createdAt" ] }, 86400000 ] } ] } } } },
     { $lookup: { from: "videos", localField: "videoId", foreignField: "_id", as: "video" } },
     { $unwind: "$video" },
     { $unwind: { path: "$video.hashtags", preserveNullAndEmptyArrays: false } },
-    { $group: { _id: { hashtag: "$video.hashtags", type: "$type" }, weight: { $sum: 1 } } },
+    { $group: { _id: "$video.hashtags", weight: { $sum: { $multiply: ["$eventWeight", "$recencyWeight"] } } } },
     { $sort: { weight: -1 } }, { $limit: 100 }
   ]).toArray();
-  const interestHashtags = [...new Set(interestRows.map((x: any) => String(x._id?.hashtag ?? "").toLowerCase()).filter(Boolean))];
+  const interestHashtags = [...new Set(interestRows.map((x: any) => String(x._id ?? "").toLowerCase()).filter(Boolean))];
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
