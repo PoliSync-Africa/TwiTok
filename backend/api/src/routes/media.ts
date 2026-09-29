@@ -40,7 +40,7 @@ mediaRouter.get("/playback/:videoId", requireUser, async (req, res) => {
       if (blocked) return res.status(404).json({ error: "Video not found" });
       if (video.visibility === "PRIVATE") return res.status(403).json({ error: "This video is private" });
       if (video.visibility === "FOLLOWERS") {
-        const following = await db.collection("follows").findOne({ followerId: req.userId!, followingId: ownerId, status: { $in: ["ACCEPTED", "ACTIVE"] } }, { projection: { _id: 1 } });
+        const following = await db.collection("follows").findOne({ followerId: req.userId!, followingId: ownerId }, { projection: { _id: 1 } });
         if (!following) return res.status(403).json({ error: "Follow the creator to view this video" });
       }
     }
