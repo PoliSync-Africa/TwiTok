@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { createPresignedPlayback, createPresignedUpload, headMediaObject, newMediaJobId } from "../media/storage.js";
+import { createPresignedPlayback, createPresignedUpload, headMediaObject, newMediaJobId, verifyMediaObject } from "../media/storage.js";
 import { createTextMessage, createVoiceMessage, getOrCreateDirectConversation, listConversations, listMessages, markMessagesDelivered, markMessagesRead } from "../social/messaging.js";
 import { broadcastToUser } from "../realtime/ws.js";
 
