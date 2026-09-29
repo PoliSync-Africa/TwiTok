@@ -76,3 +76,76 @@ export function verifyFlutterwaveWebhookSignature(rawBody: string, signature: st
   const digest = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
 }
+
+
+export async function initiateFlutterwaveTransfer(input: {
+  amount: number;
+  currency: string;
+  countryCode: string;
+  type: "BANK" | "MOBILE_MONEY";
+  accountNumber: string;
+  bankCode: string;
+  beneficiaryName: string;
+  reference: string;
+  callbackUrl?: string;
+}) {
+  const amount = Math.floor(input.amount);
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Flutterwave transfer amount must be a positive integer");
+  if (!input.accountNumber || !input.bankCode || !input.beneficiaryName) throw new Error("Flutterwave payout destination is incomplete");
+
+  const meta = input.type === "MOBILE_MONEY"
+    ? {
+        sender: process.env.TWITOK_FLUTTERWAVE_SENDER_NAME ?? "TwiTok",
+        sender_country: process.env.TWITOK_FLUTTERWAVE_SENDER_COUNTRY ?? "GH",
+        mobile_number: process.env.TWITOK_FLUTTERWAVE_SENDER_MOBILE ?? ""
+      }
+    : undefined;
+
+  return flutterwave<{
+    id: number;
+    account_number: string;
+    bank_code: string;
+    full_name: string;
+    currency: string;
+    amount: number;
+    fee?: number;
+    status: string;
+    reference: string;
+    complete_message?: string;
+    bank_name?: string;
+  }>("/transfers", {
+    method: "POST",
+    body: JSON.stringify({
+      account_bank: input.bankCode,
+      account_number: input.accountNumber,
+      amount,
+      currency: input.currency,
+      beneficiary_name: input.beneficiaryName,
+      reference: input.reference,
+      callback_url: input.callbackUrl,
+      narration: "TwiTok creator payout",
+      meta
+    })
+  });
+}
+
+export async function getFlutterwaveTransfer(transferId: string | number) {
+  return flutterwave<{
+    id: number;
+    account_number: string;
+    bank_code: string;
+    full_name: string;
+    currency: string;
+    amount: number;
+    fee?: number;
+    status: string;
+    reference: string;
+    complete_message?: string;
+  }>("/transfers/" + encodeURIComponent(String(transferId)));
+}
+
+export async function listFlutterwaveBanks(countryCode: string) {
+  return flutterwave<Array<{ id: number; code: string; name: string; provider_type?: string }>>(
+    "/banks/" + encodeURIComponent(countryCode.toUpperCase()) + "?include_provider_type=1"
+  );
+}
