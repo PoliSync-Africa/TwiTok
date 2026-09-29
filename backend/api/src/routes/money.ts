@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { allocateQualifyingRevenue } from "../money/ledger.js";
 import { createWithdrawal } from "../money/withdrawal.js";
-import { requireUser } from "../auth/middleware.js";
+import { requireAdultUser } from "../auth/middleware.js";
+import { currencyForCountry, exchangeRateEnvName } from "../money/providers/routing.js";
+import { MIN_WITHDRAWAL_USD } from "../money/wallet.js";
 import { requireInternalService } from "../security/internal.js";
 import { rateLimit } from "../security/rate-limit.js";
 
@@ -21,23 +23,70 @@ moneyRouter.post("/internal/revenue/allocate", rateLimit({ windowMs: 60 * 1000, 
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Revenue allocation failed" }); }
 });
 
-moneyRouter.post("/withdrawals", requireUser, rateLimit({ windowMs: 60 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+moneyRouter.post("/withdrawals", requireAdultUser, rateLimit({ windowMs: 60 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   try {
-    const { countryCode, type, amountUsd, exchangeRate, destination } = req.body ?? {};
-    if (!countryCode || !type || !destination || typeof destination !== "object" || Array.isArray(destination)) return res.status(400).json({ error: "countryCode, type and destination are required" });
-    if (!["BANK", "MOBILE_MONEY"].includes(String(type))) return res.status(400).json({ error: "Invalid withdrawal method" });
-    if (!Number.isFinite(Number(amountUsd)) || Number(amountUsd) <= 0 || Number(amountUsd) > 100000) return res.status(400).json({ error: "Invalid withdrawal amount" });
-    if (!Number.isFinite(Number(exchangeRate)) || Number(exchangeRate) <= 0 || Number(exchangeRate) > 1000000) return res.status(400).json({ error: "Invalid exchange rate" });
-    const idempotencyKey = String(req.header("Idempotency-Key") ?? randomUUID()).trim();
-    if (!/^[A-Za-z0-9._:-]{16,100}$/.test(idempotencyKey)) return res.status(400).json({ error: "A valid Idempotency-Key is required" });
-    const withdrawalId = randomUUID();
+    const { countryCode, type, amountUsd, destination } = req.body ?? {};
+    if (!type || !destination || typeof destination !== "object" || Array.isArray(destination)) {
+      return res.status(400).json({ error: "type and destination are required" });
+    }
+    const payoutType = String(type).toUpperCase();
+    if (!["BANK", "MOBILE_MONEY"].includes(payoutType)) {
+      return res.status(400).json({ error: "Invalid withdrawal method" });
+    }
+    const amount = Number(amountUsd);
+    if (!Number.isFinite(amount) || amount < MIN_WITHDRAWAL_USD || amount > 100000) {
+      return res.status(400).json({ error: "Invalid withdrawal amount" });
+    }
+
     const db = await getDb();
-    const existing = await db.collection("withdrawals").findOne({ userId: req.userId!.toHexString(), idempotencyKey }, { projection: { status: 1, payoutCurrency: 1 } });
-    if (existing) return res.status(200).json({ status: existing.status, currency: existing.payoutCurrency ?? "USD", idempotent: true });
+    const user = await db.collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { countryCode: 1 } }
+    );
+    const accountCountry = String(user?.countryCode ?? "").toUpperCase();
+    if (!accountCountry) return res.status(400).json({ error: "Account country is required for payouts" });
+    if (countryCode && String(countryCode).toUpperCase() !== accountCountry) {
+      return res.status(400).json({ error: "Payout country must match the account country" });
+    }
+
+    const currency = currencyForCountry(accountCountry);
+    if (!currency) return res.status(400).json({ error: "Unsupported payout currency for this country" });
+    const exchangeRate = Number(process.env[exchangeRateEnvName(currency)]);
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      return res.status(503).json({ error: currency + " payout exchange rate is not configured" });
+    }
+
+    const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
+    if (!/^[A-Za-z0-9._:-]{16,100}$/.test(idempotencyKey)) {
+      return res.status(400).json({ error: "A valid Idempotency-Key is required" });
+    }
+
+    const existing = await db.collection("withdrawals").findOne(
+      { userId: req.userId!.toHexString(), idempotencyKey },
+      { projection: { status: 1, withdrawalId: 1, payoutCurrency: 1 } }
+    );
+    if (existing) {
+      return res.status(200).json({
+        status: existing.status,
+        withdrawalId: existing.withdrawalId,
+        currency: existing.payoutCurrency ?? currency,
+        idempotent: true
+      });
+    }
+
+    const withdrawalId = randomUUID();
     await createWithdrawal(db, {
-      withdrawalId, userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
-      amountUsd: Number(amountUsd), exchangeRate: Number(exchangeRate), destination, idempotencyKey
+      withdrawalId,
+      userId: req.userId!.toHexString(),
+      countryCode: accountCountry,
+      type: payoutType as "BANK" | "MOBILE_MONEY",
+      amountUsd: amount,
+      exchangeRate,
+      destination,
+      idempotencyKey
     });
-    return res.status(201).json({ status: "PENDING", currency: "USD" });
-  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
+    return res.status(201).json({ status: "PENDING", withdrawalId, currency });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" });
+  }
 });

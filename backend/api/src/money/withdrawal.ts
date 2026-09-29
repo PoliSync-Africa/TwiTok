@@ -74,19 +74,20 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
   if (withdrawal.countryCode !== "GH") throw new Error("Only Ghana payouts are currently connected to the Paystack provider");
 
   const destination = withdrawal.destination as Record<string, unknown>;
-  const recipient = await createGhanaRecipient({
-    name: String(destination.name ?? ""),
-    accountNumber: String(destination.accountNumber ?? ""),
-    bankCode: String(destination.bankCode ?? ""),
-    type: withdrawal.type === "BANK" ? "ghipss" : "mobile_money"
-  });
-
-  await db.collection("withdrawals").updateOne(
-    { withdrawalId, status: "PENDING" },
-    { $set: { provider: "PAYSTACK", providerRecipientCode: recipient.recipient_code, status: "PROCESSING", updatedAt: new Date() } }
-  );
 
   try {
+    const recipient = await createGhanaRecipient({
+      name: String(destination.name ?? ""),
+      accountNumber: String(destination.accountNumber ?? ""),
+      bankCode: String(destination.bankCode ?? ""),
+      type: withdrawal.type === "BANK" ? "ghipss" : "mobile_money"
+    });
+
+    await db.collection("withdrawals").updateOne(
+      { withdrawalId, status: "PENDING" },
+      { $set: { provider: "PAYSTACK", providerRecipientCode: recipient.recipient_code, status: "PROCESSING", updatedAt: new Date() } }
+    );
+
     const transfer = await initiateGhanaTransfer({
       amountGhs: Number(withdrawal.payoutAmount),
       recipientCode: recipient.recipient_code,
@@ -102,7 +103,7 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
     if (!session) throw error;
     try {
       await session.withTransaction(async () => {
-        const current = await db.collection("withdrawals").findOne({ withdrawalId, status: "PROCESSING" }, { session });
+        const current = await db.collection("withdrawals").findOne({ withdrawalId, status: { $in: ["PENDING", "PROCESSING"] } }, { session });
         if (!current) return;
         await db.collection("wallets").updateOne(
           { userId: String(current.userId) },
@@ -251,9 +252,24 @@ export async function reconcileFlutterwaveTransfer(db: Db, input: {
     const session = db.client?.startSession();
     if (!session) throw new Error("MongoDB session unavailable");
     let resultStatus = isReversal ? "REVERSED" : "FAILED";
+    let duplicateEvent = false;
 
     try {
       await session.withTransaction(async () => {
+        const eventGate = await db.collection("payout_webhook_events").updateOne(
+          { eventId: input.eventId },
+          { $setOnInsert: {
+              eventId: input.eventId, provider: "FLUTTERWAVE",
+              transferId: input.transferId, reference: input.reference,
+              status: normalized, createdAt: new Date()
+            } },
+          { upsert: true, session }
+        );
+        if (eventGate.upsertedCount === 0) {
+          duplicateEvent = true;
+          return;
+        }
+
         const allowedStatuses = isReversal
           ? { $in: ["PROCESSING", "PENDING", "PAID"] }
           : { $in: ["PROCESSING", "PENDING"] };
@@ -299,16 +315,7 @@ export async function reconcileFlutterwaveTransfer(db: Db, input: {
       await session.endSession();
     }
 
-    const inserted = await db.collection("payout_webhook_events").updateOne(
-      { eventId: input.eventId },
-      { $setOnInsert: {
-          eventId: input.eventId, provider: "FLUTTERWAVE",
-          transferId: input.transferId, reference: input.reference,
-          status: normalized, createdAt: new Date()
-        } },
-      { upsert: true }
-    );
-    return { status: resultStatus, duplicate: inserted.upsertedCount === 0 };
+    return { status: resultStatus, duplicate: duplicateEvent };
   }
 
   const inserted = await db.collection("payout_webhook_events").updateOne(
@@ -377,9 +384,24 @@ export async function reconcilePaystackTransfer(db: Db, input: {
   const session = db.client?.startSession();
   if (!session) throw new Error("MongoDB session unavailable");
   const resultStatus = isReversal ? "REVERSED" : "FAILED";
+  let duplicateEvent = false;
 
   try {
     await session.withTransaction(async () => {
+      const eventGate = await db.collection("payout_webhook_events").updateOne(
+        { eventId: input.eventId },
+        { $setOnInsert: {
+            eventId: input.eventId, provider: "PAYSTACK",
+            event: input.event, reference: input.reference,
+            status: input.rawStatus ?? input.event, createdAt: new Date()
+          } },
+        { upsert: true, session }
+      );
+      if (eventGate.upsertedCount === 0) {
+        duplicateEvent = true;
+        return;
+      }
+
       const allowedStatuses = isReversal
         ? { $in: ["PROCESSING", "PENDING", "PAID"] }
         : { $in: ["PROCESSING", "PENDING"] };
@@ -424,14 +446,5 @@ export async function reconcilePaystackTransfer(db: Db, input: {
     await session.endSession();
   }
 
-  const inserted = await db.collection("payout_webhook_events").updateOne(
-    { eventId: input.eventId },
-    { $setOnInsert: {
-        eventId: input.eventId, provider: "PAYSTACK",
-        event: input.event, reference: input.reference,
-        status: input.rawStatus ?? input.event, createdAt: new Date()
-      } },
-    { upsert: true }
-  );
-  return { status: resultStatus, duplicate: inserted.upsertedCount === 0 };
+  return { status: resultStatus, duplicate: duplicateEvent };
 }
