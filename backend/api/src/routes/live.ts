@@ -3,10 +3,12 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { createLiveStream, setLiveStatus } from "../live/service.js";
 import { requireUser } from "../auth/middleware.js";
+import { rateLimit } from "../security/rate-limit.js";
 
 export const liveRouter = Router();
+const liveActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-liveRouter.post("/streams", requireUser, async (req, res) => {
+liveRouter.post("/streams", requireUser, liveActionLimit, async (req, res) => {
   try {
     const { title, category, coverUrl } = req.body ?? {};
     if (typeof title !== "string" || !title.trim() || title.length > 150) return res.status(400).json({ error: "A valid LIVE title is required" });
@@ -16,7 +18,7 @@ liveRouter.post("/streams", requireUser, async (req, res) => {
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE creation failed" }); }
 });
 
-liveRouter.post("/streams/:streamId/status", requireUser, async (req, res) => {
+liveRouter.post("/streams/:streamId/status", requireUser, liveActionLimit, async (req, res) => {
   try {
     const db = await getDb(), streamId = String(req.params.streamId);
     const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1 } });
