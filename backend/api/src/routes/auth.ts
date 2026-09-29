@@ -1,4 +1,5 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
 import { requireUser } from "../auth/middleware.js";
