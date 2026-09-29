@@ -1,6 +1,18 @@
 import type { Db } from "mongodb";
+import { ObjectId } from "mongodb";
 import { randomUUID } from "node:crypto";
 import { CREATOR_DIAMONDS_PER_COIN, DIAMOND_CASH_VALUE_USD } from "./wallet.js";
+
+export const AFRICAN_COUNTRY_CODES = new Set(["DZ","AO","BJ","BW","BF","BI","CV","CM","CF","TD","KM","CG","CD","CI","DJ","EG","GQ","ER","SZ","ET","GA","GM","GH","GN","GW","KE","LS","LR","LY","MG","MW","ML","MR","MU","MA","MZ","NA","NE","NG","RW","ST","SN","SC","SL","SO","ZA","SS","SD","TZ","TG","TN","UG","ZM","ZW"]);
+export const NON_AFRICAN_GIFT_MULTIPLIER = 1.5;
+
+export function giftCoinsForCountry(baseCoins: number, countryCode?: string) {
+  return AFRICAN_COUNTRY_CODES.has(String(countryCode ?? "").trim().toUpperCase()) ? baseCoins : Math.ceil(baseCoins * NON_AFRICAN_GIFT_MULTIPLIER);
+}
+
+export function giftCatalogForCountry(countryCode?: string) {
+  return GIFT_CATALOG.map((gift) => ({ ...gift, baseCoins: gift.coins, coins: giftCoinsForCountry(gift.coins, countryCode) }));
+}
 
 export const GIFT_CATALOG = [
   { giftId: "rose", name: "Rose", coins: 3, animation: "rose" },
@@ -122,8 +134,11 @@ export async function sendGift(db: Db, input: {
   context: "LIVE"|"VIDEO"|"COMMENT"; videoId?: string;
 }) {
   if (input.senderId === input.receiverId) throw new Error("You cannot gift yourself");
-  const gift = GIFT_CATALOG.find((item) => item.giftId === input.giftId);
-  if (!gift) throw new Error("Gift not found");
+  const baseGift = GIFT_CATALOG.find((item) => item.giftId === input.giftId);
+  if (!baseGift) throw new Error("Gift not found");
+  const sender = await db.collection("users").findOne({ _id: new ObjectId(input.senderId) }, { projection: { countryCode: 1 } });
+  if (!sender) throw new Error("Sender account not found");
+  const gift = { ...baseGift, coins: giftCoinsForCountry(baseGift.coins, String(sender.countryCode ?? "")) };
   const idempotencyKey = String(input.idempotencyKey ?? "").trim();
   if (!idempotencyKey || idempotencyKey.length > 128) throw new Error("A valid Idempotency-Key is required");
   const existing = await db.collection("gift_transactions").findOne({ senderId: input.senderId, idempotencyKey });
