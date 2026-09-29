@@ -6,8 +6,6 @@ import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 
 export const authRouter = Router();
 
-const WEB_SESSION_COOKIE = "twitok_session";
-const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
 
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
   try {
@@ -15,7 +13,6 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
     const token = issueUserToken(user);
-    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
     res.status(201).json({ token, user });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
@@ -37,7 +34,6 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
 authRouter.post("/logout", requireUser, async (req, res) => {
   try {
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
-    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     return res.status(204).send();
   } catch { return res.status(500).json({ error: "Unable to end session" }); }
 });
