@@ -43,6 +43,24 @@ authRouter.post("/logout", requireUser, async (req, res) => {
   } catch { return res.status(500).json({ error: "Unable to end session" }); }
 });
 
+authRouter.post("/change-password", requireUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    const currentPassword = String(req.body?.currentPassword ?? "");
+    const newPassword = String(req.body?.newPassword ?? "");
+    if (newPassword.length < 12) return res.status(400).json({ error: "New password must contain at least 12 characters" });
+    if (currentPassword === newPassword) return res.status(400).json({ error: "New password must differ from the current password" });
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 1 } });
+    if (!user?.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) return res.status(401).json({ error: "Current password is incorrect" });
+    await db.collection("users").updateOne(
+      { _id: req.userId! },
+      { $set: { passwordHash: await bcrypt.hash(newPassword, 12), updatedAt: new Date() }, $inc: { sessionVersion: 1 } }
+    );
+    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    return res.status(204).send();
+  } catch { return res.status(400).json({ error: "Unable to change password" }); }
+});
+
 authRouter.get("/me", requireUser, async (req, res) => {
   try {
     const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
