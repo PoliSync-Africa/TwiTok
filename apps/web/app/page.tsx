@@ -41,6 +41,7 @@ export default function Home() {
   const [feedLoading, setFeedLoading] = useState(false);
   const [muted, setMuted] = useState(true);
   const api = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) { return authFetch(input, { ...init, credentials: "include" }); }
   const activeRef = useRef<string | null>(null);
   const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
   const [captionLanguage, setCaptionLanguage] = useState<Record<string, string>>({});
@@ -58,11 +59,10 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const token = typeof window !== "undefined" ? window.localStorage.getItem("twitok_user_token") : null;
-      if (!token) return;
-      setFeedLoading(true);
+  
+        setFeedLoading(true);
       try {
-        const response = await fetch(api + "/feed/" + tab + "?limit=10", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+        const response = await authFetch(api + "/feed/" + tab + "?limit=10", { headers: {}, cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         const items = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];
@@ -76,11 +76,10 @@ export default function Home() {
 
   async function loadMoreFeed() {
     if (feedLoading || !feedCursor) return;
-    const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return;
+    const token = "";
     setFeedLoading(true);
     try {
-      const response = await fetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor), { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+      const response = await authFetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor), { headers: {}, cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
       const items = Array.isArray(data.videos) ? data.videos : [];
@@ -98,14 +97,13 @@ export default function Home() {
   }, [feedCursor, feedLoading, tab]);
 
   useEffect(() => {
-    const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return;
+    const token = "";
     let cancelled = false;
     async function loadNotifications() {
       try {
         const [listResponse, countResponse] = await Promise.all([
-          fetch(api + "/notifications?limit=30", { headers: { Authorization: "Bearer " + token }, cache: "no-store" }),
-          fetch(api + "/notifications/unread-count", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
+          authFetch(api + "/notifications?limit=30", { headers: {}, cache: "no-store" }),
+          authFetch(api + "/notifications/unread-count", { headers: {}, cache: "no-store" })
         ]);
         if (cancelled) return;
         if (listResponse.ok) { const data = await listResponse.json(); setNotifications(Array.isArray(data.notifications) ? data.notifications : []); }
@@ -118,11 +116,10 @@ export default function Home() {
   }, [api]);
 
   useEffect(() => {
-    const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return;
+    const token = "";
     const realtimeBase = api.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
     const socket = new WebSocket(realtimeBase.replace(/\/api\/v1\/?$/, "") + "/realtime");
-    socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "auth", token })));
+    // Browser authentication is now performed by the HttpOnly session cookie during the WebSocket handshake.
     socket.addEventListener("message", event => {
       try {
         const data = JSON.parse(event.data);
@@ -134,12 +131,11 @@ export default function Home() {
 
   async function openStory(storyId: string) {
     setStoryOpen(storyId);
-    const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return;
+    const token = "";
     try {
-      await fetch(api + "/stories/" + encodeURIComponent(storyId) + "/view", {
+      await authFetch(api + "/stories/" + encodeURIComponent(storyId) + "/view", {
         method: "POST",
-        headers: { Authorization: "Bearer " + token }
+        headers: {}
       });
       setStories(items => items.map(item => item.id === storyId ? { ...item, viewed: true } : item));
     } catch {}
@@ -147,31 +143,29 @@ export default function Home() {
 
   async function openNotifications() {
     setNotificationsOpen(true);
-    const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return;
+    const token = "";
     try {
-      const response = await fetch(api + "/notifications/read", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: "{}" });
+      const response = await authFetch(api + "/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       if (response.ok) { setNotifications(items => items.map(item => ({ ...item, read: true }))); setUnreadNotifications(0); }
     } catch {}
   }
 
   useEffect(() => {
-    const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return;
+    const token = "";
     let cancelled = false;
     Promise.all(videos.filter(v => !v.id.startsWith("demo-")).map(async v => {
-      try { const r = await fetch(`${api}/music/videos/${v.id}/sound`, { headers: { Authorization: `Bearer ${token}` } }); if (!r.ok) return null; const d = await r.json(); return d.sound ? [v.id, d.sound] as const : null; } catch { return null; }
+      try { const r = await authFetch(`${api}/music/videos/${v.id}/sound`, { headers: {} }); if (!r.ok) return null; const d = await r.json(); return d.sound ? [v.id, d.sound] as const : null; } catch { return null; }
     })).then(items => { if (!cancelled) setSoundMap(prev => { const next = { ...prev }; items.forEach(item => { if (item) next[item[0]] = item[1]; }); return next; }); });
     return () => { cancelled = true; };
   }, [videos, api]);
 
   async function track(videoId: string, type: string, watchMs = 0) {
-    const token = window.localStorage.getItem("twitok_user_token");
+    const token = "";
     if (!token || videoId.startsWith("demo-")) return;
     try {
-      await fetch(`${api}/feed/events`, {
+      await authFetch(`${api}/feed/events`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoId, type, watchMs, sessionId: activeRef.current })
       });
     } catch {}
@@ -187,7 +181,7 @@ export default function Home() {
   }, [videos, captionLanguage]);
 
   async function engage(videoId: string, action: "like" | "save" | "share" | "repost") {
-    const token = window.localStorage.getItem("twitok_user_token");
+    const token = "";
     if (!token || videoId.startsWith("demo-")) return;
     try {
       if (action === "share" && typeof navigator.share === "function") {
@@ -195,9 +189,9 @@ export default function Home() {
       } else if (action === "share") {
         await navigator.clipboard?.writeText(window.location.origin + "/video/" + videoId);
       }
-      const response = await fetch(`${api}/engagement/${videoId}/${action}`, {
+      const response = await authFetch(`${api}/engagement/${videoId}/${action}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {}
       });
       if (!response.ok) return;
       const data = await response.json();
@@ -207,12 +201,12 @@ export default function Home() {
   }
 
   async function remixVideo(videoId: string, mode: "DUET" | "STITCH") {
-    const token = window.localStorage.getItem("twitok_user_token");
+    const token = "";
     if (!token || videoId.startsWith("demo-")) return;
     try {
-      const response = await fetch(api + "/video/" + encodeURIComponent(videoId) + "/remix", {
+      const response = await authFetch(api + "/video/" + encodeURIComponent(videoId) + "/remix", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode })
       });
       const data = await response.json();
@@ -224,48 +218,48 @@ export default function Home() {
   }
 
   async function openComments(videoId: string) {
-    const token = window.localStorage.getItem("twitok_user_token");
+    const token = "";
     if (!token || videoId.startsWith("demo-")) return;
     setCommentsVideoId(videoId);
     setCommentsBusy(true);
     try {
-      const response = await fetch(`${api}/engagement/${videoId}/comments?limit=50`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await authFetch(`${api}/engagement/${videoId}/comments?limit=50`, { headers: {} });
       if (response.ok) { const data = await response.json(); setComments(Array.isArray(data.comments) ? data.comments : []); }
     } finally { setCommentsBusy(false); }
   }
 
   async function submitComment() {
-    const token = window.localStorage.getItem("twitok_user_token");
+    const token = "";
     if (!token || !commentsVideoId || !commentDraft.trim()) return;
     const text = commentDraft.trim().slice(0, 500);
     setCommentsBusy(true);
     try {
-      const response = await fetch(`${api}/engagement/${commentsVideoId}/comments`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text }) });
+      const response = await authFetch(`${api}/engagement/${commentsVideoId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       if (!response.ok) return;
       const data = await response.json();
       if (data.comment) setComments(items => [data.comment, ...items]);
       setCommentDraft("");
-      const engagementResponse = await fetch(`${api}/engagement/${commentsVideoId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const engagementResponse = await authFetch(`${api}/engagement/${commentsVideoId}`, { headers: {} });
       if (engagementResponse.ok) { const engagement = await engagementResponse.json(); setVideos(items => items.map(item => item.id === commentsVideoId ? { ...item, engagement } : item)); }
       track(commentsVideoId, "COMMENT");
     } finally { setCommentsBusy(false); }
   }
 
   async function requestTranslation(videoId: string, language: string) {
-    const token = window.localStorage.getItem("twitok_user_token");
+    const token = "";
     if (!token || !language) return;
     setTranslationBusy(prev => ({ ...prev, [videoId]: true }));
     try {
-      const response = await fetch(`${api}/video/${videoId}/caption-translations`, {
+      const response = await authFetch(`${api}/video/${videoId}/caption-translations`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetLanguage: language })
       });
       if (!response.ok) return;
       for (let attempt = 0; attempt < 10; attempt++) {
         await new Promise(resolve => setTimeout(resolve, 2500));
-        const tracksResponse = await fetch(`${api}/video/${videoId}/caption-tracks`, {
-          headers: { Authorization: "Bearer " + token }
+        const tracksResponse = await authFetch(`${api}/video/${videoId}/caption-tracks`, {
+          headers: {}
         });
         if (!tracksResponse.ok) continue;
         const data = await tracksResponse.json();
