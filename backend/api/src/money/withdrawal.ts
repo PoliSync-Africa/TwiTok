@@ -205,54 +205,122 @@ export async function reconcileFlutterwaveTransfer(db: Db, input: {
   status: string;
   rawMessage?: string;
 }) {
-  const inserted = await db.collection("payout_webhook_events").insertOne({
-    eventId: input.eventId,
-    provider: "FLUTTERWAVE",
-    transferId: input.transferId,
-    reference: input.reference,
-    createdAt: new Date()
-  }).catch(() => null);
-  if (!inserted) return { duplicate: true };
-
   const withdrawal = await db.collection("withdrawals").findOne({
     $or: [{ providerTransferId: input.transferId }, { providerReference: input.reference }]
   });
-  if (!withdrawal) return { ignored: true };
+
+  if (!withdrawal) {
+    await db.collection("payout_webhook_events").updateOne(
+      { eventId: input.eventId },
+      { $setOnInsert: {
+          eventId: input.eventId,
+          provider: "FLUTTERWAVE",
+          transferId: input.transferId,
+          reference: input.reference,
+          status: input.status,
+          createdAt: new Date()
+        } },
+      { upsert: true }
+    );
+    return { ignored: true };
+  }
 
   const normalized = input.status.toUpperCase();
+
   if (normalized === "SUCCESSFUL") {
     await db.collection("withdrawals").updateOne(
       { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } },
       { $set: { status: "PAID", providerStatus: normalized, paidAt: new Date(), updatedAt: new Date() } }
     );
-    return { status: "PAID" };
+    const inserted = await db.collection("payout_webhook_events").updateOne(
+      { eventId: input.eventId },
+      { $setOnInsert: {
+          eventId: input.eventId, provider: "FLUTTERWAVE",
+          transferId: input.transferId, reference: input.reference,
+          status: normalized, createdAt: new Date()
+        } },
+      { upsert: true }
+    );
+    return { status: "PAID", duplicate: inserted.upsertedCount === 0 };
   }
 
-  if (normalized === "FAILED") {
+  const isReversal = ["REVERSED", "CANCELLED", "CANCELED"].includes(normalized);
+  const isFailure = normalized === "FAILED";
+
+  if (isFailure || isReversal) {
     const session = db.client?.startSession();
     if (!session) throw new Error("MongoDB session unavailable");
+    let resultStatus = isReversal ? "REVERSED" : "FAILED";
+
     try {
       await session.withTransaction(async () => {
+        const allowedStatuses = isReversal
+          ? { $in: ["PROCESSING", "PENDING", "PAID"] }
+          : { $in: ["PROCESSING", "PENDING"] };
+
         const current = await db.collection("withdrawals").findOne(
-          { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } }, { session }
+          { withdrawalId: withdrawal.withdrawalId, status: allowedStatuses },
+          { session }
         );
         if (!current) return;
+
         await db.collection("wallets").updateOne(
           { userId: String(current.userId) },
           { $inc: { cashBalanceUsd: Number(current.amountUsd) }, $set: { updatedAt: new Date() } },
           { session }
         );
+
+        await db.collection("wallet_ledger").insertOne({
+          transactionId: "PAYOUT_REFUND:" + String(current.withdrawalId),
+          userId: String(current.userId),
+          type: "PAYOUT_REFUND",
+          coinsDelta: 0,
+          diamondsDelta: 0,
+          cashDeltaUsd: Number(current.amountUsd),
+          referenceId: String(current.withdrawalId),
+          provider: "FLUTTERWAVE",
+          reason: isReversal ? "provider_reversal" : "provider_failure",
+          createdAt: new Date()
+        }, { session });
+
         await db.collection("withdrawals").updateOne(
           { withdrawalId: current.withdrawalId },
-          { $set: { status: "FAILED", providerStatus: normalized, failureReason: input.rawMessage ?? "Flutterwave transfer failed", updatedAt: new Date() } },
+          { $set: {
+              status: resultStatus,
+              providerStatus: normalized,
+              failureReason: input.rawMessage ?? (isReversal ? "Flutterwave transfer reversed" : "Flutterwave transfer failed"),
+              walletRefundedAt: new Date(),
+              updatedAt: new Date()
+            } },
           { session }
         );
       });
-    } finally { await session.endSession(); }
-    return { status: "FAILED" };
+    } finally {
+      await session.endSession();
+    }
+
+    const inserted = await db.collection("payout_webhook_events").updateOne(
+      { eventId: input.eventId },
+      { $setOnInsert: {
+          eventId: input.eventId, provider: "FLUTTERWAVE",
+          transferId: input.transferId, reference: input.reference,
+          status: normalized, createdAt: new Date()
+        } },
+      { upsert: true }
+    );
+    return { status: resultStatus, duplicate: inserted.upsertedCount === 0 };
   }
 
-  return { status: "PROCESSING" };
+  const inserted = await db.collection("payout_webhook_events").updateOne(
+    { eventId: input.eventId },
+    { $setOnInsert: {
+        eventId: input.eventId, provider: "FLUTTERWAVE",
+        transferId: input.transferId, reference: input.reference,
+        status: normalized, createdAt: new Date()
+      } },
+    { upsert: true }
+  );
+  return { status: "PROCESSING", duplicate: inserted.upsertedCount === 0 };
 }
 
 export async function refreshFlutterwaveWithdrawal(db: Db, withdrawalId: string) {
@@ -268,48 +336,102 @@ export async function refreshFlutterwaveWithdrawal(db: Db, withdrawalId: string)
   });
 }
 
-
 export async function reconcilePaystackTransfer(db: Db, input: {
   eventId: string;
   event: "transfer.success" | "transfer.failed" | "transfer.reversed";
   reference: string;
   rawStatus?: string;
 }) {
-  const inserted = await db.collection("payout_webhook_events").insertOne({
-    eventId: input.eventId, event: input.event, reference: input.reference, createdAt: new Date()
-  }).catch(() => null);
-  if (!inserted) return { duplicate: true };
-
   const withdrawal = await db.collection("withdrawals").findOne({ providerReference: input.reference });
-  if (!withdrawal) return { ignored: true };
+  if (!withdrawal) {
+    await db.collection("payout_webhook_events").updateOne(
+      { eventId: input.eventId },
+      { $setOnInsert: {
+          eventId: input.eventId, provider: "PAYSTACK",
+          event: input.event, reference: input.reference,
+          status: input.rawStatus ?? input.event, createdAt: new Date()
+        } },
+      { upsert: true }
+    );
+    return { ignored: true };
+  }
 
   if (input.event === "transfer.success") {
     await db.collection("withdrawals").updateOne(
       { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } },
       { $set: { status: "PAID", providerStatus: input.rawStatus ?? "success", paidAt: new Date(), updatedAt: new Date() } }
     );
-    return { status: "PAID" };
+    const inserted = await db.collection("payout_webhook_events").updateOne(
+      { eventId: input.eventId },
+      { $setOnInsert: {
+          eventId: input.eventId, provider: "PAYSTACK",
+          event: input.event, reference: input.reference,
+          status: input.rawStatus ?? input.event, createdAt: new Date()
+        } },
+      { upsert: true }
+    );
+    return { status: "PAID", duplicate: inserted.upsertedCount === 0 };
   }
 
+  const isReversal = input.event === "transfer.reversed";
   const session = db.client?.startSession();
   if (!session) throw new Error("MongoDB session unavailable");
+  const resultStatus = isReversal ? "REVERSED" : "FAILED";
+
   try {
     await session.withTransaction(async () => {
+      const allowedStatuses = isReversal
+        ? { $in: ["PROCESSING", "PENDING", "PAID"] }
+        : { $in: ["PROCESSING", "PENDING"] };
+
       const current = await db.collection("withdrawals").findOne(
-        { withdrawalId: withdrawal.withdrawalId, status: { $in: ["PROCESSING", "PENDING"] } }, { session }
+        { withdrawalId: withdrawal.withdrawalId, status: allowedStatuses }, { session }
       );
       if (!current) return;
+
       await db.collection("wallets").updateOne(
         { userId: String(current.userId) },
         { $inc: { cashBalanceUsd: Number(current.amountUsd) }, $set: { updatedAt: new Date() } },
         { session }
       );
+
+      await db.collection("wallet_ledger").insertOne({
+        transactionId: "PAYOUT_REFUND:" + String(current.withdrawalId),
+        userId: String(current.userId),
+        type: "PAYOUT_REFUND",
+        coinsDelta: 0,
+        diamondsDelta: 0,
+        cashDeltaUsd: Number(current.amountUsd),
+        referenceId: String(current.withdrawalId),
+        provider: "PAYSTACK",
+        reason: isReversal ? "provider_reversal" : "provider_failure",
+        createdAt: new Date()
+      }, { session });
+
       await db.collection("withdrawals").updateOne(
         { withdrawalId: current.withdrawalId },
-        { $set: { status: "FAILED", failureReason: input.event, updatedAt: new Date() } },
+        { $set: {
+            status: resultStatus,
+            providerStatus: input.rawStatus ?? input.event,
+            failureReason: isReversal ? "Paystack transfer reversed" : "Paystack transfer failed",
+            walletRefundedAt: new Date(),
+            updatedAt: new Date()
+          } },
         { session }
       );
     });
-  } finally { await session.endSession(); }
-  return { status: "FAILED" };
+  } finally {
+    await session.endSession();
+  }
+
+  const inserted = await db.collection("payout_webhook_events").updateOne(
+    { eventId: input.eventId },
+    { $setOnInsert: {
+        eventId: input.eventId, provider: "PAYSTACK",
+        event: input.event, reference: input.reference,
+        status: input.rawStatus ?? input.event, createdAt: new Date()
+      } },
+    { upsert: true }
+  );
+  return { status: resultStatus, duplicate: inserted.upsertedCount === 0 };
 }
