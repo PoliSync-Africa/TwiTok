@@ -35,6 +35,52 @@ export async function createPresignedUpload(input: { objectKey: string; mimeType
   return { url, expiresInSeconds: expires };
 }
 
+
+function matchesSignature(bytes: Uint8Array, mimeType: string) {
+  const text = new TextDecoder("ascii", { fatal: false }).decode(bytes.subarray(0, 32));
+  const starts = (...values: number[]) => values.every((value, index) => bytes[index] === value);
+  const hasAscii = (value: string, offset: number) => text.slice(offset, offset + value.length) === value;
+
+  switch (mimeType.toLowerCase()) {
+    case "image/jpeg": return starts(0xff, 0xd8, 0xff);
+    case "image/png": return starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    case "image/webp": return starts(0x52, 0x49, 0x46, 0x46) && hasAscii("WEBP", 8);
+    case "video/webm": return starts(0x1a, 0x45, 0xdf, 0xa3);
+    case "video/mp4":
+    case "video/quicktime":
+    case "audio/mp4":
+    case "audio/x-m4a":
+      return bytes.length >= 12 && hasAscii("ftyp", 4);
+    case "audio/wav": return starts(0x52, 0x49, 0x46, 0x46) && hasAscii("WAVE", 8);
+    case "audio/mpeg": return starts(0x49, 0x44, 0x33) || starts(0xff, 0xfb) || starts(0xff, 0xf3) || starts(0xff, 0xf2);
+    case "audio/ogg": return hasAscii("OggS", 0);
+    default: return false;
+  }
+}
+
+export async function verifyMediaObject(objectKey: string, mimeType: string, maxBytes: number) {
+  validateObjectKey(objectKey);
+  validateMimeType(mimeType);
+  if (!Number.isFinite(maxBytes) || maxBytes <= 0) throw new Error("Invalid media size limit");
+
+  const head = await headMediaObject(objectKey);
+  const size = Number(head.ContentLength ?? 0);
+  if (!Number.isFinite(size) || size <= 0 || size > maxBytes) throw new Error("Media object exceeds the allowed size");
+  if (head.ContentType && String(head.ContentType).toLowerCase().split(";")[0] !== mimeType.toLowerCase()) {
+    throw new Error("Media object type does not match the declared type");
+  }
+
+  const response = await getClient().send(new GetObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    Range: "bytes=0-63"
+  }));
+  if (!response.Body) throw new Error("Media object content is unavailable");
+  const bytes = await response.Body.transformToByteArray();
+  if (!matchesSignature(bytes, mimeType)) throw new Error("Media object content does not match the declared type");
+  return { sizeBytes: size, contentType: mimeType };
+}
+
 export async function headMediaObject(objectKey: string) {
   validateObjectKey(objectKey);
   return getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: objectKey }));
