@@ -9,6 +9,8 @@ const WEB_SESSION_COOKIE = "twitok_user_session";
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
 
 export const authRouter = Router();
+const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const userWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
@@ -36,7 +38,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
-authRouter.post("/logout", requireUser, async (req, res) => {
+authRouter.post("/logout", requireUser, userWriteLimit, async (req, res) => {
   try {
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
     res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
@@ -62,7 +64,7 @@ authRouter.post("/change-password", requireUser, rateLimit({ windowMs: 15 * 60 *
   } catch { return res.status(400).json({ error: "Unable to change password" }); }
 });
 
-authRouter.get("/me", requireUser, async (req, res) => {
+authRouter.get("/me", requireUser, userReadLimit, async (req, res) => {
   try {
     const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     if (!user) return res.status(404).json({ error: "Account not found" });
@@ -70,7 +72,7 @@ authRouter.get("/me", requireUser, async (req, res) => {
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 });
 
-authRouter.patch("/profile-setup", requireUser, async (req, res) => {
+authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res) => {
   try {
     const username = String(req.body?.username ?? "").trim().toLowerCase(), nickname = String(req.body?.nickname ?? "").trim(), bio = String(req.body?.bio ?? "").trim(), isPrivate = Boolean(req.body?.isPrivate);
     if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Username must be 3-24 characters, use letters, numbers, dots or underscores, and not end with a dot" });
@@ -93,7 +95,7 @@ authRouter.patch("/profile-setup", requireUser, async (req, res) => {
   }
 });
 
-authRouter.patch("/comment-settings", requireUser, async (req, res) => {
+authRouter.patch("/comment-settings", requireUser, userWriteLimit, async (req, res) => {
   try {
     const settings = { allowComments: req.body?.allowComments !== false, filterAll: Boolean(req.body?.filterAll), filterSpam: req.body?.filterSpam !== false, filterKeywords: Array.isArray(req.body?.filterKeywords) ? [...new Set(req.body.filterKeywords.map((x: unknown) => String(x).trim().toLowerCase()).filter(Boolean))].slice(0, 100) : [] };
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $set: { commentSettings: settings, updatedAt: new Date() } });
