@@ -18,6 +18,8 @@ import { searchRouter } from "./search.js";
 import { playlistsRouter } from "./playlists.js";
 import { storiesRouter } from "./stories.js";
 import { promotionsRouter } from "./promotions.js";
+import { walletRouter } from "./wallet.js";
+import { paymentRoutingRouter } from "./payment-routing.js";
 
 export const apiRouter = Router();
 
@@ -40,3 +42,5 @@ apiRouter.use("/search", searchRouter);
 apiRouter.use("/playlists", playlistsRouter);
 apiRouter.use("/stories", storiesRouter);
 apiRouter.use("/promotions", promotionsRouter);
+apiRouter.use("/wallet", walletRouter);
+apiRouter.use("/payments", paymentRoutingRouter);

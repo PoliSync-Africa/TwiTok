@@ -23,10 +23,11 @@ moneyRouter.post("/internal/revenue/allocate", rateLimit({ windowMs: 60 * 1000, 
 
 moneyRouter.post("/withdrawals", requireUser, rateLimit({ windowMs: 60 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   try {
-    const { countryCode, type, amountUsd, destination } = req.body ?? {};
+    const { countryCode, type, amountUsd, exchangeRate, destination } = req.body ?? {};
     if (!countryCode || !type || !destination || typeof destination !== "object" || Array.isArray(destination)) return res.status(400).json({ error: "countryCode, type and destination are required" });
     if (!["BANK", "MOBILE_MONEY"].includes(String(type))) return res.status(400).json({ error: "Invalid withdrawal method" });
     if (!Number.isFinite(Number(amountUsd)) || Number(amountUsd) <= 0 || Number(amountUsd) > 100000) return res.status(400).json({ error: "Invalid withdrawal amount" });
+    if (!Number.isFinite(Number(exchangeRate)) || Number(exchangeRate) <= 0 || Number(exchangeRate) > 1000000) return res.status(400).json({ error: "Invalid exchange rate" });
     const idempotencyKey = String(req.header("Idempotency-Key") ?? randomUUID()).trim();
     if (!/^[A-Za-z0-9._:-]{16,100}$/.test(idempotencyKey)) return res.status(400).json({ error: "A valid Idempotency-Key is required" });
     const withdrawalId = randomUUID();
@@ -35,7 +36,7 @@ moneyRouter.post("/withdrawals", requireUser, rateLimit({ windowMs: 60 * 60 * 10
     if (existing) return res.status(200).json({ status: existing.status, currency: existing.payoutCurrency ?? "USD", idempotent: true });
     await createWithdrawal(db, {
       withdrawalId, userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
-      amountUsd: Number(amountUsd), destination, idempotencyKey
+      amountUsd: Number(amountUsd), exchangeRate: Number(exchangeRate), destination, idempotencyKey
     });
     return res.status(201).json({ status: "PENDING", currency: "USD" });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }

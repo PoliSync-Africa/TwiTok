@@ -7,6 +7,8 @@ import { getDb } from "./db/mongo.js";
 import { apiRouter } from "./routes/index.js";
 import { ensureOwnerAccount } from "./auth/owner.js";
 import { initializeMoneyIndexes } from "./money/ledger.js";
+import { initializeWalletIndexes } from "./money/wallet.js";
+import { initializeGiftIndexes } from "./money/gifts.js";
 import { initializeWithdrawalIndexes } from "./money/withdrawal.js";
 import { initializeCreatorIndexes } from "./creator/studio.js";
 import { initializeLiveIndexes } from "./live/service.js";
@@ -57,7 +59,7 @@ async function start() {
   if (process.env.MONGODB_URI) {
     const db = await getDb();
     await ensureOwnerAccount(db);
-    await initializeMoneyIndexes(db); await initializeWithdrawalIndexes(db); await initializeCreatorIndexes(db); await initializeLiveIndexes(db); await initializeSafetyIndexes(db); await initializeMonetizationIndexes(db); await ensureUserIndexes(db); await ensureFollowIndexes(db); await initializeVideoIndexes(db); await initializeVideoProcessingIndexes(db); await initializeFeedIndexes(db); await initializeEngagementIndexes(db); await initializeNotificationIndexes(db); await initializeSearchIndexes(db); await ensureSoundIndexes(db); await ensureTranscriptionIndexes(db); await ensureTranslationIndexes(db); await ensureStickerIndexes(db); await initializePlaylistIndexes(db); await initializeStoryIndexes(db); await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
+    await initializeMoneyIndexes(db); await initializeWalletIndexes(db); await initializeGiftIndexes(db); await initializeWithdrawalIndexes(db); await initializeCreatorIndexes(db); await initializeLiveIndexes(db); await initializeSafetyIndexes(db); await initializeMonetizationIndexes(db); await ensureUserIndexes(db); await ensureFollowIndexes(db); await initializeVideoIndexes(db); await initializeVideoProcessingIndexes(db); await initializeFeedIndexes(db); await initializeEngagementIndexes(db); await initializeNotificationIndexes(db); await initializeSearchIndexes(db); await ensureSoundIndexes(db); await ensureTranscriptionIndexes(db); await ensureTranslationIndexes(db); await ensureStickerIndexes(db); await initializePlaylistIndexes(db); await initializeStoryIndexes(db); await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
   } else console.warn("MONGODB_URI is not configured. Database features are disabled.");
   httpServer.listen(port, () => console.log(`TwiTok API listening on port ${port}`));
 }
