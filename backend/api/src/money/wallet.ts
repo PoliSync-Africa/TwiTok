@@ -19,6 +19,8 @@ export async function initializeWalletIndexes(db: Db) {
     db.collection("wallet_ledger").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("iap_transactions").createIndex({ providerTransactionId: 1 }, { unique: true }),
     db.collection("iap_transactions").createIndex({ userId: 1, createdAt: -1 }),
+    db.collection("revenuecat_webhook_events").createIndex({ eventId: 1 }, { unique: true }),
+    db.collection("revenuecat_webhook_events").createIndex({ transactionId: 1, createdAt: -1 }),
     db.collection("coin_purchases").createIndex({ reference: 1 }, { unique: true }),
     db.collection("coin_purchases").createIndex({ userId: 1, createdAt: -1 })
   ]);
