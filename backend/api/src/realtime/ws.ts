@@ -1,16 +1,26 @@
 import { WebSocketServer, type WebSocket } from "ws";
+import { getDb } from "../db/mongo.js";
 import { verifyUserToken } from "../auth/user.js";
 
 type Client = { socket: WebSocket; userId: string };
 const clients = new Map<string, Set<WebSocket>>();
 const authAttempts = new WeakMap<WebSocket, number>();
 
+function allowedOrigins() {
+  return (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean);
+}
+function originAllowed(origin?: string) {
+  const allowed = allowedOrigins();
+  if (!origin) return true; // native mobile clients may omit Origin
+  return allowed.length > 0 && allowed.includes(origin);
+}
+
 function addClient(userId: string, socket: WebSocket) {
   const set = clients.get(userId) ?? new Set<WebSocket>();
   if (set.size >= 3) {
     const oldest = set.values().next().value as WebSocket | undefined;
     oldest?.close(1008, "Connection limit reached");
-    set.delete(oldest as WebSocket);
+    if (oldest) set.delete(oldest);
   }
   set.add(socket); clients.set(userId, set);
 }
@@ -25,11 +35,12 @@ export function broadcastToUser(userId: string, payload: unknown) {
 }
 export function attachRealtime(server: import("node:http").Server) {
   const wss = new WebSocketServer({ server, path: "/realtime", maxPayload: 64 * 1024, perMessageDeflate: false });
-  wss.on("connection", socket => {
+  wss.on("connection", async (socket, request) => {
+    if (!originAllowed(request.headers.origin)) { socket.close(1008, "Origin not allowed"); return; }
     let client: Client | null = null, authenticated = false;
     const timeout = setTimeout(() => { if (!authenticated) socket.close(1008, "Authentication timeout"); }, 10000);
     const heartbeat = setInterval(() => { if (socket.readyState === socket.OPEN) socket.ping(); }, 30000);
-    socket.on("message", raw => {
+    socket.on("message", async raw => {
       if (raw.length > 64 * 1024) return socket.close(1009, "Message too large");
       try {
         const message = JSON.parse(raw.toString());
@@ -37,6 +48,9 @@ export function attachRealtime(server: import("node:http").Server) {
         const attempts = (authAttempts.get(socket) ?? 0) + 1; authAttempts.set(socket, attempts);
         if (attempts > 3) return socket.close(1008, "Too many authentication attempts");
         const token = verifyUserToken(message.token);
+        const db = await getDb();
+        const user = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(token.sub), status: "ACTIVE" }, { projection: { _id: 1 } });
+        if (!user) return socket.close(1008, "Account unavailable");
         if (client) removeClient(client.userId, socket);
         client = { socket, userId: token.sub }; authenticated = true; clearTimeout(timeout);
         addClient(client.userId, socket); socket.send(JSON.stringify({ type: "ready" }));
