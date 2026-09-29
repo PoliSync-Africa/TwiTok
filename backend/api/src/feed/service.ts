@@ -168,7 +168,21 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       { $match: { $expr: { $and: [
         { $eq: ["$videoId", "$videoId"] },
         { $eq: ["$status", "ACTIVE"] },
-        { $lt: ["$spentMinor", "$budgetMinor"] }
+        { $lt: ["$spentMinor", "$budgetMinor"] },
+        { $or: [
+          { $eq: [{ $size: { $ifNull: ["$target.countryCodes", []] } }, 0] },
+          { $in: [String(countryCode ?? "").toUpperCase(), { $ifNull: ["$target.countryCodes", []] }] }
+        ] },
+        { $or: [
+          { $eq: [{ $size: { $ifNull: ["$target.interests", []] } }, 0] },
+          { $gt: [
+            { $size: { $setIntersection: [
+              { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$tag" } } },
+              { $ifNull: ["$target.interests", []] }
+            ] } },
+            0
+          ] }
+        ] }
       ] } } },
       { $project: { _id: 1, objective: 1, budgetMinor: 1, spentMinor: 1 } },
       { $limit: 1 }
