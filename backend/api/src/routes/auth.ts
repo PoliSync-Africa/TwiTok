@@ -37,6 +37,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
 authRouter.post("/logout", requireUser, async (req, res) => {
   try {
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
+    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     return res.status(204).send();
   } catch { return res.status(500).json({ error: "Unable to end session" }); }
 });
