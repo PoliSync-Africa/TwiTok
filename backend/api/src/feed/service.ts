@@ -53,7 +53,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $match: query },
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
       { $match: { userId } },
-      { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
+      { $match: { $expr: { $eq: ["$videoId", "$" + "$videoId"] } } },
       { $group: { _id: null,
         eventScore: { $sum: { $switch: {
           branches: [
