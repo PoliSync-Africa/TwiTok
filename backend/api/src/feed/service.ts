@@ -115,6 +115,8 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
+    { $lookup: { from: "video_sounds", localField: "_id", foreignField: "videoId", as: "_soundLink" } },
+    { $addFields: { _soundId: { $arrayElemAt: ["$_soundLink.soundId", 0] } } },
     { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
     { $addFields: {
       engagement: {
@@ -151,7 +153,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const soundCounts = new Map<string, number>();
   for (const video of videos) {
     const creatorId = video.ownerId?.toHexString?.() ?? String(video.ownerId ?? "unknown");
-    const soundId = video.soundId?.toHexString?.() ?? String(video.soundId ?? "");
+    const soundId = video._soundId?.toHexString?.() ?? String(video._soundId ?? "");
     const creatorCount = creatorCounts.get(creatorId) ?? 0;
     const soundCount = soundId ? (soundCounts.get(soundId) ?? 0) : 0;
     if (creatorCount >= 2) continue;
