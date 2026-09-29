@@ -7,8 +7,9 @@ import { getFeed, recordFeedEvent } from "../feed/service.js";
 
 export const feedRouter = Router();
 const feedEventLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const feedReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-feedRouter.get("/:surface", requireUser, async (req, res) => {
+feedRouter.get("/:surface", requireUser, feedReadLimit, async (req, res) => {
   try {
     const surface = String(req.params.surface).toUpperCase() as "FOR_YOU" | "FOLLOWING" | "AFRICA";
     if (!["FOR_YOU","FOLLOWING","AFRICA"].includes(surface)) return res.status(400).json({ error: "Invalid feed surface" });
