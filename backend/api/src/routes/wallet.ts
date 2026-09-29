@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
 import { giftCatalogForCountry, GIFT_CATALOG, sendGift } from "../money/gifts.js";
@@ -113,7 +114,7 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
     const refundEvents = new Set(["CANCELLATION"]);
     const db = await getDb();
-    const account = await db.collection("users").findOne({ _id: (() => { try { return new (require("mongodb").ObjectId)(userId); } catch { return null; } })() }, { projection: { _id: 1 } });
+    const account = ObjectId.isValid(userId) ? await db.collection("users").findOne({ _id: new ObjectId(userId) }, { projection: { _id: 1 } }) : null;
     if (!account) return res.status(404).json({ error: "RevenueCat App User is not a TwiTok account" });
 
     if (purchaseEvents.has(eventType)) {
