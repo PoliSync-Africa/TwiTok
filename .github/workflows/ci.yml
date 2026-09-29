@@ -16,11 +16,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/api/package.json
       - run: npm install
-      - run: npm audit --audit-level=high
       - run: npm audit --audit-level=high
       - run: npm run test:types
       - run: npm run build
@@ -34,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/admin/package.json
       - run: npm install
@@ -51,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/web/package.json
       - run: npm install
@@ -69,7 +68,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/mobile/package.json
       - run: npm install
