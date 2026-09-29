@@ -71,3 +71,89 @@ grossUsd: input.grossUsd ?? null, netProceedsUsd, status: "CREDITED", settlement
   } finally { await session.endSession(); }
   return { duplicate: false, wallet: await ensureWallet(db, input.userId) };
 }
+
+
+export async function recordPurchasedCoinRefund(db: Db, input: {
+  providerTransactionId: string;
+  refundEventId: string;
+  refundNetProceedsUsd: number;
+  refundGrossUsd?: number;
+}) {
+  if (!input.providerTransactionId || !input.refundEventId) throw new Error("Refund identifiers are required");
+  if (!Number.isFinite(input.refundNetProceedsUsd) || input.refundNetProceedsUsd < 0) throw new Error("Invalid refund net proceeds");
+
+  const session = db.client?.startSession();
+  if (!session) throw new Error("MongoDB session unavailable");
+  const now = new Date();
+
+  try {
+    return await session.withTransaction(async () => {
+      const iap = await db.collection("iap_transactions").findOne(
+        { providerTransactionId: input.providerTransactionId },
+        { session }
+      );
+      if (!iap) throw new Error("Original Coin purchase not found");
+      if (iap.status === "REFUNDED" && iap.refundEventId === input.refundEventId) {
+        return { duplicate: true, userId: String(iap.userId), adjustedUnallocatedUsd: 0, refundLiabilityUsd: Number(iap.refundLiabilityUsd ?? 0) };
+      }
+
+      const userId = String(iap.userId);
+      await ensureWallet(db, userId, session);
+      const wallet = await db.collection("wallets").findOne({ userId }, { session });
+      const unallocated = Number(wallet?.unallocatedNetProceedsUsd ?? 0);
+      if (!Number.isFinite(unallocated) || unallocated < 0) throw new Error("Invalid Coin funding ledger");
+
+      const adjustedUnallocatedUsd = Number(Math.min(unallocated, input.refundNetProceedsUsd).toFixed(8));
+      const refundLiabilityUsd = Number(Math.max(0, input.refundNetProceedsUsd - adjustedUnallocatedUsd).toFixed(8));
+
+      if (adjustedUnallocatedUsd > 0) {
+        await db.collection("wallets").updateOne(
+          { userId },
+          { $inc: { unallocatedNetProceedsUsd: -adjustedUnallocatedUsd }, $set: { updatedAt: now } },
+          { session }
+        );
+      }
+      if (refundLiabilityUsd > 0) {
+        await db.collection("wallets").updateOne(
+          { userId },
+          { $inc: { refundLiabilityUsd: refundLiabilityUsd }, $set: { updatedAt: now } },
+          { session }
+        );
+      }
+
+      await db.collection("iap_transactions").updateOne(
+        { providerTransactionId: input.providerTransactionId },
+        {
+          $set: {
+            status: "REFUNDED",
+            settlementStatus: "REFUNDED",
+            refundedAt: now,
+            refundEventId: input.refundEventId,
+            refundGrossUsd: input.refundGrossUsd ?? null,
+            refundNetProceedsUsd: input.refundNetProceedsUsd,
+            refundLiabilityUsd
+          }
+        },
+        { session }
+      );
+
+      await db.collection("wallet_ledger").insertOne({
+        transactionId: randomUUID(),
+        userId,
+        type: "COIN_PURCHASE_REFUND",
+        coinsDelta: 0,
+        diamondsDelta: 0,
+        cashDeltaUsd: -input.refundNetProceedsUsd,
+        referenceId: input.providerTransactionId,
+        refundEventId: input.refundEventId,
+        adjustedUnallocatedUsd,
+        refundLiabilityUsd,
+        createdAt: now
+      }, { session });
+
+      return { duplicate: false, userId, adjustedUnallocatedUsd, refundLiabilityUsd };
+    });
+  } finally {
+    await session.endSession();
+  }
+}
