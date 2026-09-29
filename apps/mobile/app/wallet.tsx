@@ -89,7 +89,7 @@ export default function WalletScreen() {
   async function buyCoins(){
     try{
       const packages=await getCoinPackages();
-      const matched=packages.filter(pkg=>coinPackages.some(p=>p.sku===pkg.identifier || pkg.identifier.includes(p.sku) || p.sku.includes(pkg.identifier)));
+      const matched=packages.filter(pkg=>coinPackages.some(p=>p.sku===pkg.product.identifier));
       if(!matched.length){
         Alert.alert("Coin purchases","RevenueCat has no configured TwiTok Coin products for this build yet. Configure the five approved SKUs in RevenueCat/App Store/Google Play first.");
         return;
@@ -138,7 +138,7 @@ export default function WalletScreen() {
         <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Buy TwiTok Coins</Text><Pressable disabled={purchasing} onPress={()=>setShowCoinPicker(false)}><Text style={styles.close}>×</Text></Pressable></View>
         <Text style={styles.sheetHint}>Choose a Coin package. Payment is processed by the App Store or Google Play.</Text>
         {rcPackages.map(pkg=>{
-          const match=coinPackages.find(p=>p.sku===pkg.identifier || pkg.identifier.includes(p.sku) || p.sku.includes(pkg.identifier));
+          const match=coinPackages.find(p=>p.sku===pkg.product.identifier);
           if(!match) return null;
           return <Pressable key={pkg.identifier} disabled={purchasing} style={styles.coinOption} onPress={()=>void purchaseSelectedCoinPackage(pkg)}>
             <View><Text style={styles.coinAmount}>{match.coins.toLocaleString()} Coins</Text><Text style={styles.coinSku}>{match.sku}</Text></View>
