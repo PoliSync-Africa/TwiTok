@@ -56,6 +56,11 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
       { $group: { _id: null, count: { $sum: 1 }, totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }, latest: { $max: "$createdAt" } } }
     ], as: "viewerEvents" } },
+    { $lookup: { from: "video_likes", localField: "_id", foreignField: "videoId", as: "_likes" } },
+    { $lookup: { from: "video_comments", localField: "_id", foreignField: "videoId", as: "_comments" } },
+    { $lookup: { from: "video_shares", localField: "_id", foreignField: "videoId", as: "_shares" } },
+    { $lookup: { from: "video_saves", localField: "_id", foreignField: "videoId", as: "_saves" } },
+    { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
     { $addFields: {
       _engagement: { $add: [
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.count", 0] }, 0] }, 0.5] },
@@ -63,11 +68,6 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
-    { $lookup: { from: "video_likes", localField: "_id", foreignField: "videoId", as: "_likes" } },
-    { $lookup: { from: "video_comments", localField: "_id", foreignField: "videoId", as: "_comments" } },
-    { $lookup: { from: "video_shares", localField: "_id", foreignField: "videoId", as: "_shares" } },
-    { $lookup: { from: "video_saves", localField: "_id", foreignField: "videoId", as: "_saves" } },
-    { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
     { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
     { $addFields: {
       engagement: {
