@@ -14,6 +14,7 @@ export async function requireOwner(req: Request, res: Response, next: NextFuncti
     const db = await getDb();
     const owner = await db.collection("owner_accounts").findOne({ _id: new ObjectId(claims.sub), role: "OWNER", isActive: true });
     if (!owner) return res.status(401).json({ error: "Administrator session unavailable" });
+    if (owner.mfaRequired && claims.mfaVerified !== true) return res.status(401).json({ error: "Administrator MFA verification required" });
     req.ownerId = claims.sub; next();
   } catch { res.status(401).json({ error: "Administrator session expired" }); }
 }
