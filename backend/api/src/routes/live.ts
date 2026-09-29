@@ -23,7 +23,7 @@ liveRouter.post("/streams/:streamId/status", requireUser, async (req, res) => {
     if (!stream) return res.status(404).json({ error: "LIVE stream not found" });
     if (String(stream.hostUserId) !== req.userId!.toHexString()) return res.status(403).json({ error: "Only the host can change this stream status" });
     const status = req.body?.status;
-    if (!["LIVE","ENDED","SUSPENDED"].includes(status)) return res.status(400).json({ error: "Invalid LIVE status" });
+    if (!["LIVE","ENDED"].includes(status)) return res.status(400).json({ error: "Hosts may only start or end their LIVE stream" });
     return res.json(await setLiveStatus(db, streamId, status));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE status update failed" }); }
 });
