@@ -39,8 +39,12 @@ const allowedOrigins = (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB
 if (!allowedOrigins.length) throw new Error("ALLOWED_WEB_ORIGINS or ADMIN_WEB_ORIGIN must be configured");
 app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error("CORS origin denied")), credentials: true }));
 app.use((req, res, next) => {
+  const stateChanging = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  if (!stateChanging) return next();
+  const origin = req.get("Origin");
+  if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: "Origin not allowed" });
   const site = req.get("Sec-Fetch-Site");
-  if (site === "cross-site" && !["GET", "HEAD", "OPTIONS"].includes(req.method)) return res.status(403).json({ error: "Cross-site state-changing request blocked" });
+  if (site === "cross-site") return res.status(403).json({ error: "Cross-site state-changing request blocked" });
   next();
 });
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
