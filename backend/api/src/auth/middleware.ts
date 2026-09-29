@@ -14,7 +14,9 @@ declare global {
 
 export async function requireUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const header = req.headers.authorization;\n    const cookie = req.headers.cookie?.split(";").map(v => v.trim()).find(v => v.startsWith("twitok_session="));\n    const cookieToken = cookie ? decodeURIComponent(cookie.slice("twitok_session=".length)) : undefined;
+    const header = req.headers.authorization;
+    const cookie = req.headers.cookie?.split(";").map(v => v.trim()).find(v => v.startsWith("twitok_session="));
+    const cookieToken = cookie ? decodeURIComponent(cookie.slice("twitok_session=".length)) : undefined;
     if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Authorization required" });
     const token = verifyUserToken(header.slice(7));
     const userId = new ObjectId(token.sub);
