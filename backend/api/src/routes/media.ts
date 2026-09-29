@@ -13,32 +13,27 @@ mediaRouter.post("/upload-url", requireUser, async (req, res) => {
   try {
     const objectKey = String(req.body?.objectKey ?? "");
     const mimeType = String(req.body?.mimeType ?? "");
-    if (!objectKey || !mimeType) return res.status(400).json({ error: "objectKey and mimeType are required" });
-
-    const owned = await (await getDb()).collection("video_uploads").findOne({
-      userId: req.userId,
-      objectKey
-    });
-    if (!owned) return res.status(404).json({ error: "Upload object not found" });
-
+    const userPrefix = `videos/${req.userId!.toHexString()}/`;
+    const allowedPrefixes = [userPrefix, `photos/${req.userId!.toHexString()}/`, `remixes/${req.userId!.toHexString()}/`, `profile-photos/${req.userId!.toHexString()}/`, `comment-media/${req.userId!.toHexString()}/`];
+    if (!objectKey || !allowedPrefixes.some(prefix => objectKey.startsWith(prefix))) return res.status(403).json({ error: "Media object is not owned by this account" });
+    if (!mimeType) return res.status(400).json({ error: "mimeType is required" });
+    const db = await getDb();
+    const owned = await db.collection("video_uploads").findOne({ userId: req.userId, objectKey });
+    const photo = await db.collection("photo_uploads").findOne({ userId: req.userId, objectKey });
+    if (!owned && !photo && !objectKey.startsWith("comment-media/") && !objectKey.startsWith("profile-photos/")) return res.status(404).json({ error: "Upload object not found" });
     const result = await createPresignedUpload({ objectKey, mimeType });
     res.json(result);
-  } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign upload" });
-  }
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign upload" }); }
 });
 
 mediaRouter.get("/playback/:videoId", requireUser, async (req, res) => {
   try {
-    const video = await (await getDb()).collection("videos").findOne({ _id: new (await import("mongodb")).ObjectId(String(req.params.videoId)) });
+    const { ObjectId } = await import("mongodb");
+    if (!ObjectId.isValid(String(req.params.videoId))) return res.status(400).json({ error: "Invalid video id" });
+    const video = await (await getDb()).collection("videos").findOne({ _id: new ObjectId(String(req.params.videoId)) });
     if (!video || video.status !== "PUBLISHED") return res.status(404).json({ error: "Video not found" });
-
     if (video.playback?.hlsUrl) return res.json({ url: video.playback.hlsUrl, type: "HLS" });
-    if (video.playback?.objectKey) {
-      return res.json(await createPresignedPlayback(video.playback.objectKey));
-    }
+    if (video.playback?.objectKey) return res.json(await createPresignedPlayback(video.playback.objectKey));
     return res.status(404).json({ error: "Playback asset is not ready" });
-  } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create playback URL" });
-  }
+  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create playback URL" }); }
 });
