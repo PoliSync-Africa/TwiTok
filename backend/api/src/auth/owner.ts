@@ -14,7 +14,7 @@ export interface OwnerAccount {
   updatedAt: Date;
 }
 
-type StoredOwnerAccount = OwnerAccount & { _id: InstanceType<typeof ObjectId> };
+type StoredOwnerAccount = OwnerAccount & { _id: ObjectId };
 
 const JWT_SECRET = () => {
   const secret = process.env.OWNER_SESSION_SECRET;
