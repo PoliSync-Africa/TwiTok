@@ -52,6 +52,40 @@ export default function PromoteScreen() {
     finally { setBusy(false); }
   }
 
+  async function verifyPayment() {
+    if (!reference) return Alert.alert("Payment", "No payment reference is waiting for verification.");
+    setBusy(true);
+    try {
+      await request("/promotions/payments/verify", { method: "POST", body: JSON.stringify({ reference }) });
+      Alert.alert("Payment confirmed", "Your promotion is now paid. Start the campaign when you are ready.");
+      setReference("");
+      await loadCampaigns();
+    } catch (e) {
+      Alert.alert("Payment", e instanceof Error ? e.message : "Payment is not confirmed yet.");
+    } finally { setBusy(false); }
+  }
+
+  async function startCampaign(id: string) {
+    setBusy(true);
+    try {
+      await request("/promotions/" + id + "/start", { method: "POST" });
+      await loadCampaigns();
+      Alert.alert("Promotion active", "Your campaign is now running.");
+    } catch (e) {
+      Alert.alert("Promotion", e instanceof Error ? e.message : "Unable to start campaign");
+    } finally { setBusy(false); }
+  }
+
+  async function pauseCampaign(id: string) {
+    setBusy(true);
+    try {
+      await request("/promotions/" + id + "/pause", { method: "POST" });
+      await loadCampaigns();
+    } catch (e) {
+      Alert.alert("Promotion", e instanceof Error ? e.message : "Unable to pause campaign");
+    } finally { setBusy(false); }
+  }
+
   return <ScrollView contentContainerStyle={styles.container}>
     <Text style={styles.title}>Promote on TwiTok 🚀</Text>
     <Text style={styles.subtitle}>Pay TwiTok to give your real video more opportunities to reach relevant viewers.</Text>
