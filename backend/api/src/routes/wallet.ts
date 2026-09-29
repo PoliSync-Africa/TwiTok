@@ -113,6 +113,18 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
     const refundEvents = new Set(["CANCELLATION"]);
     const db = await getDb();
+    const account = await db.collection("users").findOne({ _id: (() => { try { return new (require("mongodb").ObjectId)(userId); } catch { return null; } })() }, { projection: { _id: 1 } });
+    if (!account) return res.status(404).json({ error: "RevenueCat App User is not a TwiTok account" });
+
+    if (purchaseEvents.has(eventType)) {
+      const grossUsd = Number(event?.price);
+      const taxPct = Number(event?.tax_percentage ?? 0);
+      const commissionPct = Number(event?.commission_percentage ?? 0);
+      if (!Number.isFinite(grossUsd) || grossUsd <= 0) return res.status(400).json({ error: "RevenueCat purchase price is invalid" });
+      if (!Number.isFinite(taxPct) || taxPct < 0 || taxPct > 1 || !Number.isFinite(commissionPct) || commissionPct < 0 || commissionPct > 1) {
+        return res.status(400).json({ error: "RevenueCat tax or commission percentage is invalid" });
+      }
+    }
 
     try {
       await db.collection("revenuecat_webhook_events").insertOne({
@@ -129,13 +141,6 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
       const grossUsd = Number(event?.price);
       const taxPct = Number(event?.tax_percentage ?? 0);
       const commissionPct = Number(event?.commission_percentage ?? 0);
-
-      if (!Number.isFinite(grossUsd) || grossUsd <= 0) {
-        return res.status(400).json({ error: "RevenueCat purchase price is invalid" });
-      }
-      if (!Number.isFinite(taxPct) || taxPct < 0 || taxPct > 1 || !Number.isFinite(commissionPct) || commissionPct < 0 || commissionPct > 1) {
-        return res.status(400).json({ error: "RevenueCat tax or commission percentage is invalid" });
-      }
 
       const netProceedsUsd = Number((grossUsd * (1 - taxPct - commissionPct)).toFixed(8));
       const result = await creditPurchasedCoins(db, {
