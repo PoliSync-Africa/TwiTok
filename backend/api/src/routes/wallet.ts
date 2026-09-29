@@ -127,17 +127,6 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
       }
     }
 
-    try {
-      await db.collection("revenuecat_webhook_events").insertOne({
-        eventId, eventType, userId, transactionId, productId, store,
-        createdAt: new Date(),
-        payload: req.body
-      });
-    } catch (error) {
-      if ((error as { code?: number })?.code === 11000) return res.status(200).json({ ok: true, duplicate: true });
-      throw error;
-    }
-
     if (purchaseEvents.has(eventType)) {
       const grossUsd = Number(event?.price);
       const taxPct = Number(event?.tax_percentage ?? 0);
@@ -153,6 +142,14 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
         grossUsd,
         netProceedsUsd
       });
+      try {
+        await db.collection("revenuecat_webhook_events").insertOne({
+          eventId, eventType, userId, transactionId, productId, store,
+          createdAt: new Date()
+        });
+      } catch (error) {
+        if ((error as { code?: number })?.code !== 11000) throw error;
+      }
       return res.status(200).json({ ok: true, duplicate: result.duplicate });
     }
 
@@ -161,9 +158,25 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
         { providerTransactionId: "REVENUECAT:" + store + ":" + transactionId },
         { $set: { status: "REFUNDED", settlementStatus: "REFUNDED", refundedAt: new Date(), refundEventId: eventId } }
       );
+      try {
+        await db.collection("revenuecat_webhook_events").insertOne({
+          eventId, eventType, userId, transactionId, productId, store,
+          createdAt: new Date()
+        });
+      } catch (error) {
+        if ((error as { code?: number })?.code !== 11000) throw error;
+      }
       return res.status(200).json({ ok: true, refunded: true });
     }
 
+    try {
+      await db.collection("revenuecat_webhook_events").insertOne({
+        eventId, eventType, userId, transactionId, productId, store,
+        createdAt: new Date()
+      });
+    } catch (error) {
+      if ((error as { code?: number })?.code !== 11000) throw error;
+    }
     return res.status(200).json({ ok: true, ignored: true, eventType });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" });
