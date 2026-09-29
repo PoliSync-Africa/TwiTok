@@ -28,7 +28,8 @@ export async function initializeWalletIndexes(db: Db) {
     db.collection("coin_funding_lots").createIndex({ userId: 1, status: 1, createdAt: 1 }),
     db.collection("gift_coin_allocations").createIndex({ giftTransactionId: 1, providerTransactionId: 1 }, { unique: true }),
     db.collection("gift_coin_allocations").createIndex({ providerTransactionId: 1, createdAt: 1 }),
-    db.collection("platform_refund_ledger").createIndex({ refundEventId: 1 }, { unique: true }),
+    db.collection("platform_refund_ledger").createIndex({ transactionId: 1 }, { unique: true }),
+    db.collection("platform_refund_ledger").createIndex({ refundEventId: 1, giftTransactionId: 1 }, { unique: true }),
     db.collection("platform_refund_ledger").createIndex({ providerTransactionId: 1, createdAt: -1 })
   ]);
 }
