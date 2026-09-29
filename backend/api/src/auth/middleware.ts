@@ -36,3 +36,23 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
     res.status(401).json({ error: "Invalid or expired session" });
   }
 }
+
+
+export async function requireAdultUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const header = req.headers.authorization;
+    const tokenValue = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
+    if (!tokenValue) return res.status(401).json({ error: "Authorization required" });
+    const claims = verifyUserToken(tokenValue);
+    const userId = new ObjectId(claims.sub);
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ _id: userId }, { projection: { status: 1, sessionVersion: 1, dateOfBirth: 1 } });
+    if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
+    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
+    const dob = user.dateOfBirth ? new Date(user.dateOfBirth) : null;
+    if (!dob || Number.isNaN(dob.getTime())) return res.status(403).json({ error: "Date of birth is required for Coin, Gift and Cash-out features" });
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
+    if (dob > cutoff) return res.status(403).json({ error: "This wallet feature requires an adult account" });
+    req.userId = userId; req.userToken = claims; next();
+  } catch { res.status(401).json({ error: "Invalid or expired session" }); }
+}
