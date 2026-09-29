@@ -18,6 +18,10 @@ export async function getDb(): Promise<Db> {
   await db.collection("owner_accounts").createIndex({ email: 1 }, { unique: true });
   await db.collection("admin_sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection("audit_logs").createIndex({ createdAt: -1 });
+  await db.collection("promotion_campaigns").createIndex({ ownerId: 1, createdAt: -1 });
+  await db.collection("promotion_campaigns").createIndex({ status: 1, startAt: 1, endAt: 1 });
+  await db.collection("promotion_payments").createIndex({ reference: 1 }, { unique: true });
+  await db.collection("promotion_payments").createIndex({ userId: 1, createdAt: -1 });
 
   return db;
 }
