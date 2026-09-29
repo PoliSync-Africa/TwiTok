@@ -21,7 +21,10 @@ export default function WalletScreen() {
   const [name,setName]=useState("");
   const [account,setAccount]=useState("");
   const [code,setCode]=useState("");
-  const [providers,setProviders]=useState<{name:string;code:string;active:boolean}[]>([]);
+  const [providers,setProviders]=useState<{name:string;code:string;active?:boolean}[]>([]);
+  const [payoutProvider,setPayoutProvider]=useState<"PAYSTACK"|"FLUTTERWAVE"|"">("");
+  const [countryCode,setCountryCode]=useState("");
+  const [payoutCurrency,setPayoutCurrency]=useState("");
   const [providersLoading,setProvidersLoading]=useState(false);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
@@ -56,8 +59,27 @@ export default function WalletScreen() {
   async function loadProviders(nextType:"BANK"|"MOBILE_MONEY"){
     const token=await getAuthToken(); if(!token)return;
     setProvidersLoading(true);
-    try{const q=nextType==="MOBILE_MONEY"?"mobile_money":"bank";const r=await fetch(API+"/wallet/payout/ghana/options?type="+q,{headers:{Authorization:"Bearer "+token}});const d=await r.json().catch(()=>({}));if(r.ok){const list=(d.providers??[]).filter((p:any)=>p.active!==false);setProviders(list);if(list.length&&!list.some((p:any)=>p.code===code))setCode(list[0].code);}}
-    finally{setProvidersLoading(false);}
+    try{
+      const opts=await fetch(API+"/payments/options",{headers:{Authorization:"Bearer "+token}});
+      const options=await opts.json().catch(()=>({}));
+      const cc=String(options.countryCode??"").toUpperCase();
+      setCountryCode(cc); setPayoutCurrency(String(options.providers?.[0]?.currency??""));
+      const payoutProviders=(options.payoutProviders??[]) as string[];
+      const preferred=(payoutProvider && payoutProviders.includes(payoutProvider)) ? payoutProvider : (payoutProviders[0] as "PAYSTACK"|"FLUTTERWAVE"|undefined);
+      if(preferred) setPayoutProvider(preferred);
+      let list:any[]=[];
+      if(preferred==="FLUTTERWAVE"){
+        const r=await fetch(API+"/wallet/payout/flutterwave/options?type="+nextType,{headers:{Authorization:"Bearer "+token}});
+        const d=await r.json().catch(()=>({})); list=d.providers??[];
+      }else if(preferred==="PAYSTACK" && cc==="GH"){
+        const q=nextType==="MOBILE_MONEY"?"mobile_money":"bank";
+        const r=await fetch(API+"/wallet/payout/ghana/options?type="+q,{headers:{Authorization:"Bearer "+token}});
+        const d=await r.json().catch(()=>({})); list=d.providers??[];
+      }
+      list=list.filter((p:any)=>p.active!==false);
+      setProviders(list);
+      if(list.length&&!list.some((p:any)=>p.code===code))setCode(String(list[0].code??""));
+    } finally{setProvidersLoading(false);}
   }
   useEffect(()=>{void load();},[]);
   useEffect(()=>{void loadProviders(type);},[type]);
@@ -97,7 +119,7 @@ export default function WalletScreen() {
     if(!name.trim()||!account.trim()||!code.trim()){Alert.alert("Payout details","Choose your provider and complete all payout fields.");return;}
     setBusy(true);
     try{
-      const r=await fetch(API+"/wallet/withdrawals",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"Idempotency-Key":String(Date.now())+"-"+Math.random().toString(36).slice(2)},body:JSON.stringify({countryCode:"GH",type,amountUsd:value,destination:{name:name.trim(),accountNumber:account.trim(),bankCode:code.trim(),providerCode:code.trim(),currency:"GHS"}})});
+      const r=await fetch(API+"/wallet/withdrawals",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"Idempotency-Key":String(Date.now())+"-"+Math.random().toString(36).slice(2)},body:JSON.stringify({countryCode,type,amountUsd:value,provider:payoutProvider,destination:{name:name.trim(),accountNumber:account.trim(),bankCode:code.trim(),providerCode:code.trim(),currency:payoutCurrency}})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Withdrawal failed");
       Alert.alert("Withdrawal submitted","Your payout request is now "+String(d.status??"pending").toLowerCase()+".");
@@ -146,7 +168,7 @@ export default function WalletScreen() {
         <View style={styles.switchRow}><Pressable onPress={()=>setType("MOBILE_MONEY")} style={[styles.switch,type==="MOBILE_MONEY"&&styles.switchActive]}><Text style={styles.switchText}>Mobile Money</Text></Pressable><Pressable onPress={()=>setType("BANK")} style={[styles.switch,type==="BANK"&&styles.switchActive]}><Text style={styles.switchText}>Bank</Text></Pressable></View>
         <Field placeholder="Account name" value={name} onChangeText={setName}/>
         <Field placeholder={type==="MOBILE_MONEY"?"MoMo number":"Bank account number"} value={account} onChangeText={setAccount} keyboardType="phone-pad"/>
-        <Text style={styles.providerLabel}>{type==="MOBILE_MONEY"?"Mobile Money provider":"Bank"}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{providersLoading?<ActivityIndicator color="#fff"/>:providers.map(p=><Pressable key={p.code} onPress={()=>setCode(p.code)} style={[styles.provider,code===p.code&&styles.providerActive]}><Text style={styles.providerText}>{p.name}</Text></Pressable>)}</ScrollView><Field placeholder={type==="MOBILE_MONEY"?"Provider code":"Bank code"} value={code} editable={false} onChangeText={setCode}/>
+        <Text style={styles.providerLabel}>Country: {countryCode || "—"} · Currency: {payoutCurrency || "—"}</Text><Text style={styles.providerLabel}>Payout provider</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{(["PAYSTACK","FLUTTERWAVE"] as const).filter(p=>payoutProvider===p || p==="FLUTTERWAVE" || (p==="PAYSTACK"&&countryCode==="GH")).map(p=><Pressable key={p} onPress={()=>{setPayoutProvider(p);setCode("");void loadProviders(type)}} style={[styles.provider, payoutProvider===p&&styles.providerActive]}><Text style={styles.providerText}>{p}</Text></Pressable>)}</ScrollView><Text style={styles.providerLabel}>{type==="MOBILE_MONEY"?"Mobile Money provider":"Bank"}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerRow}>{providersLoading?<ActivityIndicator color="#fff"/>:providers.map(p=><Pressable key={p.code} onPress={()=>setCode(p.code)} style={[styles.provider,code===p.code&&styles.providerActive]}><Text style={styles.providerText}>{p.name}</Text></Pressable>)}</ScrollView><Field placeholder={type==="MOBILE_MONEY"?"Provider code":"Bank code"} value={code} editable={false} onChangeText={setCode}/>
         <Field placeholder="Amount in USD (minimum $10)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad"/>
         <Pressable disabled={busy} onPress={()=>void withdraw()} style={styles.withdraw}><Text style={styles.withdrawText}>{busy?"Submitting…":"Withdraw earnings"}</Text></Pressable>
       </Section>
