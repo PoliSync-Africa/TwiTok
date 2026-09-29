@@ -1,4 +1,4 @@
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocketServer, type WebSocket, type RawData } from "ws";
 import { getDb } from "../db/mongo.js";
 import { verifyUserToken } from "../auth/user.js";
 
@@ -65,13 +65,14 @@ export function attachRealtime(server: import("node:http").Server) {
       const window = messageWindows.get(socket);
       if (!window || now - window.startedAt >= 10000) messageWindows.set(socket, { startedAt: now, count: 1 });
       else if (++window.count > 30) return socket.close(1008, "Message rate limit exceeded");
+      const rawData: RawData = raw;
       let rawBuffer: Buffer;
-      if (Buffer.isBuffer(raw)) {
-        rawBuffer = raw;
-      } else if (raw instanceof ArrayBuffer) {
-        rawBuffer = Buffer.from(new Uint8Array(raw));
+      if (Buffer.isBuffer(rawData)) {
+        rawBuffer = rawData;
+      } else if (rawData instanceof ArrayBuffer) {
+        rawBuffer = Buffer.from(new Uint8Array(rawData));
       } else {
-        rawBuffer = Buffer.concat(raw as Buffer[]);
+        rawBuffer = Buffer.concat(rawData);
       }
       const rawText = rawBuffer.toString("utf8");
       if (Buffer.byteLength(rawText, "utf8") > 64 * 1024) return socket.close(1009, "Message too large");
