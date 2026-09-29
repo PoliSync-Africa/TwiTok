@@ -7,7 +7,8 @@ export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMP
 export async function initializeFeedIndexes(db: Db) {
   await Promise.all([
     db.collection("feed_events").createIndex({ userId: 1, createdAt: -1 }),
-    db.collection("feed_events").createIndex({ videoId: 1, createdAt: -1 }),\n    db.collection("feed_events").createIndex({ videoId: 1, type: 1, createdAt: -1 }),
+    db.collection("feed_events").createIndex({ videoId: 1, createdAt: -1 }),
+    db.collection("feed_events").createIndex({ videoId: 1, type: 1, createdAt: -1 }),
     db.collection("video_feedback").createIndex({ userId: 1, videoId: 1, type: 1 }, { unique: true }),
     db.collection("feed_caches").createIndex({ userId: 1, surface: 1 }, { unique: true }),
     db.collection("feed_caches").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
@@ -151,21 +152,6 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
-    { $addFields: {
-      _engagement: { $add: [
-        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
-        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
-        { $multiply: [{ $size: "$_likes" }, 0.15] },
-        { $multiply: [{ $size: "$_comments" }, 0.25] },
-        { $multiply: [{ $size: "$_shares" }, 0.35] },
-        { $multiply: [{ $size: "$_saves" }, 0.3] },
-        { $multiply: [{ $size: "$_reposts" }, 0.2] },
-        { $multiply: ["$_interest", 2.5] },
-        { $multiply: ["$_velocityScore", 1.5] },
-        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] },
-        { $multiply: ["$_promotionScore", 1] }
-      ] }
-    } },
         { $lookup: { from: "promotion_campaigns", let: { videoId: "$_id" }, pipeline: [
       { $match: { $expr: { $and: [
         { $eq: ["$videoId", "$videoId"] },
@@ -198,6 +184,22 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
           { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "WEBSITE_TRAFFIC"] }, then: 5 }
         ], default: 8 } },
         0
+      ] }
+    } },
+
+    { $addFields: {
+      _engagement: { $add: [
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
+        { $multiply: [{ $size: "$_likes" }, 0.15] },
+        { $multiply: [{ $size: "$_comments" }, 0.25] },
+        { $multiply: [{ $size: "$_shares" }, 0.35] },
+        { $multiply: [{ $size: "$_saves" }, 0.3] },
+        { $multiply: [{ $size: "$_reposts" }, 0.2] },
+        { $multiply: ["$_interest", 2.5] },
+        { $multiply: ["$_velocityScore", 1.5] },
+        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] },
+        { $multiply: ["$_promotionScore", 1] }
       ] }
     } },
     { $lookup: { from: "video_sounds", localField: "_id", foreignField: "videoId", as: "_soundLink" } },
