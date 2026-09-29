@@ -102,9 +102,21 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const transactionId = String(event?.transaction_id ?? event?.original_transaction_id ?? "").trim();
     const productId = String(event?.product_id ?? "").trim();
     const store = String(event?.store ?? "").trim().toUpperCase();
+    const environment = String(event?.environment ?? "").trim().toUpperCase();
+    const configuredAppId = String(process.env.REVENUECAT_APP_ID ?? "").trim();
+    const allowedEnvironment = String(process.env.REVENUECAT_WEBHOOK_ENVIRONMENT ?? "PRODUCTION").trim().toUpperCase();
     const pkg = COIN_PACKAGES.find((p) => p.sku === productId);
 
     if (!eventId || !eventType) return res.status(400).json({ error: "RevenueCat event id and type are required" });
+    if (configuredAppId && String(event?.app_id ?? "").trim() !== configuredAppId) {
+      return res.status(401).json({ error: "RevenueCat app does not match this webhook endpoint" });
+    }
+    if (!["PRODUCTION", "SANDBOX"].includes(allowedEnvironment)) {
+      return res.status(503).json({ error: "RevenueCat webhook environment configuration is invalid" });
+    }
+    if (environment && environment !== allowedEnvironment) {
+      return res.status(400).json({ error: "RevenueCat webhook environment is not allowed" });
+    }
     if (!userId || !transactionId) return res.status(400).json({ error: "RevenueCat user and transaction identifiers are required" });
     if (!pkg) return res.status(400).json({ error: "Unknown RevenueCat Coin product" });
 
