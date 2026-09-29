@@ -56,6 +56,8 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
 }
 
 export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string) {
+  const viewer = await db.collection("users").findOne({ _id: userId }, { projection: { countryCode: 1 } });
+  const viewerCountryCode = String(countryCode ?? viewer?.countryCode ?? "").toUpperCase();
   const following = await db.collection("follows").find({ followerId: userId }).project({ followingId: 1 }).limit(5000).toArray();
   const followingIds = following.map(x => x.followingId);
   const blocked = await db.collection("blocks").find({ $or: [{ blockerId: userId }, { blockedId: userId }] }).limit(5000).toArray();
@@ -171,7 +173,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         { $lt: ["$spentMinor", "$budgetMinor"] },
         { $or: [
           { $eq: [{ $size: { $ifNull: ["$target.countryCodes", []] } }, 0] },
-          { $in: [String(countryCode ?? "").toUpperCase(), { $ifNull: ["$target.countryCodes", []] }] }
+          { $in: [viewerCountryCode, { $ifNull: ["$target.countryCodes", []] }] }
         ] },
         { $or: [
           { $eq: [{ $size: { $ifNull: ["$target.interests", []] } }, 0] },
