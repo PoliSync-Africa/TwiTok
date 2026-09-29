@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
-import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
+import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet, recordPurchasedCoinRefund } from "../money/wallet.js";
 import { giftCatalogForCountry, GIFT_CATALOG, sendGift } from "../money/gifts.js";
 import { createWithdrawal, processGhanaWithdrawal, processFlutterwaveWithdrawal, reconcilePaystackTransfer, reconcileFlutterwaveTransfer, refreshFlutterwaveWithdrawal } from "../money/withdrawal.js";
 import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
@@ -166,10 +166,32 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     }
 
     if (refundEvents.has(eventType) && String(event?.cancel_reason ?? "").toUpperCase() === "CUSTOMER_SUPPORT") {
-      await db.collection("iap_transactions").updateOne(
-        { providerTransactionId: "REVENUECAT:" + store + ":" + transactionId },
-        { $set: { status: "REFUNDED", settlementStatus: "REFUNDED", refundedAt: new Date(), refundEventId: eventId } }
+      const originalTransactionId = "REVENUECAT:" + store + ":" + transactionId;
+      const refundGrossUsdRaw = Number(event?.price);
+      const taxPct = Number(event?.tax_percentage ?? 0);
+      const commissionPct = Number(event?.commission_percentage ?? 0);
+      const refundGrossUsd = Number.isFinite(refundGrossUsdRaw) && refundGrossUsdRaw !== 0
+        ? Math.abs(refundGrossUsdRaw)
+        : undefined;
+      const refundNetProceedsUsd = Number(
+        (
+          (refundGrossUsd ?? 0) *
+          Math.max(0, 1 - taxPct - commissionPct)
+        ).toFixed(8)
       );
+      const original = await db.collection("iap_transactions").findOne(
+        { providerTransactionId: originalTransactionId },
+        { projection: { netProceedsUsd: 1 } }
+      );
+      const netRefund = refundNetProceedsUsd > 0
+        ? refundNetProceedsUsd
+        : Number(original?.netProceedsUsd ?? 0);
+      const refundResult = await recordPurchasedCoinRefund(db, {
+        providerTransactionId: originalTransactionId,
+        refundEventId: eventId,
+        refundGrossUsd,
+        refundNetProceedsUsd: netRefund
+      });
       try {
         await db.collection("revenuecat_webhook_events").insertOne({
           eventId, eventType, userId, transactionId, productId, store,
@@ -178,7 +200,7 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
       } catch (error) {
         if ((error as { code?: number })?.code !== 11000) throw error;
       }
-      return res.status(200).json({ ok: true, refunded: true });
+      return res.status(200).json({ ok: true, refunded: true, ...refundResult });
     }
 
     try {
