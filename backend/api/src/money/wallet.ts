@@ -11,7 +11,6 @@ export const COIN_PACKAGES = [
 
 export const CREATOR_DIAMONDS_PER_COIN = 0.30;
 export const MIN_WITHDRAWAL_USD = 10;
-export const DIAMOND_CASH_VALUE_USD = 0.003;
 
 export async function initializeWalletIndexes(db: Db) {
   await Promise.all([
@@ -37,7 +36,7 @@ export async function ensureWallet(db: Db, userId: string, session?: ClientSessi
 
 export async function creditPurchasedCoins(db: Db, input: {
   userId: string; coins: number; provider: "APPLE"|"GOOGLE"|"REVENUECAT"|"WEB"|"PAYSTACK";
-  providerTransactionId: string; sku: string; grossUsd?: number;
+  providerTransactionId: string; sku: string; grossUsd?: number; netProceedsUsd?: number;
 }) {
   if (!Number.isInteger(input.coins) || input.coins <= 0) throw new Error("Invalid coin amount");
   const existing = await db.collection("iap_transactions").findOne({ providerTransactionId: input.providerTransactionId });
@@ -49,13 +48,17 @@ export async function creditPurchasedCoins(db: Db, input: {
   try {
     await session.withTransaction(async () => {
       await ensureWallet(db, input.userId, session);
+      const netProceedsUsd = Number(input.netProceedsUsd ?? 0);
+      if (!Number.isFinite(netProceedsUsd) || netProceedsUsd < 0) throw new Error("Invalid net proceeds");
       await db.collection("wallets").updateOne(
-        { userId: input.userId }, { $inc: { coinBalance: input.coins }, $set: { updatedAt: now } }, { session }
+        { userId: input.userId },
+        { $inc: { coinBalance: input.coins, unallocatedNetProceedsUsd: netProceedsUsd }, $set: { updatedAt: now } },
+        { session }
       );
       await db.collection("iap_transactions").insertOne({
         providerTransactionId: input.providerTransactionId, userId: input.userId,
         provider: input.provider, sku: input.sku, coins: input.coins,
-        grossUsd: input.grossUsd ?? null, status: "CREDITED", createdAt: now
+grossUsd: input.grossUsd ?? null, netProceedsUsd, status: "CREDITED", settlementStatus: "SETTLED", createdAt: now
       }, { session });
       await db.collection("wallet_ledger").insertOne({
         transactionId: randomUUID(), userId: input.userId, type: "COIN_PURCHASE",
