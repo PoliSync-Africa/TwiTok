@@ -22,8 +22,9 @@ const VOICE_MIME_TYPES = new Set([
 export const messagesRouter = Router();
 const userActionLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const messageSendLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const messageReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-messagesRouter.get("/conversations", requireUser, async (req, res) => {
+messagesRouter.get("/conversations", requireUser, messageReadLimit, async (req, res) => {
   try { res.json({ conversations: await listConversations(await getDb(), req.userId!) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load conversations" }); }
 });
@@ -46,7 +47,7 @@ messagesRouter.post("/conversations/direct", requireUser, userActionLimit, async
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create conversation" }); }
 });
 
-messagesRouter.get("/conversations/:conversationId/messages", requireUser, async (req, res) => {
+messagesRouter.get("/conversations/:conversationId/messages", requireUser, messageReadLimit, async (req, res) => {
   try {
     const conversationId = new ObjectId(String(req.params.conversationId));
     const before = req.query.before ? new Date(String(req.query.before)) : undefined;
@@ -106,7 +107,7 @@ messagesRouter.post("/conversations/:conversationId/voice", requireUser, message
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to send voice message" }); }
 });
 
-messagesRouter.get("/messages/:messageId/audio", requireUser, async (req, res) => {
+messagesRouter.get("/messages/:messageId/audio", requireUser, messageReadLimit, async (req, res) => {
   try {
     const db = await getDb();
     const messageId = new ObjectId(String(req.params.messageId));
@@ -116,7 +117,7 @@ messagesRouter.get("/messages/:messageId/audio", requireUser, async (req, res) =
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create voice playback URL" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/delivered", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/delivered", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
@@ -128,7 +129,7 @@ messagesRouter.post("/conversations/:conversationId/delivered", requireUser, asy
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update delivery status" }); }
 });
 
-messagesRouter.post("/conversations/:conversationId/read", requireUser, async (req, res) => {
+messagesRouter.post("/conversations/:conversationId/read", requireUser, userActionLimit, async (req, res) => {
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
