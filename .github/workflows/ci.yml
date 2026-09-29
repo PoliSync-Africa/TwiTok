@@ -21,6 +21,7 @@ jobs:
           cache-dependency-path: backend/api/package.json
       - run: npm install
       - run: npm audit --audit-level=high
+      - run: npm audit --audit-level=high
       - run: npm run test:types
       - run: npm run build
 
@@ -37,6 +38,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/admin/package.json
       - run: npm install
+      - run: npm audit --audit-level=high
+      - run: npm run test:types
       - run: npm run build
 
   web:
@@ -52,6 +55,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package.json
       - run: npm install
+      - run: npm audit --audit-level=high
+      - run: npm run test:types
       - run: npm run build
 
 
@@ -68,4 +73,5 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package.json
       - run: npm install
+      - run: npm audit --audit-level=high
       - run: npm run typecheck
