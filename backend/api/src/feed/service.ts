@@ -28,6 +28,24 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
     userId, videoId, type: input.type, watchMs,
     sessionId: input.sessionId ? String(input.sessionId).slice(0, 128) : null, createdAt: new Date()
   });
+  if (input.type === "IMPRESSION") {
+    await db.collection("promotion_campaigns").updateOne(
+      { videoId, status: "ACTIVE", $expr: { $lt: ["$spentMinor", "$budgetMinor"] } },
+      { $inc: { spentMinor: 1, "metrics.impressions": 1 }, $set: { updatedAt: new Date() } }
+    );
+  }
+  if (input.type === "VIEW_2S") {
+    await db.collection("promotion_campaigns").updateOne(
+      { videoId, status: "ACTIVE", $expr: { $lt: ["$spentMinor", "$budgetMinor"] } },
+      { $inc: { "metrics.views": 1 }, $set: { updatedAt: new Date() } }
+    );
+  }
+  if (input.type === "FOLLOW") {
+    await db.collection("promotion_campaigns").updateOne(
+      { videoId, status: "ACTIVE" },
+      { $inc: { "metrics.follows": 1 }, $set: { updatedAt: new Date() } }
+    );
+  }
   if (["LIKE","SAVE","NOT_INTERESTED"].includes(input.type)) {
     await db.collection("video_feedback").updateOne(
       { userId, videoId, type: input.type },
@@ -69,6 +87,15 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
+  const activePromotionVideos = surface === "FOR_YOU" ? await db.collection("promotion_campaigns").find({
+    status: "ACTIVE", spentMinor: { $lt: 1000000000 },
+    $or: [
+      { "target.countryCodes": { $exists: false } },
+      { "target.countryCodes": { $size: 0 } },
+      ...(countryCode ? [{ "target.countryCodes": String(countryCode).toUpperCase() }] : [])
+    ]
+  }).project({ videoId: 1, objective: 1, budgetMinor: 1, spentMinor: 1, target: 1 }).limit(2000).toArray() : [];
+  const promotedVideoIds = activePromotionVideos.map((x: any) => x.videoId).filter((x: any) => x instanceof ObjectId);
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const videos = await db.collection("videos").aggregate([
     { $match: query },
@@ -142,7 +169,28 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         { $multiply: [{ $size: "$_reposts" }, 0.2] },
         { $multiply: ["$_interest", 2.5] },
         { $multiply: ["$_velocityScore", 1.5] },
-        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] }
+        { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] },
+        { $multiply: ["$_promotionScore", 1] }
+      ] }
+    } },
+        { $lookup: { from: "promotion_campaigns", let: { videoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $and: [
+        { $eq: ["$videoId", "$videoId"] },
+        { $eq: ["$status", "ACTIVE"] },
+        { $lt: ["$spentMinor", "$budgetMinor"] }
+      ] } } },
+      { $project: { _id: 1, objective: 1, budgetMinor: 1, spentMinor: 1 } },
+      { $limit: 1 }
+    ], as: "_promotion" } },
+    { $addFields: {
+      _promotionScore: { $cond: [
+        { $gt: [{ $size: "$_promotion" }, 0] },
+        { $switch: { branches: [
+          { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "MORE_FOLLOWERS"] }, then: 7 },
+          { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "LIVE_AUDIENCE"] }, then: 6 },
+          { case: { $eq: [{ $arrayElemAt: ["$_promotion.objective", 0] }, "WEBSITE_TRAFFIC"] }, then: 5 }
+        ], default: 8 } },
+        0
       ] }
     } },
     { $lookup: { from: "video_sounds", localField: "_id", foreignField: "videoId", as: "_soundLink" } },
@@ -214,7 +262,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     const soundLink = await db.collection("video_sounds").findOne({ videoId: v._id });
     const sound = soundLink ? await db.collection("sounds").findOne({ _id: soundLink.soundId, status: "ACTIVE" }, { projection: { _id: 1, title: 1, artist: 1, coverUrl: 1 } }) : null;
     const photos = mediaConfigured() ? (await Promise.all(photoKeys.map((key: string) => createPresignedPlayback(key, 3600).catch(() => null)))).filter(Boolean).map((x: any) => x.url) : [];
-    return { id: v._id.toHexString(), ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], sound: sound ? { id: sound._id.toHexString(), title: sound.title ?? "", artist: sound.artist ?? "", coverUrl: sound.coverUrl ?? null } : null, playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
+    return { id: v._id.toHexString(), promoted: Boolean(v._promotion?.length), promotionObjective: v._promotion?.[0]?.objective ?? null, ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], sound: sound ? { id: sound._id.toHexString(), title: sound.title ?? "", artist: sound.artist ?? "", coverUrl: sound.coverUrl ?? null } : null, playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
   }));
   return { videos: hydrated, nextCursor: next };
 }
