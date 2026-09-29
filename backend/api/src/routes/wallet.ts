@@ -20,9 +20,13 @@ walletRouter.get("/revenuecat/config", requireUser, async (req, res) => {
 walletRouter.get("/catalog", requireUser, async (req, res) => {
   const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { countryCode: 1 } });
   const countryCode = String(user?.countryCode ?? "");
+  const { collectionProviders, currencyForCountry } = await import("../money/providers/routing.js");
   return res.json({
-    coinPackages: COIN_PACKAGES, gifts: giftCatalogForCountry(countryCode),
-    pricingRegion: /^[A-Z]{2}$/.test(countryCode.toUpperCase()) ? (countryCode.toUpperCase() && giftCatalogForCountry(countryCode).some((g) => g.coins !== g.baseCoins) ? "NON_AFRICA" : "AFRICA") : "NON_AFRICA",
+    coinPackages: COIN_PACKAGES,
+    gifts: giftCatalogForCountry(countryCode),
+    collectionProviders: collectionProviders(countryCode),
+    collectionCurrency: currencyForCountry(countryCode),
+    pricingRegion: giftCatalogForCountry(countryCode).some((g) => g.coins !== g.baseCoins) ? "NON_AFRICA" : "AFRICA",
     nonAfricanGiftMultiplier: 1.5,
     creatorSharePercent: 30, platformSharePercent: 70,
     diamondsPerCoin: 0.30, minWithdrawalUsd: MIN_WITHDRAWAL_USD, accountingModel: "NET_PROCEEDS_70_30"
