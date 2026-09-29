@@ -212,7 +212,7 @@ walletRouter.post("/coins/flutterwave/webhook", async (req, res) => {
     const result = await creditPurchasedCoins(db, {
       userId: String(purchase.userId),
       coins: Number(purchase.coins),
-      provider: "WEB",
+      provider: "FLUTTERWAVE",
       providerTransactionId: "FLUTTERWAVE:" + transactionId,
       sku: String(purchase.sku),
       grossUsd,
