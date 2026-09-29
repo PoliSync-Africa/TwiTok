@@ -3,14 +3,16 @@ import { requireUser } from "../auth/middleware.js";
 import { createPresignedPlayback, createPresignedUpload, mediaConfigured } from "../media/storage.js";
 import { getDb } from "../db/mongo.js";
 import { ObjectId } from "mongodb";
+import { rateLimit } from "../security/rate-limit.js";
 
 export const mediaRouter = Router();
+const uploadSigningLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 mediaRouter.get("/status", (_req, res) => {
   res.json({ configured: mediaConfigured() });
 });
 
-mediaRouter.post("/upload-url", requireUser, async (req, res) => {
+mediaRouter.post("/upload-url", requireUser, uploadSigningLimit, async (req, res) => {
   try {
     const objectKey = String(req.body?.objectKey ?? "");
     const mimeType = String(req.body?.mimeType ?? "");
