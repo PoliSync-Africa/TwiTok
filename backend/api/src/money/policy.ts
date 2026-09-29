@@ -2,7 +2,7 @@ export const PLATFORM_CURRENCY = "USD";
 export const CREATOR_SHARE_BPS = 3000;
 export const PLATFORM_SHARE_BPS = 7000;
 
-export const MOBILE_MONEY_COUNTRIES = new Set(["GH", "ZA", "KE", "UG", "NG"]);
+export const MOBILE_MONEY_COUNTRIES = new Set(["GH", "KE", "UG", "RW", "TZ", "ZM", "CM", "CI", "SN"]);
 
 export function withdrawalMethods(countryCode: string) {
   const country = countryCode.toUpperCase();
