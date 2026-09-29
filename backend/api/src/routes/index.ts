@@ -17,6 +17,7 @@ import { notificationsRouter } from "./notifications.js";
 import { searchRouter } from "./search.js";
 import { playlistsRouter } from "./playlists.js";
 import { storiesRouter } from "./stories.js";
+import { promotionsRouter } from "./promotions.js";
 
 export const apiRouter = Router();
 
@@ -38,3 +39,4 @@ apiRouter.use("/notifications", notificationsRouter);
 apiRouter.use("/search", searchRouter);
 apiRouter.use("/playlists", playlistsRouter);
 apiRouter.use("/stories", storiesRouter);
+apiRouter.use("/promotions", promotionsRouter);
