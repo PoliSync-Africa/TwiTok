@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
-import { GIFT_CATALOG, sendGift } from "../money/gifts.js";
+import { giftCatalogForCountry, GIFT_CATALOG, sendGift } from "../money/gifts.js";
 import { createWithdrawal, processGhanaWithdrawal, reconcilePaystackTransfer } from "../money/withdrawal.js";
 import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
@@ -15,11 +15,17 @@ walletRouter.get("/revenuecat/config", requireUser, async (req, res) => {
   return res.json({ appUserId: req.userId!.toHexString() });
 });
 
-walletRouter.get("/catalog", (_req, res) => res.json({
-  coinPackages: COIN_PACKAGES, gifts: GIFT_CATALOG,
-  creatorSharePercent: 30, platformSharePercent: 70,
-  diamondsPerCoin: 0.30, diamondCashValueUsd: 0.003, minWithdrawalUsd: MIN_WITHDRAWAL_USD
-}));
+walletRouter.get("/catalog", requireUser, async (req, res) => {
+  const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { countryCode: 1 } });
+  const countryCode = String(user?.countryCode ?? "");
+  return res.json({
+    coinPackages: COIN_PACKAGES, gifts: giftCatalogForCountry(countryCode),
+    pricingRegion: /^[A-Z]{2}$/.test(countryCode.toUpperCase()) ? (countryCode.toUpperCase() && giftCatalogForCountry(countryCode).some((g) => g.coins !== g.baseCoins) ? "NON_AFRICA" : "AFRICA") : "NON_AFRICA",
+    nonAfricanGiftMultiplier: 1.5,
+    creatorSharePercent: 30, platformSharePercent: 70,
+    diamondsPerCoin: 0.30, diamondCashValueUsd: 0.003, minWithdrawalUsd: MIN_WITHDRAWAL_USD
+  });
+});
 
 walletRouter.get("/me", requireUser, async (req, res) => {
   try { return res.json(await ensureWallet(await getDb(), req.userId!.toHexString())); }
