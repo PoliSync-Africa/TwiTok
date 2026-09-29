@@ -62,14 +62,7 @@ walletRouter.get("/me/withdrawals", requireUser, async (req, res) => {
   } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Withdrawal history lookup failed" }); }
 });
 
-walletRouter.get("/:userId", requireUser, async (req, res) => {
-  try {
-    const requested = String(req.params.userId);
-    if (requested !== req.userId!.toHexString()) return res.status(403).json({ error: "You can only access your own wallet" });
-    return res.json(await ensureWallet(await getDb(), requested));
-  }
-  catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Wallet lookup failed" }); }
-});
+;
 
 walletRouter.post("/coins/paystack/initialize", requireUser, async (req, res) => {
   try {
@@ -389,3 +382,12 @@ walletRouter.post("/withdrawals", requireUser, async (req, res) => {
     return res.status(201).json({ status: payout?.status ?? "PROCESSING", withdrawalId, provider });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
 });
+
+walletRouter.get("/:userId", requireUser, async (req, res) => {
+  try {
+    const requested = String(req.params.userId);
+    if (requested !== req.userId!.toHexString()) return res.status(403).json({ error: "You can only access your own wallet" });
+    return res.json(await ensureWallet(await getDb(), requested));
+  }
+  catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Wallet lookup failed" }); }
+})
