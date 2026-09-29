@@ -113,6 +113,8 @@ export default function PromoteScreen() {
           <Text style={styles.status}>{campaign.status}</Text>
         </View>
         <Text style={styles.budget}>{campaign.currency} {(Number(campaign.spentMinor ?? 0) / 100).toFixed(2)} spent / {(Number(campaign.budgetMinor ?? 0) / 100).toFixed(2)} budget</Text>
+        <View style={styles.progressTrack}><View style={[styles.progressFill,{width: Math.min(100, Math.round((Number(campaign.spentMinor ?? 0) / Math.max(1,Number(campaign.budgetMinor ?? 1))) * 100)) + "%"}]} /></View>
+        <Text style={styles.remaining}>Remaining: {campaign.currency} {Math.max(0,(Number(campaign.budgetMinor ?? 0)-Number(campaign.spentMinor ?? 0))/100).toFixed(2)}</Text>
         <View style={styles.metrics}>
           <Text>👁 {campaign.metrics?.impressions ?? 0} impressions</Text>
           <Text>▶️ {campaign.metrics?.views ?? 0} views</Text>
@@ -148,6 +150,9 @@ const styles = StyleSheet.create({
   objective:{fontWeight:"800"},
   status:{fontWeight:"800"},
   budget:{fontSize:15,fontWeight:"700"},
+  progressTrack:{height:7,borderRadius:4,backgroundColor:"#e5e5e5",overflow:"hidden"},
+  progressFill:{height:"100%",backgroundColor:"#111",borderRadius:4},
+  remaining:{fontSize:13,color:"#666",fontWeight:"600"},
   metrics:{gap:5},
   smallButton:{backgroundColor:"#111",padding:12,borderRadius:10,alignItems:"center"},
   smallButtonText:{color:"#fff",fontWeight:"800"},
