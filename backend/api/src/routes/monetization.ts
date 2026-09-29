@@ -37,7 +37,8 @@ monetizationRouter.post("/eligibility/evaluate", requireInternalService, async (
         { $match: { type: { $in: ["VIEW_2S", "VIEW_COMPLETE"] }, createdAt: { $gte: since } } },
         { $lookup: { from: "videos", localField: "videoId", foreignField: "_id", as: "video" } },
         { $unwind: "$video" },
-        { $match: { "video.ownerId": _id, "video.status": "PUBLISHED" } },
+        { $match: { "video.ownerId": _id, "video.status": "PUBLISHED", "video.visibility": "PUBLIC" } },
+        { $group: { _id: { viewerId: "$userId", videoId: "$videoId" } } },
         { $count: "count" }
       ]).toArray()
     ]);
