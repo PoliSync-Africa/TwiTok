@@ -3,11 +3,11 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet } from "../money/wallet.js";
 import { giftCatalogForCountry, GIFT_CATALOG, sendGift } from "../money/gifts.js";
-import { createWithdrawal, processGhanaWithdrawal, reconcilePaystackTransfer } from "../money/withdrawal.js";
+import { createWithdrawal, processGhanaWithdrawal, processFlutterwaveWithdrawal, reconcilePaystackTransfer, reconcileFlutterwaveTransfer, refreshFlutterwaveWithdrawal } from "../money/withdrawal.js";
 import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
 import { listGhanaPayoutBanks } from "../money/providers/paystack.js";
-import { initializeFlutterwaveCheckout, verifyFlutterwaveTransaction, verifyFlutterwaveWebhookSignature } from "../money/providers/flutterwave.js";
-import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider } from "../money/providers/routing.js";
+import { initializeFlutterwaveCheckout, verifyFlutterwaveTransaction, verifyFlutterwaveWebhookSignature, listFlutterwaveBanks } from "../money/providers/flutterwave.js";
+import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider, resolvePayoutProvider, payoutProviders } from "../money/providers/routing.js";
 import { requireUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
 
@@ -313,26 +313,79 @@ walletRouter.get("/payout/ghana/options", requireUser, async (req, res) => {
   } catch (error) { return res.status(503).json({ error: error instanceof Error ? error.message : "Payout provider unavailable" }); }
 });
 
+walletRouter.get("/payout/flutterwave/options", requireUser, async (req, res) => {
+  try {
+    const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { countryCode: 1 } });
+    const countryCode = String(user?.countryCode ?? "").toUpperCase();
+    if (!countryCode) return res.status(400).json({ error: "Account country is required for payouts" });
+    if (!payoutProviders(countryCode).includes("FLUTTERWAVE")) return res.status(400).json({ error: "Flutterwave payouts are not enabled for this country" });
+    const banks = await listFlutterwaveBanks(countryCode);
+    return res.json({ countryCode, type: String(req.query.type ?? "bank").toUpperCase() === "MOBILE_MONEY" ? "MOBILE_MONEY" : "BANK", providers: banks });
+  } catch (error) { return res.status(503).json({ error: error instanceof Error ? error.message : "Flutterwave payout options unavailable" }); }
+});
+
+walletRouter.post("/payout/flutterwave/webhook", async (req, res) => {
+  try {
+    const rawBody = (req as typeof req & { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
+    const signature = req.header("verif-hash") ?? req.header("x-flutterwave-signature");
+    if (!verifyFlutterwaveWebhookSignature(rawBody, signature)) return res.status(401).json({ error: "Invalid signature" });
+    const event = String(req.body?.event ?? "");
+    if (event !== "transfer.completed") return res.json({ ok: true, ignored: true });
+    const data = req.body?.data ?? {};
+    const transferId = String(data?.id ?? "");
+    const reference = String(data?.reference ?? "");
+    const status = String(data?.status ?? "");
+    if (!transferId || !reference || !status) return res.status(400).json({ error: "Flutterwave transfer identifiers missing" });
+    const result = await reconcileFlutterwaveTransfer(await getDb(), { eventId: transferId + ":" + status, transferId, reference, status, rawMessage: String(data?.complete_message ?? "") });
+    return res.json({ ok: true, ...result });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Flutterwave payout webhook failed" }); }
+});
+
+walletRouter.get("/withdrawals/:withdrawalId/refresh", requireUser, async (req, res) => {
+  try {
+    const withdrawalId = String(req.params.withdrawalId);
+    const withdrawal = await (await getDb()).collection("withdrawals").findOne({ withdrawalId, userId: req.userId!.toHexString() });
+    if (!withdrawal) return res.status(404).json({ error: "Withdrawal not found" });
+    if (withdrawal.provider !== "FLUTTERWAVE") return res.status(400).json({ error: "This withdrawal is not a Flutterwave payout" });
+    const result = await refreshFlutterwaveWithdrawal(await getDb(), withdrawalId);
+    return res.json({ withdrawalId, ...result });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal status refresh failed" }); }
+});
+
 walletRouter.post("/withdrawals", requireUser, async (req, res) => {
   try {
-    const { countryCode, type, amountUsd, destination } = req.body ?? {};
+    const { countryCode, type, amountUsd, destination, provider: requestedProvider } = req.body ?? {};
     const userId = req.userId!.toHexString();
     const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
     if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
     const db = await getDb();
     const existing = await db.collection("withdrawals").findOne({ userId, idempotencyKey });
-    if (existing) return res.status(200).json({ status: existing.status, withdrawalId: existing.withdrawalId, provider: existing.provider ?? "PAYSTACK", duplicate: true });
-    if (!countryCode || !type || !destination) return res.status(400).json({ error: "countryCode, type and destination are required" });
-    if (String(countryCode).toUpperCase() !== "GH") return res.status(400).json({ error: "Ghana payout provider is currently enabled for this rollout" });
-    if (!["BANK", "MOBILE_MONEY"].includes(String(type))) return res.status(400).json({ error: "Invalid payout type" });
+    if (existing) return res.status(200).json({ status: existing.status, withdrawalId: existing.withdrawalId, provider: existing.provider ?? "PENDING", duplicate: true });
+
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { countryCode: 1 } });
+    const accountCountry = String(user?.countryCode ?? "").toUpperCase();
+    if (!accountCountry) return res.status(400).json({ error: "Account country is required for payouts" });
+    if (!countryCode || String(countryCode).toUpperCase() !== accountCountry) return res.status(400).json({ error: "Payout country must match the verified account country" });
+    if (!type || !destination) return res.status(400).json({ error: "type and destination are required" });
+    const payoutType = String(type).toUpperCase();
+    if (!["BANK", "MOBILE_MONEY"].includes(payoutType)) return res.status(400).json({ error: "Invalid payout type" });
     if (Number(amountUsd) < MIN_WITHDRAWAL_USD) return res.status(400).json({ error: "Minimum withdrawal is $" + MIN_WITHDRAWAL_USD });
-    const exchangeRate = Number(process.env.TWITOK_USD_GHS_RATE);
-    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return res.status(503).json({ error: "GHS payout exchange rate is not configured" });
+
+    const provider = resolvePayoutProvider(accountCountry, requestedProvider ? String(requestedProvider) : undefined);
+    const currency = currencyForCountry(accountCountry);
+    if (!currency) return res.status(400).json({ error: "Unsupported payout currency for this country" });
+    const exchangeRate = Number(process.env[exchangeRateEnvName(currency)]);
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return res.status(503).json({ error: currency + " payout exchange rate is not configured" });
+
     const withdrawalId = randomUUID();
-    await createWithdrawal(db, { withdrawalId, userId, countryCode: "GH", type, amountUsd: Number(amountUsd), exchangeRate, destination, idempotencyKey });
+    await createWithdrawal(db, { withdrawalId, userId, countryCode: accountCountry, type: payoutType as "BANK" | "MOBILE_MONEY", amountUsd: Number(amountUsd), exchangeRate, destination, idempotencyKey });
+
     let payout;
-    try { payout = await processGhanaWithdrawal(db, withdrawalId); }
-    catch (error) { return res.status(502).json({ status: "FAILED", withdrawalId, error: error instanceof Error ? error.message : "Payout provider failed" }); }
-    return res.status(201).json({ status: payout?.status ?? "PROCESSING", withdrawalId, provider: "PAYSTACK" });
+    try {
+      payout = provider === "PAYSTACK" ? await processGhanaWithdrawal(db, withdrawalId) : await processFlutterwaveWithdrawal(db, withdrawalId);
+    } catch (error) {
+      return res.status(502).json({ status: "FAILED", withdrawalId, provider, error: error instanceof Error ? error.message : "Payout provider failed" });
+    }
+    return res.status(201).json({ status: payout?.status ?? "PROCESSING", withdrawalId, provider });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Withdrawal failed" }); }
 });
