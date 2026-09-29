@@ -100,7 +100,11 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     const productId = String(event?.product_id ?? "");
     const pkg = COIN_PACKAGES.find((p) => p.sku === productId);
     if (!userId || !transactionId || !pkg) return res.status(400).json({ error: "Invalid RevenueCat coin purchase event" });
-    const grossUsd = Number(event?.price ?? pkg.priceUsd);\n    const taxPct = Number(event?.tax_percentage ?? 0);\n    const commissionPct = Number(event?.commission_percentage ?? 0);\n    const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - Math.max(0, taxPct) - Math.max(0, commissionPct))).toFixed(8));\n    const result = await creditPurchasedCoins(await getDb(), { userId, coins: pkg.coins, provider: "REVENUECAT", providerTransactionId: transactionId, sku: pkg.sku, grossUsd, netProceedsUsd });
+    const grossUsd = Number(event?.price ?? pkg.priceUsd);
+    const taxPct = Number(event?.tax_percentage ?? 0);
+    const commissionPct = Number(event?.commission_percentage ?? 0);
+    const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - Math.max(0, taxPct) - Math.max(0, commissionPct))).toFixed(8));
+    const result = await creditPurchasedCoins(await getDb(), { userId, coins: pkg.coins, provider: "REVENUECAT", providerTransactionId: transactionId, sku: pkg.sku, grossUsd, netProceedsUsd });
     return res.status(200).json({ ok: true, duplicate: result.duplicate });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "IAP webhook failed" }); }
 });
@@ -121,7 +125,12 @@ walletRouter.post("/coins/paystack/webhook", async (req, res) => {
     const expectedAmount = Math.round(Number(purchase.amountGhs) * 100);
     if (!Number.isFinite(rate) || Math.abs(Number(verified.amount) - expectedAmount) > 1) return res.status(400).json({ error: "Payment amount mismatch" });
     if (purchase.status === "CREDITED") return res.json({ ok: true, duplicate: true });
-    const grossUsd = Number(purchase.priceUsd);\n    const feeBps = Number(process.env.TWITOK_PAYSTACK_COLLECTION_FEE_BPS);\n    const taxBps = Number(process.env.TWITOK_PAYSTACK_COLLECTION_TAX_BPS ?? 0);\n    if (!Number.isFinite(feeBps) || feeBps < 0 || !Number.isFinite(taxBps) || taxBps < 0) return res.status(503).json({ error: "Paystack net-proceeds configuration is required before Coin crediting" });\n    const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - (feeBps + taxBps) / 10000)).toFixed(8));\n    const result = await creditPurchasedCoins(db, { userId: String(purchase.userId), coins: Number(purchase.coins), provider: "PAYSTACK", providerTransactionId: reference, sku: String(purchase.sku), grossUsd, netProceedsUsd });
+    const grossUsd = Number(purchase.priceUsd);
+    const feeBps = Number(process.env.TWITOK_PAYSTACK_COLLECTION_FEE_BPS);
+    const taxBps = Number(process.env.TWITOK_PAYSTACK_COLLECTION_TAX_BPS ?? 0);
+    if (!Number.isFinite(feeBps) || feeBps < 0 || !Number.isFinite(taxBps) || taxBps < 0) return res.status(503).json({ error: "Paystack net-proceeds configuration is required before Coin crediting" });
+    const netProceedsUsd = Number((grossUsd * Math.max(0, 1 - (feeBps + taxBps) / 10000)).toFixed(8));
+    const result = await creditPurchasedCoins(db, { userId: String(purchase.userId), coins: Number(purchase.coins), provider: "PAYSTACK", providerTransactionId: reference, sku: String(purchase.sku), grossUsd, netProceedsUsd });
     await db.collection("coin_purchases").updateOne({ reference }, { $set: { status: "CREDITED", creditedAt: new Date() } });
     return res.json({ ok: true, duplicate: result.duplicate, coins: purchase.coins });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Coin payment webhook failed" }); }
