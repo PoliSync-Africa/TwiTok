@@ -51,6 +51,10 @@ export async function markStoryViewed(db: Db, userId: ObjectId, storyId: string)
   const story = await db.collection("stories").findOne({ _id: new ObjectId(storyId), expiresAt: { $gt: new Date() } });
   if (!story) throw new Error("Story not found");
   if (await db.collection("blocks").findOne({ $or: [{ blockerId: userId, blockedId: story.ownerId }, { blockerId: story.ownerId, blockedId: userId }] })) return { viewed: false };
+  if (!userId.equals(story.ownerId)) {
+    const following = await db.collection("follows").findOne({ followerId: userId, followingId: story.ownerId }, { projection: { _id: 1 } });
+    if (!following) return { viewed: false };
+  }
   await db.collection("story_views").updateOne({ storyId: story._id, viewerId: userId }, { $setOnInsert: { storyId: story._id, viewerId: userId, createdAt: new Date() } }, { upsert: true });
   return { viewed: true };
 }
