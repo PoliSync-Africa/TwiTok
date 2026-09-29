@@ -29,11 +29,12 @@ moneyRouter.post("/withdrawals", requireUser, rateLimit({ windowMs: 60 * 60 * 10
     if (!Number.isFinite(Number(amountUsd)) || Number(amountUsd) <= 0 || Number(amountUsd) > 100000) return res.status(400).json({ error: "Invalid withdrawal amount" });
     const idempotencyKey = String(req.header("Idempotency-Key") ?? randomUUID()).trim();
     if (!/^[A-Za-z0-9._:-]{16,100}$/.test(idempotencyKey)) return res.status(400).json({ error: "A valid Idempotency-Key is required" });
+    const withdrawalId = randomUUID();
     const db = await getDb();
-    const existing = await db.collection("withdrawals").findOne({ withdrawalId: idempotencyKey, userId: req.userId!.toHexString() }, { projection: { status: 1, payoutCurrency: 1 } });
+    const existing = await db.collection("withdrawals").findOne({ userId: req.userId!.toHexString(), idempotencyKey }, { projection: { status: 1, payoutCurrency: 1 } });
     if (existing) return res.status(200).json({ status: existing.status, currency: existing.payoutCurrency ?? "USD", idempotent: true });
     await createWithdrawal(db, {
-      withdrawalId: idempotencyKey, userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
+      withdrawalId, userId: req.userId!.toHexString(), countryCode: String(countryCode), type,
       amountUsd: Number(amountUsd), destination, idempotencyKey
     });
     return res.status(201).json({ status: "PENDING", currency: "USD" });
