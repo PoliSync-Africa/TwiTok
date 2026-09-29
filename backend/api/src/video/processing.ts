@@ -1,5 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
-import { headMediaObject } from "../media/storage.js";
+import { verifyMediaObject } from "../media/storage.js";
 
 export type VideoProcessingState =
   | "QUEUED"
