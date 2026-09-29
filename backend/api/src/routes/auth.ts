@@ -27,6 +27,13 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
+authRouter.post("/logout", requireUser, async (req, res) => {
+  try {
+    await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
+    return res.status(204).send();
+  } catch { return res.status(500).json({ error: "Unable to end session" }); }
+});
+
 authRouter.get("/me", requireUser, async (req, res) => {
   try {
     const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
