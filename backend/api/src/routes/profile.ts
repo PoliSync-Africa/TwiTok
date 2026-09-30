@@ -5,8 +5,10 @@ import { requireUser } from "../auth/middleware.js";
 import { blockUser, followUser, getProfile, removeFollower, respondToFollowRequest, unfollowUser, unblockUser } from "../social/follows.js";
 import { verifyUserToken } from "../auth/user.js";
 import { createPresignedPlayback, createPresignedUpload, mediaConfigured } from "../media/storage.js";
+import { rateLimit } from "../security/rate-limit.js";
 
 export const profileRouter = Router();
+const profileMediaLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 
 profileRouter.patch("/me", requireUser, async (req, res) => {
@@ -46,7 +48,7 @@ profileRouter.patch("/me", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update profile" }); }
 });
 
-profileRouter.post("/me/photo-upload-url", requireUser, async (req, res) => {
+profileRouter.post("/me/photo-upload-url", requireUser, profileMediaLimit, async (req, res) => {
   try {
     const mimeType = String(req.body?.mimeType ?? "");
     if (!/^image\/(jpeg|png|webp)$/i.test(mimeType)) return res.status(400).json({ error: "Profile photo must be JPEG, PNG or WebP" });
