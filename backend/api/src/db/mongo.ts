@@ -53,6 +53,8 @@ export async function getDb(): Promise<Db> {
   await db.collection("live_shop_products").createIndex({ streamId: 1, sortOrder: 1 });
   await db.collection("live_shop_products").createIndex({ streamId: 1, productId: 1 }, { unique: true });
   await db.collection("live_shop_products").createIndex({ hostUserId: 1, createdAt: -1 });
+  await db.collection("live_shop_events").createIndex({ streamId: 1, createdAt: -1 });
+  await db.collection("live_shop_events").createIndex({ streamId: 1, productId: 1, event: 1, createdAt: -1 });
 
   return db;
 }
