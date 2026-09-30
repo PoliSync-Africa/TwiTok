@@ -58,7 +58,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
     packages: TWITOK_VIEW_PACKS.map(pack => ({
       id: pack.id,
       views: pack.views,
-      durationDays: pack.durationDays,
+      durationDays: TWITOK_DEFAULT_DURATION_DAYS,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
       durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
@@ -80,7 +80,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays)),
       durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), audience: durationAdjustedAudience(pack.audience, option.days), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
-      durationDays: pack.durationDays,
+      durationDays: TWITOK_DEFAULT_DURATION_DAYS,
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
     objectivePackages: TWITOK_OBJECTIVE_BUDGET_PACKS.map(pack => ({
@@ -88,7 +88,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
       durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
-      durationDays: pack.durationDays,
+      durationDays: TWITOK_DEFAULT_DURATION_DAYS,
       recommended: Boolean("recommended" in pack && pack.recommended),
       note: "Budget-based promotion. Follower/profile results are estimates, not guaranteed."
     }))
