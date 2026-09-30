@@ -140,10 +140,11 @@ async function runFfmpeg(
   if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
 
   const filters = [
-    "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360base]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720base]`
+    "[0:v]split=4[v0][v1][v2][v3]",
+    `[v0]scale=w=360:h=640:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v360base]
+  , [v3]scale=w=1080:h=1920:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v1080base]`,
+    `[v1]scale=w=540:h=960:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v540base]`,
+    `[v2]scale=w=720:h=1280:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v720base]`
   ];
 
   const overlayInputs: string[] = [];
@@ -156,7 +157,8 @@ async function runFfmpeg(
   const variants = [
     { base: "v360base", out: "v360", width: 360 },
     { base: "v540base", out: "v540", width: 540 },
-    { base: "v720base", out: "v720", width: 720 }
+    { base: "v720base", out: "v720", width: 720 },
+    { base: "v1080base", out: "v1080", width: 1080 }
   ];
   const captionInputs: string[] = [];
   for (let index = 0; index < captions.length; index += 1) {
@@ -220,9 +222,10 @@ async function runFfmpeg(
     "-hide_banner", "-loglevel", "error", "-y",
     ...inputArgs,
     "-filter_complex", filters.join(";"),
-    "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
-    "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
-    "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
+    "-map", "[v360]", "-c:v:0", "libx264", "-preset:v:0", "medium", "-crf:v:0", "23", "-maxrate:v:0", "900k", "-bufsize:v:0", "1800k",
+    "-map", "[v540]", "-c:v:1", "libx264", "-preset:v:1", "medium", "-crf:v:1", "21", "-maxrate:v:1", "1800k", "-bufsize:v:1", "3600k",
+    "-map", "[v720]", "-c:v:2", "libx264", "-preset:v:2", "medium", "-crf:v:2", "19", "-maxrate:v:2", "4000k", "-bufsize:v:2", "8000k",
+    "-map", "[v1080]", "-c:v:3", "libx264", "-preset:v:3", "medium", "-crf:v:3", "18", "-maxrate:v:3", "6500k", "-bufsize:v:3", "13000k",
     ...audioMap,
     ...(audioMap.length ? ["-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
     "-force_key_frames", "expr:gte(t,n_forced*2)",
@@ -231,7 +234,7 @@ async function runFfmpeg(
     "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init_%v.mp4",
     "-hls_segment_filename", path.join(outputDir, "seg_%v_%05d.m4s"),
     "-master_pl_name", "master.m3u8",
-    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0" : "v:0 v:1 v:2",
+    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0 v:3,a:0" : "v:0 v:1 v:2 v:3",
     path.join(outputDir, "stream_%v.m3u8")
   ];
   await runProcess(ffmpegBin, args);
