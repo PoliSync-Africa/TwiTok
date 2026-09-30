@@ -23,7 +23,10 @@ feedRouter.post("/events", requireUser, feedEventLimit, async (req, res) => {
     const type = String(req.body?.type) as any;
     const allowed = ["IMPRESSION","VIEW_START","VIEW_2S","VIEW_COMPLETE","REWATCH","LIKE","COMMENT","SHARE","SAVE","FOLLOW","NOT_INTERESTED"];
     if (!allowed.includes(type)) return res.status(400).json({ error: "Invalid event type" });
-    await recordFeedEvent(await getDb(), req.userId!, { videoId: String(req.body?.videoId ?? ""), type, watchMs: req.body?.watchMs, sessionId: req.body?.sessionId });
+    const source = String(req.body?.source ?? "UNKNOWN").trim().toUpperCase();
+    const allowedSources = new Set(["FOR_YOU","FOLLOWING","AFRICA","PROFILE","SEARCH","SHARE","PROMOTED","UNKNOWN"]);
+    if (!allowedSources.has(source)) return res.status(400).json({ error: "Invalid traffic source" });
+    await recordFeedEvent(await getDb(), req.userId!, { videoId: String(req.body?.videoId ?? ""), type, watchMs: req.body?.watchMs, sessionId: req.body?.sessionId, source });
     res.status(202).json({ recorded: true });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to record event" }); }
 });
