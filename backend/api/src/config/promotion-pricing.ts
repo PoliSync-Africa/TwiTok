@@ -55,7 +55,7 @@ export const TWITOK_OBJECTIVES = [
 
 export const TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT = 35;
 
-export const TWITOK_PARTNERSHIP_PACKS = [
+export const TWITOK_PARTNERSHIP_PLANS = [
   { id: "PARTNERSHIP_STARTER", benchmarkUsd: 25, durationDays: 7, minCreators: 1, maxCreators: null, deliverables: "1 sponsored post + campaign distribution" },
   { id: "PARTNERSHIP_GROWTH", benchmarkUsd: 1000, durationDays: 14, minCreators: 1, maxCreators: null, deliverables: "Multi-creator sponsored campaign + campaign distribution", recommended: true },
   { id: "PARTNERSHIP_PRO", benchmarkUsd: 5000, durationDays: 30, minCreators: 1, maxCreators: null, deliverables: "Multi-creator sponsored campaign + campaign distribution" },
