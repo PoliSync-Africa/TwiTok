@@ -178,7 +178,7 @@ export default function LiveShopScreen() {
           {featured.images?.[0] ? <Image source={{ uri: featured.images[0] }} style={styles.featuredImage} /> : null}
           <View style={styles.featuredInfo}><Text style={styles.badge}>FEATURED</Text><Text style={styles.featuredName} numberOfLines={2}>{featured.name}</Text><Text style={styles.price}>{featured.currency} {(featured.priceMinor / 100).toFixed(2)}</Text><Text style={styles.stock}>{featured.stock > 0 ? "In stock" : "Out of stock"}</Text></View>
           <View style={styles.featuredActions}>
-            <Pressable disabled={!featured.stock} style={styles.buySecondary} onPress={() => { void track("BUY_NOW", featured.id); router.push({ pathname: "/shop", params: { productId: featured.id } }); }}><Text style={styles.buySecondaryText}>Buy Now</Text></Pressable>
+            <Pressable disabled={!featured.stock} style={styles.buySecondary} onPress={() => { void track("BUY_NOW", featured.id); router.push({ pathname: "/shop", params: { productId: featured.id, sourceStreamId: String(streamId), sourceProductId: featured.id } }); }}><Text style={styles.buySecondaryText}>Buy Now</Text></Pressable>
             <Pressable disabled={!featured.stock || busy === featured.id} style={styles.buy} onPress={() => void addToCart(featured.id)}><Text style={styles.buyText}>{busy === featured.id ? "Adding…" : "Add to Cart"}</Text></Pressable>
           </View>
         </View> : null;
