@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, St
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
-import FreeMediaEditor, { DEFAULT_MEDIA_EDIT_PLAN } from "../components/free-media-editor";
+import * as SecureStore from "expo-secure-store";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
@@ -22,8 +22,7 @@ const EMOJI_STICKERS = EMOJI_CATALOG.map((emoji,i) => [emojiStickerId(emoji), em
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [editorVisible, setEditorVisible] = useState(false);
-  const [editPlan, setEditPlan] = useState<any>(DEFAULT_MEDIA_EDIT_PLAN);
+  const [editPlan, setEditPlan] = useState<any>({ quality:"HD", filter:"NONE", crop:"ORIGINAL", rotate:0, mirror:false, speed:1, aiTool:"NONE", aiPrompt:"" });
   const [selectedClip, setSelectedClip] = useState(0);
   const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
@@ -46,9 +45,14 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, editPlan: incomingEditPlan } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
+  useEffect(() => {
+    const raw = String(incomingEditPlan ?? "");
+    if (raw) { try { setEditPlan(JSON.parse(raw)); } catch {} }
+    void SecureStore.getItemAsync("twitok_media_edit_plan").then(value => { if (value) { try { setEditPlan(JSON.parse(value)); } catch {} void SecureStore.deleteItemAsync("twitok_media_edit_plan"); } }).catch(() => undefined);
+  }, [incomingEditPlan]);
   useEffect(() => {
     const uri = String(recordedUri ?? "");
     if (!uri) return;
@@ -153,8 +157,6 @@ export default function CreateScreen() {
     return Math.max(0, Math.round(total + Math.max(0, localMs - selectedClipStartMs) / (activeClipSetting.speed || 1)));
   }
 
-
-  function applyEditPlan(next: any) { setEditPlan(next); }
 
   function replaceAssets(next: Asset[]) {
     setAssets(next);
@@ -356,8 +358,8 @@ export default function CreateScreen() {
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
         <TextInput value={location} onChangeText={setLocation} placeholder="📍 Add location" placeholderTextColor="#777" style={styles.input} maxLength={120} />
-        {mode !== "TEXT" && assets.length ? <Pressable style={styles.editorButton} onPress={() => setEditorVisible(true)}><Text style={styles.editorButtonIcon}>✦</Text><View style={{flex:1}}><Text style={styles.editorButtonTitle}>Edit & AI tools</Text><Text style={styles.editorButtonSub}>Free enhance, filters, crop, effects, captions, restyle & more</Text></View><Text style={styles.editorButtonArrow}>›</Text></Pressable> : null}
-         {assets.length ? <FlatList
+         {mode !== "TEXT" && assets.length ? <Pressable style={styles.editorButton} onPress={() => router.push({ pathname:"/media-editor", params:{ mode, editPlan: JSON.stringify(editPlan) } })}><Text style={styles.editorButtonIcon}>✦</Text><View style={{flex:1}}><Text style={styles.editorButtonTitle}>Edit & AI tools</Text><Text style={styles.editorButtonSub}>Free enhance, filters, crop, effects, captions, restyle & more</Text></View><Text style={styles.editorButtonArrow}>›</Text></Pressable> : null}
+        {assets.length ? <FlatList
            data={assets}
            horizontal
            keyExtractor={(a,i)=>a.uri+i}
@@ -529,7 +531,6 @@ export default function CreateScreen() {
         {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
         {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
       </ScrollView>
-      <FreeMediaEditor visible={editorVisible} mode={mode} value={editPlan} onChange={applyEditPlan} onClose={() => setEditorVisible(false)} />
     </View>
   );
 }
