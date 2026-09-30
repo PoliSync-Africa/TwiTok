@@ -291,16 +291,39 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       publishedAt: (last.publishedAt ?? new Date(0)).toISOString(), id: last._id.toHexString()
     })).toString("base64url");
   })() : null;
+  const videoIds = selectedVideos.map((video: any) => video._id);
+  const soundLinks = await db.collection("video_sounds").find({ videoId: { $in: videoIds } }).toArray();
+  const soundIds = soundLinks.map((link: any) => link.soundId);
+  const sounds = soundIds.length
+    ? await db.collection("sounds").find({ _id: { $in: soundIds }, status: "ACTIVE" }, { projection: { _id: 1, title: 1, artist: 1, coverUrl: 1 } }).toArray()
+    : [];
+  const soundByVideo = new Map(soundLinks.map((link: any) => [link.videoId.toHexString(), sounds.find((sound: any) => sound._id.equals(link.soundId)) ?? null]));
+
+  const shopTags = await db.collection("video_shop_products").find({ videoId: { $in: videoIds } }).sort({ sortOrder: 1 }).toArray();
+  const shopProductIds = [...new Set(shopTags.map((tag: any) => String(tag.productId)))];
+  const shopProductDocs = shopProductIds.length
+    ? await db.collection("shop_products").find({ id: { $in: shopProductIds }, status: "ACTIVE" }).toArray()
+    : [];
+  const shopById = new Map(shopProductDocs.map((product: any) => [String(product.id), product]));
+  const shopByVideo = new Map<string, any[]>();
+  for (const tag of shopTags) {
+    const product = shopById.get(String(tag.productId));
+    if (!product) continue;
+    const list = shopByVideo.get(tag.videoId.toHexString()) ?? [];
+    if (list.length < 10) list.push(product);
+    shopByVideo.set(tag.videoId.toHexString(), list);
+  }
+
   const hydrated = await Promise.all(selectedVideos.map(async (v: any) => {
     const photoKeys = Array.isArray(v.photoObjectKeys) ? v.photoObjectKeys : [];
-    const soundLink = await db.collection("video_sounds").findOne({ videoId: v._id });
-    const sound = soundLink ? await db.collection("sounds").findOne({ _id: soundLink.soundId, status: "ACTIVE" }, { projection: { _id: 1, title: 1, artist: 1, coverUrl: 1 } }) : null;
-    const shopTags = await db.collection("video_shop_products").find({ videoId: v._id }).sort({ sortOrder: 1 }).limit(10).toArray();
-    const shopProductIds = shopTags.map((tag: any) => String(tag.productId));
-    const shopProductDocs = shopProductIds.length ? await db.collection("shop_products").find({ id: { $in: shopProductIds }, status: "ACTIVE" }).toArray() : [];
-    const shopById = new Map(shopProductDocs.map((product: any) => [String(product.id), product]));
-    const shopProducts = shopTags.map((tag: any) => shopById.get(String(tag.productId))).filter(Boolean).map((product: any) => ({ id: product.id, name: product.name, priceMinor: product.priceMinor, currency: product.currency, images: product.images ?? [], stock: product.stock ?? 0, variants: product.variants ?? [] }));
-    const photos = mediaConfigured() ? (await Promise.all(photoKeys.map((key: string) => createPresignedPlayback(key, 3600).catch(() => null)))).filter(Boolean).map((x: any) => x.url) : [];
+    const sound = soundByVideo.get(v._id.toHexString()) ?? null;
+    const shopProducts = (shopByVideo.get(v._id.toHexString()) ?? []).map((product: any) => ({
+      id: product.id, name: product.name, priceMinor: product.priceMinor, currency: product.currency,
+      images: product.images ?? [], stock: product.stock ?? 0, variants: product.variants ?? []
+    }));
+    const photos = mediaConfigured()
+      ? (await Promise.all(photoKeys.map((key: string) => createPresignedPlayback(key, 3600).catch(() => null)))).filter(Boolean).map((x: any) => x.url)
+      : [];
     return { id: v._id.toHexString(), promoted: Boolean(v._promotion?.length), promotionObjective: v._promotion?.[0]?.objective ?? null, ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode, isVerified: v.owner.isVerified === true, verificationType: v.owner.verificationType ?? null } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], shopProducts, sound: sound ? { id: sound._id.toHexString(), title: sound.title ?? "", artist: sound.artist ?? "", coverUrl: sound.coverUrl ?? null } : null, playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
   }));
   return { videos: hydrated, nextCursor: next };
