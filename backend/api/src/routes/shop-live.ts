@@ -33,8 +33,11 @@ shopLiveRouter.post("/live/:streamId/shop-events", requireUser, writeLimit, asyn
   const allowedEvents = new Set(["VIEW", "FEATURE_VIEW", "BUY_NOW", "ADD_TO_CART", "FEATURE_PIN"]);
   if (!streamId || !productId || !allowedEvents.has(event)) return res.status(400).json({ error: "streamId, productId and a valid event are required" });
   const db = await getDb();
-  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { streamId: 1 } });
+  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { streamId: 1, status: 1 } });
   if (!stream) return res.status(404).json({ error: "LIVE stream not found" });
+  if (stream.status === "ENDED") return res.status(400).json({ error: "Ended LIVE sessions cannot receive shopping events" });
+  const tag = await db.collection("live_shop_products").findOne({ streamId, productId }, { projection: { productId: 1 } });
+  if (!tag) return res.status(404).json({ error: "Product is not attached to this LIVE" });
   const product = await db.collection("shop_products").findOne({ id: productId, status: "ACTIVE" }, { projection: { id: 1, sellerId: 1 } });
   if (!product) return res.status(404).json({ error: "Active product not found" });
   await db.collection("live_shop_events").insertOne({ streamId, productId, sellerId: String(product.sellerId), event, userId: req.userId!.toHexString(), createdAt: new Date() });
