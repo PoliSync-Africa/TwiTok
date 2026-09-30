@@ -33,6 +33,8 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_payments").createIndex({ userId: 1, createdAt: -1 });
   await db.collection("shop_orders").createIndex({ "items.sellerId": 1, status: 1, createdAt: -1 });
   await db.collection("shop_products").createIndex({ sellerId: 1, status: 1, updatedAt: -1 });
+  await db.collection("shop_returns").createIndex({ orderId: 1, createdAt: -1 });
+  await db.collection("shop_returns").createIndex({ buyerId: 1, createdAt: -1 });
 
   return db;
 }
