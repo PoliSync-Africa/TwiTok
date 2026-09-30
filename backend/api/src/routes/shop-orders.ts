@@ -19,7 +19,7 @@ shopOrdersRouter.post("/cart/items", requireUser, async (req, res) => {
   const quantity = Math.floor(Number(req.body?.quantity ?? 1));
   if (!productId || quantity < 1 || quantity > 100) return res.status(400).json({ error: "Valid productId and quantity are required" });
   const db = await getDb();
-  const product = await db.collection("shop_products").findOne({ id: productId, status: "ACTIVE" }, { projection: { id: 1, name: 1, priceMinor: 1, currency: 1, images: 1, stock: 1 } });
+  const product = await db.collection("shop_products").findOne({ id: productId, status: "ACTIVE" }, { projection: { id: 1, name: 1, priceMinor: 1, currency: 1, images: 1, stock: 1, sellerId: 1 } });
   if (!product) return res.status(404).json({ error: "Product not found" });
   if (Number(product.stock ?? 0) < quantity) return res.status(409).json({ error: "Insufficient stock" });
   await db.collection("shop_carts").updateOne(
@@ -60,7 +60,7 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
       return res.status(409).json({ error: `Insufficient stock for ${item.name}` });
     }
     subtotalMinor += Number(item.priceMinor) * quantity;
-    reservedItems.push({ productId: String(item.productId), quantity, name: item.name, priceMinor: Number(item.priceMinor) });
+    reservedItems.push({ productId: String(item.productId), sellerId: String(product.sellerId), quantity, name: item.name, priceMinor: Number(item.priceMinor) });
   }
   const shippingMinor = Math.max(0, Math.round(Number(req.body?.shippingMinor ?? 0)));
   const totalMinor = subtotalMinor + shippingMinor;
