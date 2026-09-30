@@ -239,11 +239,12 @@ async function runFfmpeg(
     filters.push(`[0:a]atempo=${speed},volume=1,atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB[audio]`);
   }
 
+  await fs.promises.writeFile(path.join(outputDir, "filters.txt"), filters.join(";"), "utf8");
   const audioMap = soundFile ? ["-map", "[mixed]"] : hasOriginalAudio ? ["-map", "[audio]"] : [];
   const args = [
     "-hide_banner", "-loglevel", "error", "-y",
     ...inputArgs,
-    "-filter_complex", filters.join(";"),
+    "-filter_complex_script", path.join(outputDir, "filters.txt"),
     "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
     "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
     "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
