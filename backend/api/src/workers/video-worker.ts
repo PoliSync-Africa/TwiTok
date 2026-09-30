@@ -141,10 +141,10 @@ async function runFfmpeg(
   if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
 
   const plan = editPlan ?? {};
-  const quality = String(plan.quality ?? "HD");
+  const quality = String(plan.quality ?? "ULTRA");
   const aiTool = String(plan.aiTool ?? "NONE");
   const filterName = String(plan.filter ?? "NONE");
-  const polish = quality === "HD" || aiTool === "HD_ENHANCE" ? "hqdn3d=1.2:1.2:6:6,unsharp=5:5:0.7:5:5:0.0,eq=contrast=1.05:saturation=1.08:brightness=0.015" : quality === "CLEAN" || aiTool === "RESTORE" ? "hqdn3d=1:1:4:4,unsharp=5:5:0.45:5:5:0.0" : "null";
+  const polish = quality === "ULTRA" ? "hqdn3d=0.9:0.9:4:4,eq=contrast=1.07:saturation=1.07:brightness=0.025:gamma=1.03,unsharp=5:5:0.55:5:5:0.0" : quality === "HD" || aiTool === "HD_ENHANCE" ? "hqdn3d=1.2:1.2:6:6,eq=contrast=1.05:saturation=1.06:brightness=0.018:gamma=1.02,unsharp=5:5:0.7:5:5:0.0" : quality === "CLEAN" || aiTool === "RESTORE" ? "hqdn3d=1:1:4:4,eq=contrast=1.03:saturation=1.03:brightness=0.01,unsharp=5:5:0.45:5:5:0.0" : "hqdn3d=0.6:0.6:2:2,eq=contrast=1.04:saturation=1.04:brightness=0.015:gamma=1.02,unsharp=5:5:0.25:5:5:0.0";
   const filterMap: Record<string,string> = {
     NONE:"null", VIVID:"eq=contrast=1.08:saturation=1.3", WARM:"colorbalance=rs=.08:gs=.03:bs=-.03",
     COOL:"colorbalance=rs=-.03:gs=.03:bs=.08", NOIR:"hue=s=0,eq=contrast=1.15:brightness=-.02",
