@@ -26,35 +26,16 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
   if (!video) throw new Error("Video not found");
   const watchMs = Number(input.watchMs ?? 0);
   if (!Number.isFinite(watchMs) || watchMs < 0 || watchMs > 24 * 60 * 60 * 1000) throw new Error("Invalid watch duration");
-  await db.collection("feed_events").insertOne({
-    userId, videoId, type: input.type, watchMs,
-    sessionId: input.sessionId ? String(input.sessionId).slice(0, 128) : null, source: input.source ? String(input.source).slice(0, 40).toUpperCase() : "UNKNOWN", createdAt: new Date()
+  const { enqueueFeedEvent } = await import("./event-queue.js");
+  await enqueueFeedEvent(db, {
+    eventId: `${userId.toHexString()}:${videoId.toHexString()}:${input.type}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    userId,
+    videoId,
+    type: input.type,
+    watchMs,
+    sessionId: input.sessionId ? String(input.sessionId).slice(0, 128) : null,
+    source: input.source ? String(input.source).slice(0, 40).toUpperCase() : "UNKNOWN"
   });
-  if (input.type === "IMPRESSION") {
-    await db.collection("promotion_campaigns").updateOne(
-      { videoId, status: "ACTIVE", $expr: { $lt: ["$spentMinor", "$budgetMinor"] } },
-      { $inc: { spentMinor: 1, "metrics.impressions": 1 }, $set: { updatedAt: new Date() } }
-    );
-  }
-  if (input.type === "VIEW_2S") {
-    await db.collection("promotion_campaigns").updateOne(
-      { videoId, status: "ACTIVE", $expr: { $lt: ["$spentMinor", "$budgetMinor"] } },
-      { $inc: { "metrics.views": 1 }, $set: { updatedAt: new Date() } }
-    );
-  }
-  if (input.type === "FOLLOW") {
-    await db.collection("promotion_campaigns").updateOne(
-      { videoId, status: "ACTIVE" },
-      { $inc: { "metrics.follows": 1 }, $set: { updatedAt: new Date() } }
-    );
-  }
-  if (["LIKE","SAVE","NOT_INTERESTED"].includes(input.type)) {
-    await db.collection("video_feedback").updateOne(
-      { userId, videoId, type: input.type },
-      { $set: { userId, videoId, type: input.type, createdAt: new Date() } },
-      { upsert: true }
-    );
-  }
 }
 
 export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string) {
