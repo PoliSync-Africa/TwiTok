@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Router } from "express";
 import { requireUser } from "../auth/middleware.js";
 import { getDb } from "../db/mongo.js";
