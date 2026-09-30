@@ -145,6 +145,12 @@ analyticsRouter.get("/creator/overview", requireUser, analyticsReadLimit, async 
       };
     }, { streams: 0, endedStreams: 0, totalDurationMs: 0, giftsUsd: 0, peakViewerCount: 0 });
 
+    const trafficRows = await db.collection("feed_events").aggregate([
+      { $match: { ...eventMatch, type: { $in: ["IMPRESSION", "VIEW_2S", "VIEW_COMPLETE", "REWATCH"] } } },
+      { $group: { _id: { $ifNull: ["$source", "UNKNOWN"] }, views: { $sum: { $cond: [{ $in: ["$type", ["VIEW_2S", "VIEW_COMPLETE", "REWATCH"]] }, 1, 0] } }, impressions: { $sum: { $cond: [{ $eq: ["$type", "IMPRESSION"] }, 1, 0] } } } },
+      { $sort: { views: -1, impressions: -1 } }
+    ]).toArray();
+
     const giftRows = await db.collection("gift_transactions").aggregate([
       { $match: { receiverId: userId, createdAt: { $gte: from, $lte: to } } },
       { $group: { _id: null, grossCreatorEarningsUsd: { $sum: { $ifNull: ["$creatorEarningsUsd", 0] } }, cashCreditedUsd: { $sum: { $ifNull: ["$creatorCashCreditUsd", 0] } }, diamonds: { $sum: { $ifNull: ["$diamondsAwarded", 0] } } } }
@@ -157,7 +163,7 @@ analyticsRouter.get("/creator/overview", requireUser, analyticsReadLimit, async 
       topVideos: topVideos.map(x => ({ id: x._id.toHexString(), views: Number(x.views ?? 0), completedViews: Number(x.completedViews ?? 0), likes: Number(x.likes ?? 0), comments: Number(x.comments ?? 0), shares: Number(x.shares ?? 0), saves: Number(x.saves ?? 0), caption: x.caption ?? "", mediaType: x.mediaType ?? "VIDEO", thumbnail: x.thumbnail ?? null, publishedAt: x.publishedAt ?? null })),
       audienceCountries: audienceCountries.map(x => ({ countryCode: String(x._id ?? "UNKNOWN"), viewers: Number(x.viewers ?? 0), views: Number(x.views ?? 0) })),
       live,
-      trafficSources: [{ source: "TRAFFIC_SOURCE_TRACKING", views: 0, tracked: false }],
+      trafficSources: trafficRows.map(x => ({ source: String(x._id ?? "UNKNOWN"), views: Number(x.views ?? 0), impressions: Number(x.impressions ?? 0), tracked: true })),
       earnings: { grossCreatorEarningsUsd: Number(giftRows[0]?.grossCreatorEarningsUsd ?? 0), cashCreditedUsd: Number(giftRows[0]?.cashCreditedUsd ?? 0), diamonds: Number(giftRows[0]?.diamonds ?? 0) }
     });
   } catch (error) {
