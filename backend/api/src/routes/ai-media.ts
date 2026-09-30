@@ -13,7 +13,10 @@ const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "PORTRAIT_PRO", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
 aiMediaRouter.get("/status", rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, (_req, res) => {
-  res.json({\n    configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY),\n    statusPollingConfigured: Boolean(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY)\n  });
+  res.json({
+    configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY),
+    statusPollingConfigured: Boolean(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY)
+  });
 });
 
 aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
@@ -24,7 +27,13 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
     const requestedResolution = String(req.body?.targetResolution ?? "SOURCE_MAX").toUpperCase();
     const targetResolution = new Set(["SOURCE_MAX", "4K", "8K", "48K_AI"]).has(requestedResolution) ? requestedResolution : "SOURCE_MAX";
     const portraitEnhance = style === "PORTRAIT" || style === "PORTRAIT_PRO" || portraitRequested(prompt);
-    const outputSpec = targetResolution === "4K" ? { width: 3840, height: 2160, maxDimension: 3840 } : targetResolution === "8K" ? { width: 7680, height: 4320, maxDimension: 7680 } : targetResolution === "48K_AI" ? { width: 46080, height: 25920, maxDimension: 46080 } : { width: null, height: null, maxDimension: 4096 };
+    const outputSpec = targetResolution === "4K"
+      ? { width: 3840, height: 2160, maxDimension: 3840 }
+      : targetResolution === "8K"
+        ? { width: 7680, height: 4320, maxDimension: 7680 }
+        : targetResolution === "48K_AI"
+          ? { width: 46080, height: 25920, maxDimension: 46080 }
+          : { width: null, height: null, maxDimension: 4096 };
     const sourceObjectKey = req.body?.sourceObjectKey ? String(req.body.sourceObjectKey) : null;
 
     if (!ALLOWED_MODES.has(mode)) return res.status(400).json({ error: "mode must be IMAGE or VIDEO" });
@@ -47,23 +56,32 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
       return res.status(503).json({ error: "AI media generation is not configured yet", code: "AI_MEDIA_NOT_CONFIGURED" });
     }
 
-    const controller = new AbortController();\n    const timeout = setTimeout(() => controller.abort(), 30_000);\n    let providerResponse: Response;\n    try {\n      providerResponse = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        mode,
-        style,
-        prompt,
-        sourceUrl,
-        preserveSubject: true,
-        enhanceQuality: true,
-        autoPolish: true,
-        portraitEnhance,
-        preserveNaturalSkinTexture: true,
-        targetResolution,
-        outputSpec
-      })
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    let providerResponse: Response;
+    try {
+      providerResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          mode,
+          style,
+          prompt,
+          sourceUrl,
+          preserveSubject: true,
+          enhanceQuality: true,
+          autoPolish: true,
+          portraitEnhance,
+          preserveNaturalSkinTexture: true,
+          targetResolution,
+          outputSpec
+        }),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
     if (!providerResponse.ok) throw new Error(`AI provider returned HTTP ${providerResponse.status}`);
     const provider = await providerResponse.json() as { outputUrl?: string; jobId?: string; status?: string };
     if (!provider.outputUrl && !provider.jobId) throw new Error("AI provider returned no output or job id");
@@ -93,22 +111,27 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   let outputUrl = job.outputUrl ?? null;
   let status = String(job.status ?? "PROCESSING").toUpperCase();
 
-  // Optional provider-side polling. Configure a URL template such as
-  // https://provider.example/jobs/{jobId}; the provider response may contain
-  // outputUrl/url, jobId/id, and status/state.
   const statusEndpoint = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
   if (!outputUrl && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
     try {
       const url = statusEndpoint.replace("{jobId}", encodeURIComponent(String(job.providerJobId)));
-      const providerResponse = await fetch(url, {
-        headers: { "content-type": "application/json", authorization: `Bearer ${process.env.TWITOK_AI_MEDIA_API_KEY ?? ""}` }
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      let providerResponse: Response;
+      try {
+        providerResponse = await fetch(url, {
+          headers: { "content-type": "application/json", authorization: `Bearer ${process.env.TWITOK_AI_MEDIA_API_KEY}` },
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
       if (providerResponse.ok) {
-        const provider = await providerResponse.json() as { outputUrl?: string; url?: string; status?: string; state?: string; error?: string };
+        const provider = await providerResponse.json() as { outputUrl?: string; url?: string; status?: string; state?: string };
         outputUrl = provider.outputUrl ?? provider.url ?? null;
         status = String(provider.status ?? provider.state ?? status).toUpperCase();
         if (outputUrl) status = "READY_FOR_REVIEW";
-        if (["FAILED", "ERROR", "CANCELLED"].includes(status)) status = status;
         await db.collection("ai_media_jobs").updateOne(
           { _id: job._id },
           { $set: { outputUrl, status, updatedAt: new Date() } }
@@ -120,7 +143,15 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   }
 
   res.json({
-    jobId: job.jobId, mode: job.mode, style: job.style, status,
-    outputUrl, targetResolution: job.targetResolution ?? "SOURCE_MAX", outputSpec: job.outputSpec ?? null, portraitEnhance: Boolean(job.portraitEnhance), createdAt: job.createdAt, updatedAt: new Date()
+    jobId: job.jobId,
+    mode: job.mode,
+    style: job.style,
+    status,
+    outputUrl,
+    targetResolution: job.targetResolution ?? "SOURCE_MAX",
+    outputSpec: job.outputSpec ?? null,
+    portraitEnhance: Boolean(job.portraitEnhance),
+    createdAt: job.createdAt,
+    updatedAt: new Date()
   });
 });
