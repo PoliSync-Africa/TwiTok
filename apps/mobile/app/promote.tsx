@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import type { DimensionValue } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import * as Location from "expo-location";
 import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -19,12 +20,15 @@ export default function PromoteScreen() {
   const [objective, setObjective] = useState("MORE_VIEWS");
   const [currency, setCurrency] = useState("GHS");
   const [budget, setBudget] = useState("4.60");
+  const [durationDays, setDurationDays] = useState(1);
+  const [audienceScope, setAudienceScope] = useState("GLOBAL");
+  const [locationLoading, setLocationLoading] = useState(false);
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<string | null>("VIEWS_800");
   const [objectivePackages, setObjectivePackages] = useState<any[]>([]);
   const [partnershipPackages, setPartnershipPackages] = useState<any[]>([]);
   const [subscriberReachPackages, setSubscriberReachPackages] = useState<any[]>([]);
-  const [countries, setCountries] = useState("GH");
+  const [countries, setCountries] = useState("");
   const [interests, setInterests] = useState("");
   const [busy, setBusy] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -45,7 +49,7 @@ export default function PromoteScreen() {
     catch (e) { Alert.alert("Promotions", e instanceof Error ? e.message : "Unable to load promotion packages"); }
   }
 
-  useEffect(() => { loadCampaigns(); loadPackages(); }, []);
+  useEffect(() => { loadCampaigns(); loadPackages(); }, []);\n\n  function selectedDurationOption() {\n    const source = objective === "MORE_VIEWS" ? packages : objectivePackages;\n    const pack = source.find(p => p.id === selectedPackage);\n    return pack?.durationOptions?.find((option: any) => Number(option.days) === durationDays) ?? null;\n  }\n\n  async function useMyLocation() {\n    setLocationLoading(true);\n    try {\n      const permission = await Location.requestForegroundPermissionsAsync();\n      if (permission.status !== "granted") {\n        return Alert.alert("Location permission", "Allow TwiTok to use your location to add your country to the audience. You can continue with Global audience without sharing location.");\n      }\n      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });\n      const places = await Location.reverseGeocodeAsync(position.coords);\n      const code = places[0]?.isoCountryCode?.toUpperCase();\n      if (!code) throw new Error("Unable to determine your country");\n      setCountries(code);\n      setAudienceScope("COUNTRIES");\n      Alert.alert("Audience location", "Your current country was added. You can still change the countries manually.");\n    } catch (e) {\n      Alert.alert("Location", e instanceof Error ? e.message : "Unable to use your location");\n    } finally { setLocationLoading(false); }\n  }
 
   async function request(path: string, options: RequestInit = {}) {
     const token = await getAuthToken();
@@ -59,10 +63,10 @@ export default function PromoteScreen() {
     if (!videoId.trim()) return Alert.alert("Video required", "Enter the video ID you want to promote.");
     setBusy(true);
     try {
-      const selected = objective === "MORE_VIEWS" ? packages.find(p => p.id === selectedPackage) : objectivePackages.find(p => p.id === selectedPackage);
+      const selected = objective === "MORE_VIEWS" ? packages.find(p => p.id === selectedPackage) : objectivePackages.find(p => p.id === selectedPackage);\n      const durationOption = selected?.durationOptions?.find((option: any) => Number(option.days) === durationDays);\n      const selectedPrice = durationOption?.price ?? selected?.price;
       const campaign = await request("/promotions", { method: "POST", body: JSON.stringify({
         videoId: videoId.trim(), objective, currency, budget: selected ? selected.price : budget, packageId: selected?.id ?? undefined,
-        target: { countryCodes: countries.split(",").map(x => x.trim().toUpperCase()).filter(Boolean), interests: interests.split(",").map(x => x.trim()).filter(Boolean) }
+        target: { countryCodes: audienceScope === "GLOBAL" ? [] : countries.split(",").map(x => x.trim().toUpperCase()).filter(Boolean), interests: interests.split(",").map(x => x.trim()).filter(Boolean) }
       })});
       const payment = await request("/promotions/" + campaign.id + "/pay", { method: "POST", body: JSON.stringify({}) });
       setReference(payment.reference);
@@ -138,7 +142,7 @@ export default function PromoteScreen() {
     <View style={styles.row}>{["MORE_VIEWS","MORE_FOLLOWERS","WEBSITE_TRAFFIC","LIVE_AUDIENCE"].map(x => <Pressable key={x} onPress={() => { setObjective(x); const first = x === "MORE_VIEWS" ? packages[0] : objectivePackages[0]; if (first) { setSelectedPackage(first.id); setBudget(String(first.price)); setCurrency("USD"); } }} style={[styles.choice, objective === x && styles.active]}><Text>{x.replaceAll("_"," ")}</Text></Pressable>)}</View>
     <Text style={styles.label}>Currency</Text>
     <View style={styles.row}>{["GHS","USD"].map(x => <Pressable key={x} onPress={() => setCurrency(x)} style={[styles.choice, currency === x && styles.active]}><Text>{x}</Text></Pressable>)}</View>
-    <Text style={styles.label}>Promotion package</Text>
+    <Text style={styles.label}>Audience</Text>\n    <View style={styles.row}>\n      <Pressable onPress={() => { setAudienceScope("GLOBAL"); setCountries(""); }} style={[styles.choice, audienceScope === "GLOBAL" && styles.active]}><Text>🌍 Global (default)</Text></Pressable>\n      <Pressable onPress={() => setAudienceScope("COUNTRIES")} style={[styles.choice, audienceScope === "COUNTRIES" && styles.active]}><Text>🌎 Choose countries</Text></Pressable>\n      <Pressable disabled={locationLoading} onPress={useMyLocation} style={styles.choice}><Text>{locationLoading ? "Finding location..." : "📍 Use my location"}</Text></Pressable>\n    </View>\n    <Text style={styles.locationHint}>Global reaches eligible audiences worldwide. Choose countries or allow location access to add your current country.</Text>\n    <Text style={styles.label}>Promotion duration</Text>\n    <View style={styles.row}>{[1,7,14,30,60].map(days => { const option = (objective === "MORE_VIEWS" ? packages : objectivePackages).find(p => p.id === selectedPackage)?.durationOptions?.find((x:any) => Number(x.days) === days); return <Pressable key={days} onPress={() => { setDurationDays(days); if (option) setBudget(String(option.price)); }} style={[styles.choice, durationDays === days && styles.active]}><Text>{days} day{days === 1 ? "" : "s"}</Text></Pressable>; })}</View>\n    {selectedDurationOption() ? <Text style={styles.durationInfo}>Price +{selectedDurationOption().priceIncreasePercent}% • estimated audience +{selectedDurationOption().audienceIncreasePercent}% vs 1 day</Text> : null}\n    <Text style={styles.label}>Promotion package</Text>
     <Text style={styles.discount}>8% DISCOUNT APPLIED</Text>
     <View style={styles.packages}>{(objective === "MORE_VIEWS" ? packages : objectivePackages).map((pack) => <Pressable key={pack.id} onPress={() => { setSelectedPackage(pack.id); setBudget(String(pack.price)); setCurrency("USD"); }} style={[styles.package, selectedPackage === pack.id && styles.packageActive]}>
       <Text style={styles.packageViews}>{objective === "MORE_VIEWS" ? `${Number(pack.views).toLocaleString()}+ estimated views` : `${String(objective).replaceAll("_"," ")} • budget tier`}</Text>
@@ -229,5 +233,5 @@ const styles = StyleSheet.create({
   partnerText:{fontSize:13,lineHeight:19},
   partnerships:{gap:8},
   partnershipCard:{borderWidth:1,borderColor:"#ddd",borderRadius:12,padding:12,gap:4,backgroundColor:"#fff"},
-  note:{fontSize:12,color:"#666",lineHeight:18,marginTop:8}
+  note:{fontSize:12,color:"#666",lineHeight:18,marginTop:8},\n  locationHint:{fontSize:12,color:"#666",lineHeight:18},\n  durationInfo:{fontSize:13,fontWeight:"800"}
 });
