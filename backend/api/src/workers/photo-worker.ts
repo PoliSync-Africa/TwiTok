@@ -51,7 +51,7 @@ async function processJob(db: any, job: any) {
     await download(String(upload.objectKey), source);
     await runProcess([
       "-hide_banner","-loglevel","error","-y","-i",source,
-      "-vf","scale=w=2048:h=2048:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,unsharp=5:5:0.25:5:5:0",
+      "-vf","scale=w=4096:h=4096:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,hqdn3d=0.8:0.8:3:3,eq=contrast=1.06:saturation=1.06:brightness=0.025:gamma=1.03,unsharp=5:5:0.32:5:5:0,setsar=1",
       "-c:v","libwebp","-quality","92","-compression_level","6",output
     ]);
     const optimizedKey = String(upload.objectKey).replace(/\/[^/]+$/, "/optimized.webp");
