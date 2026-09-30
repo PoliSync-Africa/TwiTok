@@ -53,12 +53,22 @@ export const TWITOK_OBJECTIVES = [
   "LIVE_AUDIENCE"
 ] as const;
 
+export const TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT = 30;
+
 export const TWITOK_PARTNERSHIP_PACKS = [
-  { id: "PARTNERSHIP_STARTER", benchmarkUsd: 25, durationDays: 7, deliverables: "1 sponsored post + campaign distribution" },
-  { id: "PARTNERSHIP_GROWTH", benchmarkUsd: 100, durationDays: 14, deliverables: "3 sponsored posts + campaign distribution", recommended: true },
-  { id: "PARTNERSHIP_PRO", benchmarkUsd: 500, durationDays: 30, deliverables: "10 sponsored posts + campaign distribution" },
-  { id: "PARTNERSHIP_BRAND", benchmarkUsd: 1000, durationDays: 30, deliverables: "20 sponsored posts + campaign distribution" }
+  { id: "PARTNERSHIP_STARTER", benchmarkUsd: 25, durationDays: 7, minCreators: 1, maxCreators: null, deliverables: "1 sponsored post + campaign distribution" },
+  { id: "PARTNERSHIP_GROWTH", benchmarkUsd: 1000, durationDays: 14, minCreators: 1, maxCreators: null, deliverables: "Multi-creator sponsored campaign + campaign distribution", recommended: true },
+  { id: "PARTNERSHIP_PRO", benchmarkUsd: 5000, durationDays: 30, minCreators: 1, maxCreators: null, deliverables: "Multi-creator sponsored campaign + campaign distribution" },
+  { id: "PARTNERSHIP_BRAND", benchmarkUsd: 10000, durationDays: 60, minCreators: 1, maxCreators: null, deliverables: "Large multi-creator sponsored campaign + campaign distribution" }
 ] as const;
+
+export function partnershipCreatorPayout(grossUsd: number) {
+  return Number((grossUsd * (1 - TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT / 100)).toFixed(2));
+}
+
+export function partnershipPlatformFee(grossUsd: number) {
+  return Number((grossUsd * TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT / 100).toFixed(2));
+}
 
 export const TWITOK_SUBSCRIBER_REACH_PACKS = [
   { id: "SUBSCRIBER_1000", audience: 1000, benchmarkUsd: 10 },
