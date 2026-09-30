@@ -49,8 +49,9 @@ shopReturnsRouter.post("/seller/returns/:returnId/reject", requireUser, async (r
 
 shopReturnsRouter.get("/seller/returns", requireUser, async (req, res) => {
   const db = await getDb();
-  const requests = await db.collection("shop_returns").find({}).sort({ createdAt: -1 }).limit(200).toArray();
   const sellerId = req.userId!.toHexString();
-  const filtered = requests.filter((r: any) => r.orderId && r.buyerId !== sellerId);
-  return res.json({ returnRequests: filtered });
+  const orders = await db.collection("shop_orders").find({ "items.sellerId": sellerId }, { projection: { id: 1 } }).limit(500).toArray();
+  const orderIds = orders.map((o: any) => o.id);
+  const requests = await db.collection("shop_returns").find({ orderId: { $in: orderIds } }).sort({ createdAt: -1 }).limit(200).toArray();
+  return res.json({ returnRequests: requests });
 });
