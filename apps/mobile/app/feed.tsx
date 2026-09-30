@@ -216,7 +216,7 @@ export default function FeedScreen() {
       await fetch(API + "/feed/events", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ videoId, type, watchMs, sessionId: `mobile-${Date.now()}` })
+        body: JSON.stringify({ videoId, type, watchMs, sessionId: `mobile-${Date.now()}`, source: surface })
       });
     } catch {}
   };
