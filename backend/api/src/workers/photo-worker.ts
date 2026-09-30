@@ -60,11 +60,11 @@ async function processJob(db: any, job: any) {
       { _id: upload._id },
       { $set: { optimizedObjectKey: optimizedKey, optimizedMimeType: "image/webp", optimizationStatus: "READY", updatedAt: new Date() } }
     );
-    const posts = await db.collection("videos").find({ mediaType: "PHOTO", photoObjectKeys: { $exists: true } }).project({ _id: 1, photoObjectKeys: 1 }).toArray();
-    for (const post of posts) {
-      const keys = Array.isArray(post.photoObjectKeys) ? post.photoObjectKeys.map((key: string) => key === upload.objectKey ? optimizedKey : key) : [];
-      if (keys.some((key: string, i: number) => key !== post.photoObjectKeys[i])) await db.collection("videos").updateOne({ _id: post._id }, { $set: { photoObjectKeys: keys, updatedAt: new Date() } });
-    }
+    await db.collection("videos").updateMany(
+      { mediaType: "PHOTO", photoObjectKeys: upload.objectKey },
+      { $set: { "photoObjectKeys.$[photoKey]": optimizedKey, updatedAt: new Date() } },
+      { arrayFilters: [{ photoKey: upload.objectKey }] }
+    );
     await db.collection("photo_processing_jobs").updateOne({ _id: job._id }, { $set: { status: "SUCCEEDED", finishedAt: new Date(), updatedAt: new Date() } });
   } finally {
     await fs.promises.rm(workDir, { recursive: true, force: true });
