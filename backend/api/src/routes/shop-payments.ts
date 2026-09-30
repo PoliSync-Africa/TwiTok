@@ -16,21 +16,23 @@ async function markShopOrderPaid(db: any, orderId: string, buyerId?: string) {
   );
   if (!result.modifiedCount) return null;
   const order = await db.collection("shop_orders").findOne({ id: orderId });
-  if (order.sourceStreamId && order.sourceProductId) {
-    const sourceItem = order.items?.find((item: any) => item.productId === order.sourceProductId);
-    if (sourceItem) {
-      await db.collection("live_shop_events").insertOne({
-        streamId: order.sourceStreamId,
-        productId: order.sourceProductId,
-        sellerId: String(sourceItem.sellerId),
-        event: "PURCHASE",
-        userId: String(order.buyerId),
-        orderId: order.id,
-        amountMinor: Number(sourceItem.priceMinor) * Number(sourceItem.quantity),
-        currency: order.currency,
-        createdAt: new Date()
-      });
-    }
+  const liveAttributions = Array.isArray(order.liveAttributions)
+    ? order.liveAttributions
+    : (order.sourceStreamId && order.sourceProductId ? [{ streamId: order.sourceStreamId, productId: order.sourceProductId, amountMinor: 0 }] : []);
+  for (const attribution of liveAttributions) {
+    const sourceItem = order.items?.find((item: any) => item.productId === attribution.productId);
+    if (!sourceItem) continue;
+    await db.collection("live_shop_events").insertOne({
+      streamId: String(attribution.streamId),
+      productId: String(attribution.productId),
+      sellerId: String(sourceItem.sellerId),
+      event: "PURCHASE",
+      userId: String(order.buyerId),
+      orderId: order.id,
+      amountMinor: Number(attribution.amountMinor || Number(sourceItem.priceMinor) * Number(sourceItem.quantity)),
+      currency: order.currency,
+      createdAt: new Date()
+    });
   }
   if (order.affiliate?.creatorId && Number(order.affiliate.commissionMinor) > 0) {
     await db.collection("shop_affiliate_commissions").updateOne(
