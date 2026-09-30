@@ -25,6 +25,9 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_products").createIndex({ status: 1, createdAt: -1 });
   await db.collection("shop_products").createIndex({ name: "text", description: "text" });
   await db.collection("shop_products").createIndex({ sellerId: 1, createdAt: -1 });
+  await db.collection("shop_carts").createIndex({ userId: 1 }, { unique: true });
+  await db.collection("shop_orders").createIndex({ buyerId: 1, createdAt: -1 });
+  await db.collection("shop_orders").createIndex({ idempotencyKey: 1, buyerId: 1 }, { unique: true });
 
   return db;
 }
