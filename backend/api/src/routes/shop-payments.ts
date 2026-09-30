@@ -10,12 +10,12 @@ const paymentLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, key: req => 
 async function markShopOrderPaid(db: any, orderId: string, buyerId?: string) {
   const query: any = { id: orderId, paymentStatus: "PENDING" };
   if (buyerId) query.buyerId = buyerId;
-  const order = await db.collection("shop_orders").findOneAndUpdate(
+  const result = await db.collection("shop_orders").updateOne(
     query,
-    { $set: { paymentStatus: "PAID", status: "PAID", paidAt: new Date(), updatedAt: new Date() } },
-    { returnDocument: "after" }
+    { $set: { paymentStatus: "PAID", status: "PAID", paidAt: new Date(), updatedAt: new Date() } }
   );
-  if (!order) return null;
+  if (!result.modifiedCount) return null;
+  const order = await db.collection("shop_orders").findOne({ id: orderId });
   if (order.affiliate?.creatorId && Number(order.affiliate.commissionMinor) > 0) {
     await db.collection("shop_affiliate_commissions").updateOne(
       { orderId: order.id, creatorId: order.affiliate.creatorId },
