@@ -65,18 +65,28 @@ export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: st
   return { uploadId, status: "READY" };
 }
 
-export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean }) {
+export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; editPlan?: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean }) {
   const uploadIds = Array.isArray(input.uploadIds) ? [...new Set(input.uploadIds.map(String).filter(Boolean))].slice(0, 35) : [];
   if (!uploadIds.length) throw new Error("At least one photo is required");
   const uploads = await db.collection("photo_uploads").find({ uploadId: { $in: uploadIds }, userId, status: "READY" }).toArray();
   if (uploads.length !== uploadIds.length) throw new Error("One or more photos are not ready");
+  const rawPhotoEdit = (input as any).editPlan && typeof (input as any).editPlan === "object" ? (input as any).editPlan : {};
+  const photoEditPlan = {
+    quality: ["ORIGINAL","CLEAN","HD"].includes(String(rawPhotoEdit.quality)) ? String(rawPhotoEdit.quality) : "HD",
+    filter: ["NONE","VIVID","WARM","COOL","NOIR","VINTAGE","CINEMATIC"].includes(String(rawPhotoEdit.filter)) ? String(rawPhotoEdit.filter) : "NONE",
+    crop: ["ORIGINAL","9:16","1:1","4:5","16:9"].includes(String(rawPhotoEdit.crop)) ? String(rawPhotoEdit.crop) : "ORIGINAL",
+    rotate: [0,90,180,270].includes(Number(rawPhotoEdit.rotate)) ? Number(rawPhotoEdit.rotate) : 0,
+    mirror: Boolean(rawPhotoEdit.mirror),
+    aiTool: String(rawPhotoEdit.aiTool ?? "NONE").slice(0, 40),
+    aiPrompt: String(rawPhotoEdit.aiPrompt ?? "").trim().slice(0, 600)
+  };
   const caption = String(input.caption ?? "").trim().slice(0, 2200);
   const postId = new ObjectId();
   const safety = await evaluateText(db, { userId: userId.toHexString(), contentId: postId.toHexString(), text: caption, actionType: "VIDEO_CAPTION" });
   if (safety.decision === "BLOCK") throw new Error("Caption blocked by TwiTok Safety Engine");
   const now = new Date();
   await db.collection("videos").insertOne({
-    _id: postId, ownerId: userId, mediaType: "PHOTO", photoObjectKeys: uploads.map(x => x.objectKey),
+    _id: postId, ownerId: userId, mediaType: "PHOTO", editPlan: photoEditPlan, photoObjectKeys: uploads.map(x => x.objectKey),
     photoMimeTypes: uploads.map(x => x.mimeType), caption, hashtags: normalizeHashtags(input.hashtags), mentions: normalizeMentions(input.mentions), location: String(input.location ?? "").trim().slice(0, 120) || null,
     visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
     status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
