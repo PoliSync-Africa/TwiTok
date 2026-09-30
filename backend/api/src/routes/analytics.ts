@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { rateLimit } from "../security/rate-limit.js";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 
 export const analyticsRouter = Router();
 
-const analyticsReadLimit = rateLimit({
+const analyticsReadLimit = expressRateLimit({
   windowMs: 60 * 1000,
-  max: 60,
-  key: req => req.userId?.toHexString() ?? req.ip ?? "unknown"
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req => req.userId?.toHexString() ?? req.ip ?? "unknown"
 });
 
 analyticsRouter.get("/creator/overview", requireUser, analyticsReadLimit, async (req, res) => {
