@@ -18,6 +18,7 @@ type Video = {
   sound?: { id: string; title?: string; artist?: string; coverUrl?: string | null } | null;
   promoted?: boolean;
   promotionObjective?: string | null;
+  shopProducts?: { id:string; name:string; priceMinor:number; currency:string; images?:string[]; stock:number }[];
 };
 
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
@@ -163,7 +164,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
-      <View style={styles.meta}>
+      {item.shopProducts?.length ? <Pressable style={styles.productCard} onPress={() => router.push({ pathname: "/shop", params: { productId: item.shopProducts![0].id } })}><Text style={styles.productBadge}>SHOP</Text><View style={styles.productRow}>{item.shopProducts[0].images?.[0] ? <Image source={{uri:item.shopProducts[0].images[0]}} style={styles.productThumb} /> : null}<View style={styles.productInfo}><Text style={styles.productName} numberOfLines={1}>{item.shopProducts[0].name}</Text><Text style={styles.productPrice}>{item.shopProducts[0].currency} {(item.shopProducts[0].priceMinor/100).toFixed(2)}</Text></View><Text style={styles.productAction}>View</Text></View></Pressable> : null}<View style={styles.meta}>
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<View style={styles.feedVerified}><Text style={styles.feedVerifiedSeal}>✺</Text><Text style={styles.feedVerifiedCheck}>✓</Text></View>}</View></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
@@ -290,6 +291,7 @@ const styles = StyleSheet.create({
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  productCard:{position:"absolute",left:16,right:92,bottom:175,backgroundColor:"rgba(0,0,0,0.78)",borderRadius:12,padding:9,zIndex:12},productBadge:{color:"#fff",fontSize:9,fontWeight:"900",marginBottom:5},productRow:{flexDirection:"row",alignItems:"center",gap:8},productThumb:{width:42,height:42,borderRadius:7,backgroundColor:"#222"},productInfo:{flex:1},productName:{color:"#fff",fontSize:12,fontWeight:"800"},productPrice:{color:"#fff",fontSize:11,fontWeight:"700",marginTop:2},productAction:{color:"#ff2d55",fontSize:11,fontWeight:"900"},
   promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
   promotedText:{color:"#fff",fontSize:12,fontWeight:"800"},
   tab: { color: "#aaa", fontSize: 13 },
