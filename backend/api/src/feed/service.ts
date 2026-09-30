@@ -93,9 +93,11 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const videos = await db.collection("videos").aggregate([
     { $match: query },
-    { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
-      { $match: { userId } },
-      { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
+    { $lookup: { from: "feed_events", let: { candidateVideoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $and: [
+        { $eq: ["$userId", userId] },
+        { $eq: ["$videoId", "$candidateVideoId"] }
+      ] } } },
       { $group: { _id: null,
         eventScore: { $sum: { $switch: {
           branches: [
@@ -114,9 +116,9 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         totalWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }
       } }
     ], as: "viewerEvents" } },
-    { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
+    { $lookup: { from: "feed_events", let: { candidateVideoId: "$_id" }, pipeline: [
       { $match: { $expr: { $and: [
-        { $eq: ["$videoId", "$videoId"] },
+        { $eq: ["$videoId", "$candidateVideoId"] },
         { $gte: ["$createdAt", new Date(Date.now() - 24 * 60 * 60 * 1000)] },
         { $in: ["$type", ["VIEW_2S", "VIEW_COMPLETE", "REWATCH", "LIKE", "COMMENT", "SHARE", "SAVE", "FOLLOW"]] }
       ] } } },
@@ -152,9 +154,9 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       ] },
       _freshness: { $divide: [{ $subtract: [new Date(), { $ifNull: ["$publishedAt", new Date(0)] }] }, 3600000] }
     } },
-        { $lookup: { from: "promotion_campaigns", let: { videoId: "$_id" }, pipeline: [
+        { $lookup: { from: "promotion_campaigns", let: { candidateVideoId: "$_id" }, pipeline: [
       { $match: { $expr: { $and: [
-        { $eq: ["$videoId", "$videoId"] },
+        { $eq: ["$videoId", "$candidateVideoId"] },
         { $eq: ["$status", "ACTIVE"] },
         { $lt: ["$spentMinor", "$budgetMinor"] },
         { $or: [
