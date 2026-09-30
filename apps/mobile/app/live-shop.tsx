@@ -41,6 +41,17 @@ export default function LiveShopScreen() {
     return () => clearInterval(timer);
   }, [streamId, isHost]);
 
+  async function track(event: string, productId: string) {
+    if (!streamId) return;
+    const token = await getAuthToken();
+    if (!token) return;
+    void fetch(API + "/shop/live/" + encodeURIComponent(streamId) + "/shop-events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({ event, productId })
+    }).catch(() => {});
+  }
+
   async function openPicker() {
     if (!isHost) return;
     const token = await getAuthToken();
@@ -86,6 +97,7 @@ export default function LiveShopScreen() {
       });
       if (!r.ok) throw new Error();
       setFeaturedProductId(productId);
+      void track("FEATURE_PIN", productId);
       setProducts(items => items.map(p => ({ ...p, pinned: p.id === productId })));
     } catch { Alert.alert("TwiTok Shop", "Could not feature this product."); }
     finally { setBusy(null); }
@@ -112,6 +124,7 @@ export default function LiveShopScreen() {
     if (!token) return;
     setBusy(productId);
     try {
+      void track("ADD_TO_CART", productId);
       const r = await fetch(API + "/shop/cart/items", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
@@ -141,7 +154,7 @@ export default function LiveShopScreen() {
           {featured.images?.[0] ? <Image source={{ uri: featured.images[0] }} style={styles.featuredImage} /> : null}
           <View style={styles.featuredInfo}><Text style={styles.badge}>FEATURED</Text><Text style={styles.featuredName} numberOfLines={2}>{featured.name}</Text><Text style={styles.price}>{featured.currency} {(featured.priceMinor / 100).toFixed(2)}</Text><Text style={styles.stock}>{featured.stock > 0 ? "In stock" : "Out of stock"}</Text></View>
           <View style={styles.featuredActions}>
-            <Pressable disabled={!featured.stock} style={styles.buySecondary} onPress={() => router.push({ pathname: "/shop", params: { productId: featured.id } })}><Text style={styles.buySecondaryText}>Buy Now</Text></Pressable>
+            <Pressable disabled={!featured.stock} style={styles.buySecondary} onPress={() => { void track("BUY_NOW", featured.id); router.push({ pathname: "/shop", params: { productId: featured.id } }); }}><Text style={styles.buySecondaryText}>Buy Now</Text></Pressable>
             <Pressable disabled={!featured.stock || busy === featured.id} style={styles.buy} onPress={() => void addToCart(featured.id)}><Text style={styles.buyText}>{busy === featured.id ? "Adding…" : "Add to Cart"}</Text></Pressable>
           </View>
         </View> : null;
@@ -155,7 +168,7 @@ export default function LiveShopScreen() {
           {isHost ? <View style={styles.actions}>
             <Pressable disabled={busy === product.id} style={[styles.pin, product.pinned && styles.pinned]} onPress={() => void pin(product.id)}><Text style={styles.pinText}>{product.pinned ? "Pinned" : "Pin"}</Text></Pressable>
             <Pressable disabled={busy === product.id} style={styles.remove} onPress={() => void remove(product.id)}><Text style={styles.removeText}>Remove</Text></Pressable>
-          </View> : <Pressable disabled={!product.stock || busy === product.id} style={styles.add} onPress={() => void addToCart(product.id)}><Text style={styles.addText}>{busy === product.id ? "…" : "Add"}</Text></Pressable>}
+          </View> : <Pressable disabled={!product.stock || busy === product.id} style={styles.add} onPress={() => { void track("ADD_TO_CART", product.id); void addToCart(product.id); }}><Text style={styles.addText}>{busy === product.id ? "…" : "Add"}</Text></Pressable>}
         </View>)}
         {!products.length && <Text style={styles.muted}>{isHost ? "No products attached to this LIVE yet." : "No Shop products are featured yet."}</Text>}
       </ScrollView>}
