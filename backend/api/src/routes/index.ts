@@ -25,6 +25,7 @@ import { analyticsRouter } from "./analytics.js";
 import { verificationRouter } from "./verification.js";
 import { aiMediaRouter } from "./ai-media.js";
 import { shopRouter } from "./shop.js";
+import { shopCommerceRouter } from "./shop-commerce.js";
 
 export const apiRouter = Router();
 
@@ -62,3 +63,4 @@ apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/verification", verificationRouter);
 apiRouter.use("/ai-media", aiMediaRouter);
 apiRouter.use("/shop", shopRouter);
+apiRouter.use("/shop/commerce", shopCommerceRouter);
