@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, St
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
+import * as SecureStore from "expo-secure-store";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
@@ -21,6 +22,7 @@ const EMOJI_STICKERS = EMOJI_CATALOG.map((emoji,i) => [emojiStickerId(emoji), em
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [editPlan, setEditPlan] = useState<any>({ quality:"HD", filter:"NONE", crop:"ORIGINAL", rotate:0, mirror:false, speed:1, aiTool:"NONE", aiPrompt:"" });
   const [selectedClip, setSelectedClip] = useState(0);
   const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
@@ -43,9 +45,14 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, editPlan: incomingEditPlan } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; editPlan?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
+  useEffect(() => {
+    const raw = String(incomingEditPlan ?? "");
+    if (raw) { try { setEditPlan(JSON.parse(raw)); } catch {} }
+    void SecureStore.getItemAsync("twitok_media_edit_plan").then(value => { if (value) { try { setEditPlan(JSON.parse(value)); } catch {} void SecureStore.deleteItemAsync("twitok_media_edit_plan"); } }).catch(() => undefined);
+  }, [incomingEditPlan]);
   useEffect(() => {
     const uri = String(recordedUri ?? "");
     if (!uri) return;
@@ -249,7 +256,7 @@ export default function CreateScreen() {
           const complete=await fetch(API+"/videos/photos/uploads/"+session.uploadId+"/complete",{method:"POST",headers:{Authorization:"Bearer "+token}}); if(!complete.ok) throw new Error("Unable to complete photo upload.");
           uploadIds.push(session.uploadId); setStatus("Uploading photo "+(index+1)+" of "+assets.length+"…");
         }
-        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),allowDuet:duet,allowStitch:stitch})});
+        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),allowDuet:duet,allowStitch:stitch,editPlan})});
         const data=await post.json().catch(()=>({})); if(!post.ok) throw new Error(data.error||"Unable to publish photo post.");
         Alert.alert("Posted","Your TwiTok photo post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
@@ -306,7 +313,7 @@ export default function CreateScreen() {
           clipSettings,
           autoCaptions,
           captionLanguage,
-          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
+          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : [],
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
@@ -351,7 +358,8 @@ export default function CreateScreen() {
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
         <TextInput value={location} onChangeText={setLocation} placeholder="📍 Add location" placeholderTextColor="#777" style={styles.input} maxLength={120} />
-         {assets.length ? <FlatList
+         {mode !== "TEXT" && assets.length ? <Pressable style={styles.editorButton} onPress={() => router.push({ pathname:"/media-editor", params:{ mode, editPlan: JSON.stringify(editPlan) } })}><Text style={styles.editorButtonIcon}>✦</Text><View style={{flex:1}}><Text style={styles.editorButtonTitle}>Edit & AI tools</Text><Text style={styles.editorButtonSub}>Free enhance, filters, crop, effects, captions, restyle & more</Text></View><Text style={styles.editorButtonArrow}>›</Text></Pressable> : null}
+        {assets.length ? <FlatList
            data={assets}
            horizontal
            keyExtractor={(a,i)=>a.uri+i}
@@ -527,6 +535,11 @@ export default function CreateScreen() {
   );
 }
 const styles=StyleSheet.create({
+  editorButton:{marginTop:12,marginBottom:10,backgroundColor:"#102b38",borderWidth:1,borderColor:"#2f8eaf",borderRadius:16,padding:14,flexDirection:"row",alignItems:"center"},
+  editorButtonIcon:{fontSize:24,color:"#62c9ec",fontWeight:"800",marginRight:10},
+  editorButtonTitle:{fontSize:16,fontWeight:"800",color:"#fff"},
+  editorButtonSub:{fontSize:11,color:"#a9bac6",marginTop:3},
+  editorButtonArrow:{fontSize:30,color:"#62c9ec",marginLeft:8},
  screen:{flex:1,backgroundColor:"#000",paddingTop:48},clipActions:{position:"absolute",bottom:4,left:8,right:8,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},action:{color:"#fff",fontSize:24,fontWeight:"900"},transitionRow:{paddingHorizontal:16,paddingVertical:4},transitionChoices:{gap:6},perClip:{paddingHorizontal:16,paddingVertical:4},helper:{color:"#777",fontSize:12,paddingHorizontal:16,paddingTop:4},trimInput:{flex:1,minWidth:130,marginHorizontal:0},draftButton:{marginHorizontal:16,marginTop:14,borderWidth:1,borderColor:"#444",borderRadius:12,padding:14,alignItems:"center"},draftText:{color:"#fff",fontWeight:"800"},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipSelected:{borderWidth:2,borderColor:"#ff2d55"},timelineBox:{marginHorizontal:16,marginTop:8,borderRadius:14,backgroundColor:"#0d0d0d",paddingVertical:10},timelineHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},timelineMeta:{color:"#777",fontSize:12,paddingHorizontal:16},timelineRow:{flexDirection:"row",gap:6,paddingHorizontal:12,paddingVertical:10,alignItems:"center"},timelineClip:{height:48,borderRadius:8,backgroundColor:"#1b1b1b",padding:7,justifyContent:"space-between",borderWidth:1,borderColor:"#292929"},timelineClipSelected:{borderColor:"#ff2d55"},timelineClipText:{color:"#fff",fontSize:12,fontWeight:"800"},timelineRange:{height:5,borderRadius:3,backgroundColor:"#333",position:"relative",overflow:"hidden"},timelinePlayhead:{position:"absolute",top:0,bottom:0,width:3,backgroundColor:"#ff2d55"},timelineControls:{flexDirection:"row",alignItems:"center",gap:6,paddingHorizontal:12,paddingBottom:4},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"},soundButton:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",padding:14},clearSound:{color:"#ff2d55",fontWeight:"800",marginHorizontal:16,marginTop:4},effectOverlay:{position:"absolute",top:0,bottom:0,left:0,right:0},effectVibrant:{backgroundColor:"rgba(255,180,80,0.12)"},effectWarm:{backgroundColor:"rgba(255,140,40,0.18)"},effectCool:{backgroundColor:"rgba(60,150,255,0.16)"},effectNoir:{backgroundColor:"rgba(0,0,0,0.42)"},effectVintage:{backgroundColor:"rgba(150,90,40,0.20)"},
   previewCard:{marginHorizontal:16,marginTop:10,borderRadius:14,backgroundColor:"#0d0d0d",overflow:"hidden"},
   previewStage:{height:360,backgroundColor:"#000",position:"relative"},
