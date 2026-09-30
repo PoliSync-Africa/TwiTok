@@ -7,20 +7,14 @@ import { rateLimit } from "../security/rate-limit.js";
 
 export const aiMediaRouter = Router();
 
-const aiMediaWriteLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
-  key: req => req.userId?.toHexString() ?? req.ip ?? "unknown"
-});
-
 const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
-aiMediaRouter.get("/status", requireUser, rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), (_req, res) => {
+aiMediaRouter.get("/status", rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, (_req, res) => {
   res.json({ configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY) });
 });
 
-aiMediaRouter.post("/restyle", requireUser, aiMediaWriteLimit, async (req, res) => {
+aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
     const mode = String(req.body?.mode ?? "").toUpperCase();
     const style = String(req.body?.style ?? "CLEAN").toUpperCase();
@@ -79,7 +73,7 @@ aiMediaRouter.post("/restyle", requireUser, aiMediaWriteLimit, async (req, res) 
   }
 });
 
-aiMediaRouter.get("/jobs/:jobId", requireUser, rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   const db = await getDb();
   const job = await db.collection("ai_media_jobs").findOne({ jobId: String(req.params.jobId), userId: req.userId });
   if (!job) return res.status(404).json({ error: "AI media job not found" });
