@@ -54,6 +54,8 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
   const reservedItems: any[] = [];
   for (const item of items) {
     const quantity = Math.floor(Number(item.quantity));
+    const product = await db.collection("shop_products").findOne({ id: String(item.productId), status: "ACTIVE" }, { projection: { id: 1, sellerId: 1, stock: 1 } });
+    if (!product) return res.status(404).json({ error: `Product not found: ${item.name}` });
     const result = await db.collection("shop_products").updateOne({ id: String(item.productId), status: "ACTIVE", stock: { $gte: quantity } }, { $inc: { stock: -quantity } });
     if (!result.modifiedCount) {
       for (const reserved of reservedItems) await db.collection("shop_products").updateOne({ id: reserved.productId }, { $inc: { stock: reserved.quantity } });
