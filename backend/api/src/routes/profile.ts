@@ -11,7 +11,7 @@ export const profileRouter = Router();
 const profileMediaLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 
-profileRouter.patch("/me", requireUser, async (req, res) => {
+profileRouter.patch("/me", requireUser, profileMediaLimit, async (req, res) => {
   try {
     const username = String(req.body?.username ?? "").trim().toLowerCase();
     const nickname = String(req.body?.nickname ?? "").trim();
