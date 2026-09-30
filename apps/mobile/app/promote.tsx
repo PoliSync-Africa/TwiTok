@@ -26,6 +26,7 @@ export default function PromoteScreen() {
   const [busy, setBusy] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [reference, setReference] = useState("");
+  const [analytics, setAnalytics] = useState<Record<string, any>>({});
 
   async function loadCampaigns() {
     try {
@@ -79,6 +80,11 @@ export default function PromoteScreen() {
     } catch (e) {
       Alert.alert("Payment", e instanceof Error ? e.message : "Payment is not confirmed yet.");
     } finally { setBusy(false); }
+  }
+
+  async function loadAnalytics(id: string) {
+    try { const data = await request("/promotions/" + id + "/analytics"); setAnalytics(prev => ({ ...prev, [id]: data.analytics })); }
+    catch (e) { Alert.alert("Analytics", e instanceof Error ? e.message : "Unable to load analytics"); }
   }
 
   async function startCampaign(id: string) {
@@ -138,6 +144,8 @@ export default function PromoteScreen() {
           <Text>👥 {campaign.metrics?.follows ?? 0} follows</Text>
         </View>
         {campaign.status === "PAID" ? <Pressable disabled={busy} onPress={() => startCampaign(campaign.id)} style={styles.smallButton}><Text style={styles.smallButtonText}>Start Campaign</Text></Pressable> : null}
+        <Pressable disabled={busy} onPress={() => loadAnalytics(campaign.id)} style={styles.analyticsButton}><Text style={styles.analyticsText}>View Analytics</Text></Pressable>
+        {analytics[campaign.id] ? <View style={styles.analyticsCard}><Text>Impressions: {analytics[campaign.id].impressions}</Text><Text>2s views: {analytics[campaign.id].views}</Text><Text>Completed: {analytics[campaign.id].completedViews}</Text><Text>Likes: {analytics[campaign.id].likes} • Shares: {analytics[campaign.id].shares}</Text><Text>Follows: {analytics[campaign.id].follows}</Text></View> : null}
         {campaign.status === "ACTIVE" ? <Pressable disabled={busy} onPress={() => pauseCampaign(campaign.id)} style={styles.pauseButton}><Text style={styles.pauseText}>Pause Campaign</Text></Pressable> : null}
       </View>
     ))}
@@ -182,6 +190,9 @@ const styles = StyleSheet.create({
   metrics:{gap:5},
   smallButton:{backgroundColor:"#111",padding:12,borderRadius:10,alignItems:"center"},
   smallButtonText:{color:"#fff",fontWeight:"800"},
+  analyticsButton:{borderWidth:1,borderColor:"#ddd",padding:12,borderRadius:10,alignItems:"center"},
+  analyticsText:{fontWeight:"800"},
+  analyticsCard:{backgroundColor:"#f2f2f2",borderRadius:12,padding:12,gap:4},
   pauseButton:{borderWidth:1,borderColor:"#999",padding:12,borderRadius:10,alignItems:"center"},
   pauseText:{fontWeight:"800"},
   note:{fontSize:12,color:"#666",lineHeight:18,marginTop:8}
