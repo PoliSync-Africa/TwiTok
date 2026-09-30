@@ -5,6 +5,8 @@ import { createOwnerToken, ensureOwnerAccount, verifyOwner } from "../auth/owner
 import { requireOwner } from "../auth/admin-middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 import { verifyTotp } from "../security/totp.js";
+import { createPresignedPlayback } from "../media/storage.js";
+import { reviewVerificationRequest } from "../verification/service.js";
 
 export const adminRouter = Router();
 const adminReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.ownerId ?? req.ip ?? "unknown" });
@@ -38,6 +40,69 @@ adminRouter.get("/auth/me",requireOwner,adminReadLimit,async(req,res)=>{
     return res.status(500).json({error:"Unable to load administrator session"});
   }
 });
+
+adminRouter.get("/verification/requests", requireOwner, adminReadLimit, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const status = String(req.query.status ?? "PENDING").toUpperCase();
+    const query = ["PENDING", "APPROVED", "REJECTED"].includes(status) ? { status } : {};
+    const db = await getDb();
+    const rows = await db.collection("verification_requests").find(query).sort({ createdAt: 1 }).limit(limit).toArray();
+    const userIds = [...new Set(rows.map(row => String(row.userId)))].filter(ObjectId.isValid).map(id => new ObjectId(id));
+    const users = await db.collection("users").find({ _id: { $in: userIds } }, { projection: { username: 1, nickname: 1, countryCode: 1, accountType: 1, isVerified: 1, profilePhotoKey: 1 } }).toArray();
+    const byId = new Map(users.map(user => [user._id.toHexString(), user]));
+    return res.json({
+      requests: rows.map(row => {
+        const user = byId.get(String(row.userId));
+        return {
+          requestId: row.requestId,
+          userId: String(row.userId),
+          username: user?.username ?? null,
+          nickname: user?.nickname ?? null,
+          countryCode: user?.countryCode ?? null,
+          accountType: user?.accountType ?? null,
+          isVerified: user?.isVerified === true,
+          type: row.type,
+          legalName: row.legalName,
+          displayName: row.displayName,
+          website: row.website ?? null,
+          supportingLinks: row.supportingLinks ?? [],
+          reason: row.reason ?? "",
+          status: row.status,
+          createdAt: row.createdAt,
+          reviewedAt: row.reviewedAt ?? null,
+          reviewNotes: row.reviewNotes ?? null
+        };
+      })
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to load verification requests" });
+  }
+});
+
+adminRouter.get("/verification/requests/:requestId/document-url", requireOwner, adminReadLimit, async (req, res) => {
+  try {
+    const requestId = String(req.params.requestId);
+    const request = await (await getDb()).collection("verification_requests").findOne({ requestId }, { projection: { identityDocumentKey: 1 } });
+    if (!request?.identityDocumentKey) return res.status(404).json({ error: "Verification document not found" });
+    const signed = await createPresignedPlayback(String(request.identityDocumentKey), 300);
+    return res.json({ url: signed.url, expiresInSeconds: signed.expiresInSeconds });
+  } catch (error) {
+    return res.status(404).json({ error: error instanceof Error ? error.message : "Unable to prepare verification document" });
+  }
+});
+
+adminRouter.post("/verification/requests/:requestId/review", requireOwner, rateLimit({ windowMs: 60 * 60 * 1000, max: 60, key: req => req.ownerId ?? req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    const decision = String(req.body?.decision ?? "").toUpperCase();
+    if (decision !== "APPROVE" && decision !== "REJECT") return res.status(400).json({ error: "Decision must be APPROVE or REJECT" });
+    const result = await reviewVerificationRequest(await getDb(), String(req.params.requestId), String(req.ownerId), decision as "APPROVE" | "REJECT", req.body?.reviewNotes);
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to review verification request" });
+  }
+});
+
 adminRouter.get("/overview",requireOwner,adminReadLimit,async(req,res)=>{
   try {
     const db=await getDb();
