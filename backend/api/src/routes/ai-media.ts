@@ -23,6 +23,8 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
     const prompt = String(req.body?.prompt ?? "").trim().slice(0, 1200);
     const requestedResolution = String(req.body?.targetResolution ?? "SOURCE_MAX").toUpperCase();
     const targetResolution = new Set(["SOURCE_MAX", "4K", "8K", "48K_AI"]).has(requestedResolution) ? requestedResolution : "SOURCE_MAX";
+    const portraitEnhance = style === "PORTRAIT" || style === "PORTRAIT_PRO" || portraitRequested(prompt);
+    const outputSpec = targetResolution === "4K" ? { width: 3840, height: 2160, maxDimension: 3840 } : targetResolution === "8K" ? { width: 7680, height: 4320, maxDimension: 7680 } : targetResolution === "48K_AI" ? { width: 46080, height: 25920, maxDimension: 46080 } : { width: null, height: null, maxDimension: 4096 };
     const sourceObjectKey = req.body?.sourceObjectKey ? String(req.body.sourceObjectKey) : null;
 
     if (!ALLOWED_MODES.has(mode)) return res.status(400).json({ error: "mode must be IMAGE or VIDEO" });
@@ -56,9 +58,10 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
         preserveSubject: true,
         enhanceQuality: true,
         autoPolish: true,
-        portraitEnhance: style === "PORTRAIT" || style === "PORTRAIT_PRO" || portraitRequested(prompt),
+        portraitEnhance,
         preserveNaturalSkinTexture: true,
-        targetResolution
+        targetResolution,
+        outputSpec
       })
     });
     if (!providerResponse.ok) throw new Error(`AI provider returned HTTP ${providerResponse.status}`);
@@ -70,6 +73,7 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
     await db.collection("ai_media_jobs").insertOne({
       jobId, userId: req.userId, mode, style, prompt: prompt || null,
       sourceObjectKey, providerJobId: provider.jobId ?? null,
+      targetResolution, outputSpec, portraitEnhance,
       outputUrl: provider.outputUrl ?? null,
       status: provider.outputUrl ? "READY_FOR_REVIEW" : String(provider.status ?? "PROCESSING").toUpperCase(),
       createdAt: new Date(), updatedAt: new Date()
@@ -87,6 +91,6 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   if (!job) return res.status(404).json({ error: "AI media job not found" });
   res.json({
     jobId: job.jobId, mode: job.mode, style: job.style, status: job.status,
-    outputUrl: job.outputUrl ?? null, createdAt: job.createdAt, updatedAt: job.updatedAt
+    outputUrl: job.outputUrl ?? null, targetResolution: job.targetResolution ?? "SOURCE_MAX", outputSpec: job.outputSpec ?? null, portraitEnhance: Boolean(job.portraitEnhance), createdAt: job.createdAt, updatedAt: job.updatedAt
   });
 });
