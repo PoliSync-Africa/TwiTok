@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { TWITOK_SHOP_PLATFORM_FEE_PERCENT } from "../config/shop-fees.js";
@@ -26,7 +27,7 @@ shopCommerceRouter.post("/products", requireUser, async (req, res) => {
   if (!body.name || body.priceMinor == null || !body.currency) {
     return res.status(400).json({ error: "name, priceMinor and currency are required" });
   }
-  const id = crypto.randomUUID();
+  const id = randomUUID();
   const product = {
     id,
     sellerId: req.userId,
