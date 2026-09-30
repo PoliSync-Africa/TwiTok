@@ -22,6 +22,8 @@ export default function PromoteScreen() {
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<string | null>("VIEWS_800");
   const [objectivePackages, setObjectivePackages] = useState<any[]>([]);
+  const [partnershipPackages, setPartnershipPackages] = useState<any[]>([]);
+  const [subscriberReachPackages, setSubscriberReachPackages] = useState<any[]>([]);
   const [countries, setCountries] = useState("GH");
   const [interests, setInterests] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +41,7 @@ export default function PromoteScreen() {
   }
 
   async function loadPackages() {
-    try { const data = await request("/promotions/packages"); setPackages(data.packages ?? []); setObjectivePackages(data.objectivePackages ?? []); }
+    try { const data = await request("/promotions/packages"); setPackages(data.packages ?? []); setObjectivePackages(data.objectivePackages ?? []); setPartnershipPackages(data.partnershipPackages ?? []); setSubscriberReachPackages(data.subscriberReachPackages ?? []); }
     catch (e) { Alert.alert("Promotions", e instanceof Error ? e.message : "Unable to load promotion packages"); }
   }
 
@@ -111,7 +113,26 @@ export default function PromoteScreen() {
 
   return <ScrollView contentContainerStyle={styles.container}>
     <Text style={styles.title}>Promote on TwiTok 🚀</Text>
-    <Text style={styles.subtitle}>Pay TwiTok to give your real video more opportunities to reach relevant viewers.</Text>
+    <Text style={styles.subtitle}>Promote real content, reach relevant audiences, and build paid brand partnerships on TwiTok.</Text>
+    <View style={styles.partnerBanner}>
+      <Text style={styles.partnerTitle}>🤝 Paid Partnerships</Text>
+      <Text style={styles.partnerText}>Brands can sponsor creator content and receive campaign distribution with clear deliverables.</Text>
+      <View style={styles.partnerships}>{partnershipPackages.map((pack) => <View key={pack.id} style={styles.partnershipCard}>
+        <Text style={styles.packageViews}>{pack.id.replaceAll("_"," ")}</Text>
+        <Text style={styles.partnerText}>{pack.deliverables}</Text>
+        <Text style={styles.packagePrice}>$ {Number(pack.price).toFixed(2)}</Text>
+        <Text style={styles.packageDiscount}>{pack.durationDays} days • 8% discount</Text>
+      </View>)}</View>
+    </View>
+    <View style={styles.partnerBanner}>
+      <Text style={styles.partnerTitle}>📣 Reach Subscribed Audiences</Text>
+      <Text style={styles.partnerText}>Paid campaigns can target eligible subscribed audiences by approved interests and geography. Audience reach is an estimate, not a guaranteed result.</Text>
+      <View style={styles.partnerships}>{subscriberReachPackages.map((pack) => <View key={pack.id} style={styles.partnershipCard}>
+        <Text style={styles.packageViews}>{Number(pack.audience).toLocaleString()} audience reach</Text>
+        <Text style={styles.packagePrice}>$ {Number(pack.price).toFixed(2)}</Text>
+        <Text style={styles.packageDiscount}>{pack.durationDays} day{pack.durationDays === 1 ? "" : "s"} • 8% discount</Text>
+      </View>)}</View>
+    </View>
     <TextInput style={styles.input} placeholder="Video ID" value={videoId} onChangeText={setVideoId} autoCapitalize="none" />
     <Text style={styles.label}>Goal</Text>
     <View style={styles.row}>{["MORE_VIEWS","MORE_FOLLOWERS","WEBSITE_TRAFFIC","LIVE_AUDIENCE"].map(x => <Pressable key={x} onPress={() => { setObjective(x); const first = x === "MORE_VIEWS" ? packages[0] : objectivePackages[0]; if (first) { setSelectedPackage(first.id); setBudget(String(first.price)); setCurrency("USD"); } }} style={[styles.choice, objective === x && styles.active]}><Text>{x.replaceAll("_"," ")}</Text></Pressable>)}</View>
@@ -203,5 +224,10 @@ const styles = StyleSheet.create({
   analyticsCard:{backgroundColor:"#f2f2f2",borderRadius:12,padding:12,gap:4},
   pauseButton:{borderWidth:1,borderColor:"#999",padding:12,borderRadius:10,alignItems:"center"},
   pauseText:{fontWeight:"800"},
+  partnerBanner:{borderWidth:1,borderColor:"#ddd",borderRadius:18,padding:15,gap:10,backgroundColor:"#f7f7f7"},
+  partnerTitle:{fontSize:19,fontWeight:"900"},
+  partnerText:{fontSize:13,lineHeight:19},
+  partnerships:{gap:8},
+  partnershipCard:{borderWidth:1,borderColor:"#ddd",borderRadius:12,padding:12,gap:4,backgroundColor:"#fff"},
   note:{fontSize:12,color:"#666",lineHeight:18,marginTop:8}
 });
