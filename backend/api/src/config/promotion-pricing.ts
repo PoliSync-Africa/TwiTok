@@ -12,6 +12,24 @@ export const TWITOK_VIEW_PACKS = [
   { id: "VIEWS_1000000", views: 1000000, benchmarkUsd: 6268.80, durationDays: 30 }
 ] as const;
 
+export const TWITOK_OBJECTIVES = [
+  "MORE_VIEWS",
+  "MORE_FOLLOWERS",
+  "MORE_PROFILE_VISITS",
+  "WEBSITE_TRAFFIC",
+  "LIVE_AUDIENCE"
+] as const;
+
+export const TWITOK_OBJECTIVE_BUDGET_PACKS = [
+  { id: "BUDGET_5", benchmarkUsd: 5.00, durationDays: 1 },
+  { id: "BUDGET_10", benchmarkUsd: 10.00, durationDays: 1, recommended: true },
+  { id: "BUDGET_20", benchmarkUsd: 20.06, durationDays: 1 },
+  { id: "BUDGET_50", benchmarkUsd: 50.00, durationDays: 3 },
+  { id: "BUDGET_100", benchmarkUsd: 100.00, durationDays: 7 },
+  { id: "BUDGET_500", benchmarkUsd: 500.00, durationDays: 14 },
+  { id: "BUDGET_1000", benchmarkUsd: 1000.00, durationDays: 30 }
+] as const;
+
 export function discountedPromotionPrice(benchmarkUsd: number) {
   return Number((benchmarkUsd * (1 - TWITOK_PROMOTION_DISCOUNT)).toFixed(2));
 }
