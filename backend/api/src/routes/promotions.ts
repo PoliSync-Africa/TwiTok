@@ -4,7 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_SUBSCRIBER_REACH_PACKS, TWITOK_DURATION_OPTIONS, TWITOK_DEFAULT_DURATION_DAYS, discountedPromotionPrice, durationAdjustedPrice, durationAdjustedAudience, durationPriceIncreasePercent, getViewPack } from "../config/promotion-pricing.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT, TWITOK_SUBSCRIBER_REACH_PACKS, TWITOK_DURATION_OPTIONS, TWITOK_DEFAULT_DURATION_DAYS, discountedPromotionPrice, durationAdjustedPrice, durationAdjustedAudience, durationPriceIncreasePercent, partnershipCreatorPayout, partnershipPlatformFee, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -64,15 +64,37 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
-    partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => ({
-      id: pack.id,
-      benchmarkPrice: pack.benchmarkUsd,
-      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, TWITOK_DEFAULT_DURATION_DAYS)),
-      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
-      durationDays: pack.durationDays,
-      deliverables: pack.deliverables,
-      recommended: Boolean("recommended" in pack && pack.recommended)
-    })),
+    partnershipPlatformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
+    partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => {
+      const grossPrice = discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays));
+      return {
+        id: pack.id,
+        benchmarkPrice: pack.benchmarkUsd,
+        price: grossPrice,
+        creatorCount: { min: pack.minCreators, max: pack.maxCreators },
+        creatorCountLabel: pack.maxCreators === null ? "1 to unlimited creators" : `1 to ${pack.maxCreators} creators`,
+        platformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
+        platformFee: partnershipPlatformFee(grossPrice),
+        creatorPoolAfterPlatformFee: partnershipCreatorPayout(grossPrice),
+        durationOptions: TWITOK_DURATION_OPTIONS.map(option => {
+          const optionGrossPrice = discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days));
+          return {
+            days: option.days,
+            price: optionGrossPrice,
+            priceIncreasePercent: option.priceIncreasePercent,
+            cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days),
+            audienceIncreasePercent: option.audienceIncreasePercent,
+            creatorCount: { min: pack.minCreators, max: pack.maxCreators },
+            platformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
+            platformFee: partnershipPlatformFee(optionGrossPrice),
+            creatorPoolAfterPlatformFee: partnershipCreatorPayout(optionGrossPrice)
+          };
+        }),
+        durationDays: pack.durationDays,
+        deliverables: pack.deliverables,
+        recommended: Boolean("recommended" in pack && pack.recommended)
+      };
+    }),
     subscriberReachPackages: TWITOK_SUBSCRIBER_REACH_PACKS.map(pack => ({
       id: pack.id,
       audience: durationAdjustedAudience(pack.audience, TWITOK_DEFAULT_DURATION_DAYS),
