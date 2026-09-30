@@ -50,6 +50,9 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_affiliate_links").createIndex({ creatorId: 1, createdAt: -1 });
   await db.collection("shop_affiliate_commissions").createIndex({ orderId: 1, creatorId: 1 }, { unique: true });
   await db.collection("shop_affiliate_commissions").createIndex({ creatorId: 1, status: 1, createdAt: -1 });
+  await db.collection("live_shop_products").createIndex({ streamId: 1, sortOrder: 1 });
+  await db.collection("live_shop_products").createIndex({ streamId: 1, productId: 1 }, { unique: true });
+  await db.collection("live_shop_products").createIndex({ hostUserId: 1, createdAt: -1 });
 
   return db;
 }
