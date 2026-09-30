@@ -164,7 +164,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
       </View>
       <View style={styles.meta}>
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
-        <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<Text style={styles.feedVerified}>✓</Text>}</View></Pressable>
+        <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<View style={styles.feedVerified}><Text style={styles.feedVerifiedCheck}>✓</Text></View>}</View></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   activeIcon: { color: "#ff2d55" },
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
   usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
-  feedVerified:{color:"#1da1f2",fontSize:15,fontWeight:"900"},
+  feedVerified:{width:17,height:17,borderRadius:8.5,backgroundColor:"#1877F2",alignItems:"center",justifyContent:"center"},feedVerifiedCheck:{color:"#fff",fontSize:11,fontWeight:"900",lineHeight:13},
   username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
   caption: { color: "#fff", fontSize: 15, lineHeight: 21 },
   soundMeta: { flexDirection: "row", alignItems: "center", marginTop: 10, maxWidth: "88%" },
