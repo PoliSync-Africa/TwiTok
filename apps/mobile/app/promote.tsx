@@ -20,7 +20,7 @@ export default function PromoteScreen() {
   const [objective, setObjective] = useState("MORE_VIEWS");
   const [currency, setCurrency] = useState("GHS");
   const [budget, setBudget] = useState("4.60");
-  const [durationDays, setDurationDays] = useState(1);
+  const [durationDays, setDurationDays] = useState(7);
   const [audienceScope, setAudienceScope] = useState("GLOBAL");
   const [locationLoading, setLocationLoading] = useState(false);
   const [packages, setPackages] = useState<any[]>([]);
@@ -177,8 +177,8 @@ export default function PromoteScreen() {
     </View>
     <Text style={styles.locationHint}>Global reaches eligible audiences worldwide. Choose countries or allow location access to add your current country.</Text>
     <Text style={styles.label}>Promotion duration</Text>
-    <View style={styles.row}>{[1,7,14,30,60].map(days => { const option = (objective === "MORE_VIEWS" ? packages : objectivePackages).find(p => p.id === selectedPackage)?.durationOptions?.find((x:any) => Number(x.days) === days); return <Pressable key={days} onPress={() => { setDurationDays(days); if (option) setBudget(String(option.price)); }} style={[styles.choice, durationDays === days && styles.active]}><Text>{days} day{days === 1 ? "" : "s"}</Text></Pressable>; })}</View>
-    {selectedDurationOption() ? <Text style={styles.durationInfo}>Total price +{selectedDurationOption().cumulativePriceIncreasePercent ?? selectedDurationOption().priceIncreasePercent}% vs 1 day • estimated audience +{selectedDurationOption().audienceIncreasePercent}%</Text> : null}
+    <View style={styles.row}>{[7,14,30,60].map(days => { const option = (objective === "MORE_VIEWS" ? packages : objectivePackages).find(p => p.id === selectedPackage)?.durationOptions?.find((x:any) => Number(x.days) === days); return <Pressable key={days} onPress={() => { setDurationDays(days); if (option) setBudget(String(option.price)); }} style={[styles.choice, durationDays === days && styles.active]}><Text>{days} day{days === 1 ? "" : "s"}</Text></Pressable>; })}</View>
+    {selectedDurationOption() ? <Text style={styles.durationInfo}>Total price +{selectedDurationOption().cumulativePriceIncreasePercent ?? selectedDurationOption().priceIncreasePercent}% vs 7-day base • estimated audience +{selectedDurationOption().audienceIncreasePercent}%</Text> : null}
     <Text style={styles.label}>Promotion package</Text>
     <Text style={styles.discount}>8% DISCOUNT APPLIED</Text>
     <View style={styles.packages}>{(objective === "MORE_VIEWS" ? packages : objectivePackages).map((pack) => <Pressable key={pack.id} onPress={() => { setSelectedPackage(pack.id); setBudget(String(pack.price)); setCurrency("USD"); }} style={[styles.package, selectedPackage === pack.id && styles.packageActive]}>
@@ -204,7 +204,7 @@ export default function PromoteScreen() {
           <Text style={styles.objective}>{String(campaign.objective).replaceAll("_"," ")}</Text>
           <Text style={styles.status}>{campaign.status}</Text>
         </View>
-        {campaign.targetViews ? <Text style={styles.packageInfo}>🎯 {Number(campaign.targetViews).toLocaleString()}+ estimated views • {campaign.durationDays ?? 1} day • {campaign.discountPercent ?? 0}% discount</Text> : null}
+        {campaign.targetViews ? <Text style={styles.packageInfo}>🎯 {Number(campaign.targetViews).toLocaleString()}+ estimated views • {campaign.durationDays ?? 7} day • {campaign.discountPercent ?? 0}% discount</Text> : null}
         <Text style={styles.budget}>{campaign.currency} {(Number(campaign.spentMinor ?? 0) / 100).toFixed(2)} spent / {(Number(campaign.budgetMinor ?? 0) / 100).toFixed(2)} budget</Text>
         <View style={styles.progressTrack}><View style={[styles.progressFill, { width: getProgressWidth(campaign.spentMinor, campaign.budgetMinor) }]} /></View>
         <Text style={styles.remaining}>Remaining: {campaign.currency} {Math.max(0,(Number(campaign.budgetMinor ?? 0)-Number(campaign.spentMinor ?? 0))/100).toFixed(2)}</Text>
