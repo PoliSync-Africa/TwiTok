@@ -184,7 +184,7 @@ export default function LiveShopScreen() {
         </View> : null;
       })() : null}
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isHost ? "LIVE product tray" : "All LIVE products"}</Text><Text style={styles.count}>{products.length}/20{lastSyncedAt ? " · Live sync" : ""}</Text>{isHost && <Text style={styles.analyticsSummary}>Viewers {summary.uniqueUsers ?? 0} · Views {summary.views ?? 0} · Cart {summary.addToCart ?? 0} · Buy {summary.buyNow ?? 0}</Text>}</View>{isHost ? <Pressable style={styles.addProductButton} onPress={() => void openPicker()}><Text style={styles.addProductText}>+ Add Product</Text></Pressable> : null}</View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isHost ? "LIVE product tray" : "All LIVE products"}</Text><Text style={styles.count}>{products.length}/20{lastSyncedAt ? " · Live sync" : ""}</Text>{isHost && <Text style={styles.analyticsSummary}>Viewers {summary.uniqueUsers ?? 0} · Views {summary.views ?? 0} · Cart {summary.addToCart ?? 0} · Buy {summary.buyNow ?? 0} · Cart rate {summary.addToCartRate ?? 0}% · Buy rate {summary.buyNowRate ?? 0}%</Text>}</View>{isHost ? <Pressable style={styles.addProductButton} onPress={() => void openPicker()}><Text style={styles.addProductText}>+ Add Product</Text></Pressable> : null}</View>
       {loading ? <Text style={styles.muted}>Loading products…</Text> : <ScrollView contentContainerStyle={styles.list}>
         {products.map(product => <View key={product.id} style={styles.card}>
           {product.images?.[0] ? <Image source={{ uri: product.images[0] }} style={styles.thumb} /> : <View style={styles.thumb} />}
