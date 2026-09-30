@@ -67,7 +67,75 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
   const shippingMinor = Math.max(0, Math.round(Number(req.body?.shippingMinor ?? 0)));
   const totalMinor = subtotalMinor + shippingMinor;
   const shopFeeMinor = calculateTwiTokShopFee(totalMinor);
-  const order = { id: randomUUID(), buyerId: userId, items: reservedItems, currency, subtotalMinor, shippingMinor, totalMinor, platformFeeMinor: shopFeeMinor, platformFeePercent: TWITOK_SHOP_PLATFORM_FEE_PERCENT, sellerSettlementMinor: totalMinor - shopFeeMinor, shippingAddress: address, paymentStatus: "PENDING", status: "PENDING_PAYMENT", idempotencyKey, createdAt: new Date(), updatedAt: new Date() };
+
+  const affiliateCode = String(req.body?.affiliateCode ?? "").trim();
+  let affiliate: any = null;
+  if (affiliateCode) {
+    affiliate = await db.collection("shop_affiliate_links").findOne({ code: affiliateCode });
+    if (!affiliate) return res.status(400).json({ error: "Invalid affiliate code" });
+    if (!reservedItems.some(item => item.productId === String(affiliate.productId))) return res.status(400).json({ error: "Affiliate code does not match a cart product" });
+  }
+
+  const sellerGross = new Map<string, number>();
+  for (const item of reservedItems) {
+    sellerGross.set(item.sellerId, (sellerGross.get(item.sellerId) ?? 0) + Number(item.priceMinor) * Number(item.quantity));
+  }
+  const sellerIds = Array.from(sellerGross.keys());
+  const sellerBreakdown = sellerIds.map(sellerId => ({
+    sellerId,
+    grossMinor: sellerGross.get(sellerId) ?? 0,
+    platformFeeMinor: 0,
+    creatorCommissionMinor: 0,
+    settlementMinor: 0
+  }));
+  let allocatedFee = 0;
+  sellerBreakdown.forEach((seller, index) => {
+    const fee = index === sellerBreakdown.length - 1
+      ? shopFeeMinor - allocatedFee
+      : Math.floor(shopFeeMinor * seller.grossMinor / Math.max(1, subtotalMinor));
+    seller.platformFeeMinor = fee;
+    allocatedFee += fee;
+  });
+
+  if (affiliate) {
+    const affiliateItem = reservedItems.find(item => item.productId === String(affiliate.productId));
+    const membership = await db.collection("shop_affiliate_memberships").findOne({
+      offerId: affiliate.offerId,
+      creatorId: affiliate.creatorId,
+      status: "ACTIVE"
+    });
+    const offer = await db.collection("shop_affiliate_offers").findOne({ id: affiliate.offerId, status: "ACTIVE" });
+    if (!membership || !offer) return res.status(409).json({ error: "Affiliate offer is no longer active" });
+    const commission = Math.floor(Number(affiliateItem.priceMinor) * Number(affiliateItem.quantity) * Number(offer.commissionPercent) / 100);
+    const seller = sellerBreakdown.find(s => s.sellerId === String(affiliateItem.sellerId));
+    if (seller) seller.creatorCommissionMinor = commission;
+    affiliate = { code: affiliate.code, offerId: offer.id, creatorId: offer.creatorId ?? affiliate.creatorId, productId: offer.productId, commissionPercent: Number(offer.commissionPercent), commissionMinor: commission };
+  }
+
+  for (const seller of sellerBreakdown) {
+    seller.settlementMinor = Math.max(0, seller.grossMinor - seller.platformFeeMinor - seller.creatorCommissionMinor);
+  }
+
+  const order = {
+    id: randomUUID(),
+    buyerId: userId,
+    items: reservedItems,
+    currency,
+    subtotalMinor,
+    shippingMinor,
+    totalMinor,
+    platformFeeMinor: shopFeeMinor,
+    platformFeePercent: TWITOK_SHOP_PLATFORM_FEE_PERCENT,
+    sellerSettlementMinor: sellerBreakdown.reduce((sum, seller) => sum + seller.settlementMinor, 0),
+    sellerBreakdown,
+    affiliate,
+    shippingAddress: address,
+    paymentStatus: "PENDING",
+    status: "PENDING_PAYMENT",
+    idempotencyKey,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
   await db.collection("shop_orders").insertOne(order);
   await db.collection("shop_carts").updateOne({ userId }, { $set: { items: [], updatedAt: new Date() } });
   return res.status(201).json({ order, paymentRequired: true });
