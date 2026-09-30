@@ -128,6 +128,7 @@ export default function PromoteScreen() {
           <Text style={styles.objective}>{String(campaign.objective).replaceAll("_"," ")}</Text>
           <Text style={styles.status}>{campaign.status}</Text>
         </View>
+        {campaign.targetViews ? <Text style={styles.packageInfo}>🎯 {Number(campaign.targetViews).toLocaleString()}+ estimated views • {campaign.durationDays ?? 1} day • {campaign.discountPercent ?? 0}% discount</Text> : null}
         <Text style={styles.budget}>{campaign.currency} {(Number(campaign.spentMinor ?? 0) / 100).toFixed(2)} spent / {(Number(campaign.budgetMinor ?? 0) / 100).toFixed(2)} budget</Text>
         <View style={styles.progressTrack}><View style={[styles.progressFill, { width: getProgressWidth(campaign.spentMinor, campaign.budgetMinor) }]} /></View>
         <Text style={styles.remaining}>Remaining: {campaign.currency} {Math.max(0,(Number(campaign.budgetMinor ?? 0)-Number(campaign.spentMinor ?? 0))/100).toFixed(2)}</Text>
@@ -173,6 +174,7 @@ const styles = StyleSheet.create({
   cardTop:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},
   objective:{fontWeight:"800"},
   status:{fontWeight:"800"},
+  packageInfo:{fontSize:13,fontWeight:"800"},
   budget:{fontSize:15,fontWeight:"700"},
   progressTrack:{height:7,borderRadius:4,backgroundColor:"#e5e5e5",overflow:"hidden"},
   progressFill:{height:"100%",backgroundColor:"#111",borderRadius:4},
