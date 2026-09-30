@@ -40,8 +40,9 @@ shopFinanceRouter.get("/seller/wallet", requireUser, async (req, res) => {
   const sellerId = req.userId!.toHexString();
   const delivered = await db.collection("shop_orders").find({ "items.sellerId": sellerId, status: "DELIVERED", paymentStatus: "PAID" }).toArray();
   const refunded = await db.collection("shop_refunds").find({ sellerId, status: "REFUNDED" }).toArray();
-  const grossMinor = delivered.reduce((sum: number, o: any) => sum + Number(o.totalMinor || 0), 0);
-  const feesMinor = delivered.reduce((sum: number, o: any) => sum + Number(o.platformFeeMinor ?? calculateTwiTokShopFee(Number(o.totalMinor || 0))), 0);
+  const sellerEntries = delivered.map((o: any) => o.sellerBreakdown?.find((s: any) => s.sellerId === sellerId)).filter(Boolean);
+  const grossMinor = sellerEntries.reduce((sum: number, s: any) => sum + Number(s.grossMinor || 0), 0);
+  const feesMinor = sellerEntries.reduce((sum: number, s: any) => sum + Number(s.platformFeeMinor ?? calculateTwiTokShopFee(Number(s.grossMinor || 0))), 0);
   const refundsMinor = refunded.reduce((sum: number, r: any) => sum + Number(r.amountMinor || 0), 0);
   return res.json({ grossMinor, feesMinor, refundsMinor, availableMinor: Math.max(0, grossMinor - feesMinor - refundsMinor), currency: delivered[0]?.currency ?? null });
 });
