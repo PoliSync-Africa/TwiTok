@@ -7,32 +7,57 @@ import { calculateTwiTokShopFee } from "../config/shop-fees.js";
 export const shopFinanceRouter = Router();
 
 shopFinanceRouter.post("/seller/returns/:returnId/refund", requireUser, async (req, res) => {
-  const db = await getDb();
-  const sellerId = req.userId!.toHexString();
-  const request = await db.collection("shop_returns").findOne({ id: String(req.params.returnId), status: "APPROVED" });
-  if (!request) return res.status(404).json({ error: "Approved return not found" });
-  const order = await db.collection("shop_orders").findOne({ id: request.orderId, "items.sellerId": sellerId, paymentStatus: "PAID" });
-  if (!order) return res.status(403).json({ error: "Seller is not associated with this order" });
-  const existing = await db.collection("shop_refunds").findOne({ orderId: order.id, returnId: request.id, status: { $in: ["REQUESTED", "PROCESSING", "REFUNDED"] } });
-  if (existing) return res.status(409).json({ error: "Refund already exists" });
+  try {
+    const db = await getDb();
+    const sellerId = req.userId!.toHexString();
+    const request = await db.collection("shop_returns").findOne({ id: String(req.params.returnId), status: "APPROVED" });
+    if (!request) return res.status(404).json({ error: "Approved return not found" });
+    const order = await db.collection("shop_orders").findOne({ id: request.orderId, "items.sellerId": sellerId, paymentStatus: "PAID" });
+    if (!order) return res.status(403).json({ error: "Seller is not associated with this order" });
 
-  const refundMinor = Number(order.totalMinor);
-  const refund = {
-    id: randomUUID(),
-    orderId: order.id,
-    returnId: request.id,
-    buyerId: order.buyerId,
-    sellerId,
-    amountMinor: refundMinor,
-    currency: order.currency,
-    status: "REQUESTED",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-  await db.collection("shop_refunds").insertOne(refund);
-  await db.collection("shop_returns").updateOne({ _id: request._id }, { $set: { status: "REFUND_REQUESTED", updatedAt: new Date() } });
-  await db.collection("shop_orders").updateOne({ id: order.id }, { $set: { refundStatus: "REQUESTED", updatedAt: new Date() } });
-  return res.status(201).json({ refund });
+    const existing = await db.collection("shop_refunds").findOne({ orderId: order.id, returnId: request.id, sellerId, status: { $in: ["REQUESTED", "PROCESSING", "REFUNDED"] } });
+    if (existing) return res.status(409).json({ error: "Refund already exists for this seller" });
+
+    const sellerItems = (order.items ?? []).filter((item: any) => String(item.sellerId) === sellerId);
+    if (!sellerItems.length) return res.status(403).json({ error: "No seller items found in this order" });
+    const refundMinor = sellerItems.reduce((sum: number, item: any) => sum + Number(item.priceMinor || 0) * Number(item.quantity || 0), 0);
+    if (refundMinor <= 0) return res.status(400).json({ error: "Refund amount is invalid" });
+
+    const payment = await db.collection("shop_payments").findOne({ orderId: order.id, status: "PAID" }, { sort: { createdAt: -1 } });
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!payment?.providerTransactionId || !secret) return res.status(503).json({ error: "A provider-backed Shop payment is required before this refund can be processed" });
+
+    const providerResponse = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + secret, "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction: payment.providerTransactionId, amount: refundMinor })
+    });
+    const providerData: any = await providerResponse.json();
+    if (!providerResponse.ok || !providerData?.status) return res.status(502).json({ error: "Payment provider could not process the refund" });
+
+    const refund = {
+      id: randomUUID(),
+      orderId: order.id,
+      returnId: request.id,
+      buyerId: order.buyerId,
+      sellerId,
+      amountMinor: refundMinor,
+      currency: order.currency,
+      status: "REFUNDED",
+      provider: "PAYSTACK",
+      providerReference: providerData?.data?.reference ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    await db.collection("shop_refunds").insertOne(refund);
+    await db.collection("shop_returns").updateOne({ _id: request._id, status: "APPROVED" }, { $set: { status: "REFUNDED", refundedAt: new Date(), updatedAt: new Date() } });
+    const remaining = await db.collection("shop_refunds").find({ orderId: order.id, status: "REFUNDED" }).toArray();
+    const totalRefunded = remaining.reduce((sum: number, item: any) => sum + Number(item.amountMinor || 0), 0);
+    await db.collection("shop_orders").updateOne({ id: order.id }, { $set: { refundStatus: totalRefunded >= Number(order.totalMinor) ? "REFUNDED" : "PARTIALLY_REFUNDED", updatedAt: new Date() } });
+    return res.status(201).json({ refund });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to process Shop refund" });
+  }
 });
 
 shopFinanceRouter.get("/seller/wallet", requireUser, async (req, res) => {
