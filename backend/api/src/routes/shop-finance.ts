@@ -52,7 +52,7 @@ shopFinanceRouter.post("/seller/returns/:returnId/refund", requireUser, async (r
     await db.collection("shop_refunds").insertOne(refund);
     const remaining = await db.collection("shop_refunds").find({ orderId: order.id, status: "REFUNDED" }).toArray();
     const totalRefunded = remaining.reduce((sum: number, item: any) => sum + Number(item.amountMinor || 0), 0);
-    const sellerIds = Array.from(new Set((order.items ?? []).map((item: any) => String(item.sellerId))));
+    const sellerIds: string[] = Array.from(new Set<string>((order.items ?? []).map((item: any) => String(item.sellerId))));
     const refundedSellerIds = new Set(remaining.map((item: any) => String(item.sellerId)));
     const fullyRefunded = sellerIds.every(id => refundedSellerIds.has(id));
     await db.collection("shop_returns").updateOne(
