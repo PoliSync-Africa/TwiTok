@@ -18,7 +18,9 @@ export default function PromoteScreen() {
   const [videoId, setVideoId] = useState(initialVideoId ?? "");
   const [objective, setObjective] = useState("MORE_VIEWS");
   const [currency, setCurrency] = useState("GHS");
-  const [budget, setBudget] = useState("50");
+  const [budget, setBudget] = useState("4.60");
+  const [packages, setPackages] = useState<any[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<string | null>("VIEWS_800");
   const [countries, setCountries] = useState("GH");
   const [interests, setInterests] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,7 +36,12 @@ export default function PromoteScreen() {
     }
   }
 
-  useEffect(() => { loadCampaigns(); }, []);
+  async function loadPackages() {
+    try { const data = await request("/promotions/packages"); setPackages(data.packages ?? []); }
+    catch (e) { Alert.alert("Promotions", e instanceof Error ? e.message : "Unable to load promotion packages"); }
+  }
+
+  useEffect(() => { loadCampaigns(); loadPackages(); }, []);
 
   async function request(path: string, options: RequestInit = {}) {
     const token = await getAuthToken();
@@ -48,8 +55,9 @@ export default function PromoteScreen() {
     if (!videoId.trim()) return Alert.alert("Video required", "Enter the video ID you want to promote.");
     setBusy(true);
     try {
+      const selected = packages.find(p => p.id === selectedPackage);
       const campaign = await request("/promotions", { method: "POST", body: JSON.stringify({
-        videoId: videoId.trim(), objective, currency, budget,
+        videoId: videoId.trim(), objective, currency, budget: selected ? selected.price : budget, packageId: selected?.id ?? undefined,
         target: { countryCodes: countries.split(",").map(x => x.trim().toUpperCase()).filter(Boolean), interests: interests.split(",").map(x => x.trim()).filter(Boolean) }
       })});
       const payment = await request("/promotions/" + campaign.id + "/pay", { method: "POST", body: JSON.stringify({}) });
@@ -140,7 +148,7 @@ const styles = StyleSheet.create({
   container:{padding:20,gap:12,backgroundColor:"#fff",minHeight:"100%"},
   title:{fontSize:28,fontWeight:"800",marginTop:30},
   subtitle:{fontSize:15,lineHeight:22},
-  label:{fontWeight:"700",marginTop:8},
+  label:{fontWeight:"700",marginTop:8},\n  discount:{fontSize:14,fontWeight:"900",letterSpacing:0.5},\n  packages:{gap:10},\n  package:{borderWidth:1,borderColor:"#ddd",borderRadius:16,padding:15,gap:5},\n  packageActive:{borderColor:"#111",backgroundColor:"#f2f2f2"},\n  packageViews:{fontSize:17,fontWeight:"800"},\n  packagePrice:{fontSize:20,fontWeight:"900"},\n  oldPrice:{textDecorationLine:"line-through",color:"#777",fontSize:14},\n  packageDiscount:{fontSize:12,fontWeight:"800",color:"#555"},
   input:{borderWidth:1,borderColor:"#ddd",borderRadius:12,padding:14,fontSize:16},
   row:{flexDirection:"row",flexWrap:"wrap",gap:8},
   choice:{borderWidth:1,borderColor:"#ddd",borderRadius:20,paddingHorizontal:12,paddingVertical:10},
