@@ -30,6 +30,7 @@ import { shopOrdersRouter } from "./shop-orders.js";
 import { shopPaymentsRouter } from "./shop-payments.js";
 import { shopSellerRouter } from "./shop-seller.js";
 import { shopReturnsRouter } from "./shop-returns.js";
+import { shopFinanceRouter } from "./shop-finance.js";
 
 export const apiRouter = Router();
 
@@ -72,3 +73,4 @@ apiRouter.use("/shop", shopOrdersRouter);
 apiRouter.use("/shop", shopPaymentsRouter);
 apiRouter.use("/shop", shopSellerRouter);
 apiRouter.use("/shop", shopReturnsRouter);
+apiRouter.use("/shop", shopFinanceRouter);
