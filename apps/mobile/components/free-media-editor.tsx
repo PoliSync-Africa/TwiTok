@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 export type MediaEditPlan = any;
 /* MediaEditPlan is intentionally runtime-flexible so the Expo editor can accept future tool families without native type churn. */
 export type MediaEditPlanShape = {
-  quality: "ORIGINAL" | "CLEAN" | "HD";
+  quality: "ORIGINAL" | "CLEAN" | "HD" | "ULTRA";
   filter: "NONE" | "VIVID" | "WARM" | "COOL" | "NOIR" | "VINTAGE" | "CINEMATIC";
   crop: "ORIGINAL" | "9:16" | "1:1" | "4:5" | "16:9";
   rotate: 0 | 90 | 180 | 270;
@@ -15,14 +15,14 @@ export type MediaEditPlanShape = {
 };
 
 export const DEFAULT_MEDIA_EDIT_PLAN: MediaEditPlan = {
-  quality: "HD", filter: "NONE", crop: "ORIGINAL", rotate: 0, mirror: false, speed: 1, aiTool: "NONE", aiPrompt: ""
+  quality: "ULTRA", filter: "NONE", crop: "ORIGINAL", rotate: 0, mirror: false, speed: 1, aiTool: "NONE", aiPrompt: ""
 };
 
 type Tool = { id: string; label: string; section: string };
 type Props = any;
 
 const TOOLS: Tool[] = [
-  {section:"Polish",id:"CLEAN",label:"Clean up"},{section:"Polish",id:"HD",label:"HD Enhance"},{section:"Polish",id:"VIVID",label:"Vivid"},{section:"Polish",id:"CINEMATIC",label:"Cinematic"},
+  {section:"Polish",id:"CLEAN",label:"Clean up"},{section:"Polish",id:"HD",label:"HD Enhance"},{section:"Polish",id:"ULTRA",label:"Ultra 48K AI"},{section:"Polish",id:"VIVID",label:"Vivid"},{section:"Polish",id:"CINEMATIC",label:"Cinematic"},
   {section:"Adjust",id:"WARM",label:"Warm"},{section:"Adjust",id:"COOL",label:"Cool"},{section:"Adjust",id:"NOIR",label:"B&W"},{section:"Adjust",id:"VINTAGE",label:"Vintage"},
   {section:"Frame",id:"9:16",label:"9:16"},{section:"Frame",id:"1:1",label:"1:1"},{section:"Frame",id:"4:5",label:"4:5"},{section:"Frame",id:"16:9",label:"16:9"},{section:"Frame",id:"MIRROR",label:"Mirror"},{section:"Frame",id:"ROTATE",label:"Rotate"},
   {section:"AI tools — Free",id:"RESTORE",label:"Restore"},{section:"AI tools — Free",id:"HD_ENHANCE",label:"HD Enhance"},{section:"AI tools — Free",id:"RELIGHT",label:"AI Light"},{section:"AI tools — Free",id:"CUTOUT",label:"Cutout"},{section:"AI tools — Free",id:"AI_SKY",label:"AI Sky"},{section:"AI tools — Free",id:"CLEAN_MIRROR",label:"Clean Mirror"},{section:"AI tools — Free",id:"COLORIZE",label:"Colorize"},{section:"AI tools — Free",id:"AI_ART",label:"AI Art"},{section:"AI tools — Free",id:"AI_PORTRAIT",label:"AI Portrait"},{section:"AI tools — Free",id:"AI_STYLES",label:"AI Styles"},{section:"AI tools — Free",id:"AI_EXPAND",label:"AI Expand"},{section:"AI tools — Free",id:"REMOVE_TEXT",label:"Remove Text"},{section:"AI tools — Free",id:"CHANGE_POSE",label:"Change Pose"}
@@ -37,7 +37,7 @@ export default function FreeMediaEditor({ visible, mode, value, onChange, onClos
   const active = (id: string) => {
     if (id === "MIRROR") return value.mirror;
     if (id === "ROTATE") return value.rotate !== 0;
-    if (id === "CLEAN" || id === "HD") return value.quality === id;
+    if (id === "CLEAN" || id === "HD" || id === "ULTRA") return value.quality === id;
     if (["VIVID","WARM","COOL","NOIR","VINTAGE","CINEMATIC"].includes(id)) return value.filter === id;
     if (["9:16","1:1","4:5","16:9"].includes(id)) return value.crop === id;
     return value.aiTool === id;
@@ -46,7 +46,7 @@ export default function FreeMediaEditor({ visible, mode, value, onChange, onClos
   const select = (id: string) => {
     if (id === "MIRROR") return update({ mirror: !value.mirror });
     if (id === "ROTATE") return update({ rotate: value.rotate === 0 ? 90 : value.rotate === 90 ? 180 : value.rotate === 180 ? 270 : 0 });
-    if (id === "CLEAN" || id === "HD") return update({ quality: id as MediaEditPlan["quality"] });
+    if (id === "CLEAN" || id === "HD" || id === "ULTRA") return update({ quality: id as MediaEditPlan["quality"] });
     if (["VIVID","WARM","COOL","NOIR","VINTAGE","CINEMATIC"].includes(id)) return update({ filter: id as MediaEditPlan["filter"] });
     if (["9:16","1:1","4:5","16:9"].includes(id)) return update({ crop: id as MediaEditPlan["crop"] });
     if (AI_IDS.has(id)) return update({ aiTool: id as MediaEditPlan["aiTool"] });
@@ -75,9 +75,9 @@ export default function FreeMediaEditor({ visible, mode, value, onChange, onClos
           </View>
         </View>)}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>AI restyle prompt</Text>
-          <Text style={styles.helper}>Describe the look you want, or leave it empty for the selected AI preset.</Text>
-          <TextInput value={value.aiPrompt} onChangeText={aiPrompt => update({ aiPrompt })} multiline placeholder="Describe your AI restyle…" placeholderTextColor="#7d8795" style={styles.prompt}/>
+          <Text style={styles.sectionTitle}>AI restyle & portrait prompt</Text>
+          <Text style={styles.helper}>Describe the look you want. Portrait mode can enhance face detail, natural skin tone, lighting and clothing while preserving identity. Ultra mode requests the highest practical resolution supported by the source and AI provider.</Text>
+          <TextInput value={value.aiPrompt} onChangeText={aiPrompt => update({ aiPrompt })} multiline placeholder="Example: natural portrait lighting, brighter balanced skin tones, refined outfit detail, smooth natural skin texture, preserve identity" placeholderTextColor="#7d8795" style={styles.prompt}/>
         </View>
       </ScrollView>
     </View>
