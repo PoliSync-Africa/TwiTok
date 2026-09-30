@@ -21,7 +21,6 @@
     "expo-image-picker": "57.0.20",
     "expo-audio": "57.0.5",
     "expo-camera": "57.0.5",
-    "react-native-purchases": "^10.10.2",
-    "expo-image-manipulator": "~57.0.17"
+    "react-native-purchases": "^10.10.2"
   }
 }
