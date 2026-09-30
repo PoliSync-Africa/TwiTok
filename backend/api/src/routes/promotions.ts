@@ -110,7 +110,7 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     const packageId = req.body?.packageId ? String(req.body.packageId) : "";
     const requestedDurationDays = Number(req.body?.durationDays ?? TWITOK_DEFAULT_DURATION_DAYS);
     const durationOption = TWITOK_DURATION_OPTIONS.find(option => option.days === requestedDurationDays);
-    if (!durationOption) return res.status(400).json({ error: "Promotion duration must be 1, 7, 14, 30, or 60 days" });
+    if (!durationOption) return res.status(400).json({ error: "Promotion duration must be 7, 14, 30, or 60 days" });
     const selectedPack = packageId ? getViewPack(packageId) : null;
     if (packageId && !selectedPack) return res.status(400).json({ error: "Invalid promotion package" });
     if (selectedPack && currency !== "USD") return res.status(400).json({ error: "TikTok-benchmark promotion packs are priced in USD" });
