@@ -60,10 +60,6 @@ async function processJob(db: any, job: any) {
       { _id: upload._id },
       { $set: { optimizedObjectKey: optimizedKey, optimizedMimeType: "image/webp", optimizationStatus: "READY", updatedAt: new Date() } }
     );
-    await db.collection("videos").updateMany(
-      { mediaType: "PHOTO", photoObjectKeys: String(upload.objectKey) },
-      { $set: { updatedAt: new Date() }, $pull: { photoObjectKeys: String(upload.objectKey) } }
-    );
     const posts = await db.collection("videos").find({ mediaType: "PHOTO", photoObjectKeys: { $exists: true } }).project({ _id: 1, photoObjectKeys: 1 }).toArray();
     for (const post of posts) {
       const keys = Array.isArray(post.photoObjectKeys) ? post.photoObjectKeys.map((key: string) => key === upload.objectKey ? optimizedKey : key) : [];
