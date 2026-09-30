@@ -1,12 +1,42 @@
 import { Router } from "express";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 
 export const shopPaymentsRouter = Router();
 const paymentLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+
+async function markShopOrderPaid(db: any, orderId: string, buyerId?: string) {
+  const query: any = { id: orderId, paymentStatus: "PENDING" };
+  if (buyerId) query.buyerId = buyerId;
+  const order = await db.collection("shop_orders").findOneAndUpdate(
+    query,
+    { $set: { paymentStatus: "PAID", status: "PAID", paidAt: new Date(), updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  if (!order) return null;
+  if (order.affiliate?.creatorId && Number(order.affiliate.commissionMinor) > 0) {
+    await db.collection("shop_affiliate_commissions").updateOne(
+      { orderId: order.id, creatorId: order.affiliate.creatorId },
+      { $setOnInsert: {
+        id: randomUUID(),
+        orderId: order.id,
+        offerId: order.affiliate.offerId,
+        productId: order.affiliate.productId,
+        sellerId: order.items?.find((item: any) => item.productId === order.affiliate.productId)?.sellerId,
+        creatorId: order.affiliate.creatorId,
+        amountMinor: Number(order.affiliate.commissionMinor),
+        currency: order.currency,
+        status: "PENDING",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } },
+      { upsert: true }
+    );
+  }
+  return order;
+}
 
 shopPaymentsRouter.post("/orders/:orderId/pay", requireUser, paymentLimit, async (req, res) => {
   try {
@@ -50,7 +80,7 @@ shopPaymentsRouter.post("/payments/verify", requireUser, paymentLimit, async (re
     if (!response.ok || !data?.status || transaction?.status !== "success") return res.status(402).json({ error: "Payment has not been completed" });
     if (Number(transaction.amount) !== Number(payment.amountMinor) || String(transaction.currency).toUpperCase() !== String(payment.currency).toUpperCase()) return res.status(400).json({ error: "Payment amount or currency mismatch" });
     await db.collection("shop_payments").updateOne({ _id: payment._id, status: { $ne: "PAID" } }, { $set: { status: "PAID", verifiedAt: new Date(), providerTransactionId: transaction.id } });
-    await db.collection("shop_orders").updateOne({ id: payment.orderId, buyerId: req.userId!.toHexString(), paymentStatus: "PENDING" }, { $set: { paymentStatus: "PAID", status: "PAID", paidAt: new Date(), updatedAt: new Date() } });
+    await markShopOrderPaid(db, payment.orderId, req.userId!.toHexString());
     return res.json({ paid: true, orderId: payment.orderId });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to verify Shop payment" }); }
 });
@@ -75,7 +105,7 @@ shopPaymentsRouter.post("/payments/webhook", async (req, res) => {
     if (!payment) return res.json({ received: true });
     if (Number(transaction.amount) !== Number(payment.amountMinor) || String(transaction.currency).toUpperCase() !== String(payment.currency).toUpperCase()) return res.status(400).json({ error: "Payment amount or currency mismatch" });
     await db.collection("shop_payments").updateOne({ _id: payment._id, status: { $ne: "PAID" } }, { $set: { status: "PAID", verifiedAt: new Date(), providerTransactionId: transaction.id } });
-    await db.collection("shop_orders").updateOne({ id: payment.orderId, paymentStatus: "PENDING" }, { $set: { paymentStatus: "PAID", status: "PAID", paidAt: new Date(), updatedAt: new Date() } });
+    await markShopOrderPaid(db, payment.orderId);
     return res.json({ received: true });
   } catch { return res.status(400).json({ error: "Unable to process Shop payment webhook" }); }
 });
