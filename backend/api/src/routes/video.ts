@@ -7,10 +7,13 @@ import { createMultipartUpload, createPresignedUploadPart, completeMultipartUplo
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
 import { listStickers } from "../video/stickers.js";
+import { rateLimit } from "../security/rate-limit.js";
+
+const mediaWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 export const videoRouter = Router();
 
-videoRouter.post("/photos/uploads", requireUser, async (req, res) => {
+videoRouter.post("/photos/uploads", requireUser, mediaWriteLimit, async (req, res) => {
   try {
     res.status(201).json(await createPhotoUploadSession(await getDb(), req.userId!, {
       mimeType: String(req.body?.mimeType ?? ""), sizeBytes: Number(req.body?.sizeBytes)
@@ -18,26 +21,26 @@ videoRouter.post("/photos/uploads", requireUser, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo upload" }); }
 });
 
-videoRouter.post("/photos/uploads/:uploadId/complete", requireUser, async (req, res) => {
+videoRouter.post("/photos/uploads/:uploadId/complete", requireUser, mediaWriteLimit, async (req, res) => {
   try { res.json(await completePhotoUpload(await getDb(), req.userId!, String(req.params.uploadId))); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete photo upload" }); }
 });
 
-videoRouter.post("/posts/photos", requireUser, async (req, res) => {
+videoRouter.post("/posts/photos", requireUser, mediaWriteLimit, async (req, res) => {
   try { res.status(201).json(await createPhotoPost(await getDb(), req.userId!, {
-    uploadIds: req.body?.uploadIds, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch
+    uploadIds: req.body?.uploadIds, editPlan: req.body?.editPlan, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch
   })); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo post" }); }
 });
 
-videoRouter.post("/posts/text", requireUser, async (req, res) => {
+videoRouter.post("/posts/text", requireUser, mediaWriteLimit, async (req, res) => {
   try { res.status(201).json(await createTextPost(await getDb(), req.userId!, {
     text: req.body?.text, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments
   })); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create text post" }); }
 });
 
-videoRouter.post("/uploads", requireUser, async (req, res) => {
+videoRouter.post("/uploads", requireUser, mediaWriteLimit, async (req, res) => {
   try {
     const result = await createUploadSession(await getDb(), req.userId!, {
       mimeType: String(req.body?.mimeType ?? ""),
@@ -143,7 +146,7 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
     res.status(201).json(await createVideoDraft(await getDb(), req.userId!, {
       uploadId: String(req.body?.uploadId ?? ""),
       clipUploadIds: req.body?.clipUploadIds, clipTrimRanges: req.body?.clipTrimRanges, clipTransitions: req.body?.clipTransitions, clipSettings: req.body?.clipSettings,
-      caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch,
+      caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch, editPlan: req.body?.editPlan,
       coverTimeMs: req.body?.coverTimeMs, trimStartMs: req.body?.trimStartMs, trimEndMs: req.body?.trimEndMs, speed: req.body?.speed, soundId: req.body?.soundId,
       originalVolume: req.body?.originalVolume, addedSoundVolume: req.body?.addedSoundVolume, textOverlays: req.body?.textOverlays, captions: req.body?.captions,
       autoCaptions: req.body?.autoCaptions === true, captionLanguage: req.body?.captionLanguage, effect: req.body?.effect, stickers: req.body?.stickers
