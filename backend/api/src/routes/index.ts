@@ -22,6 +22,7 @@ import { walletRouter } from "./wallet.js";
 import { paymentRoutingRouter } from "./payment-routing.js";
 import { analyticsRouter } from "./analytics.js";
 import { verificationRouter } from "./verification.js";
+import { aiMediaRouter } from "./ai-media.js";
 
 export const apiRouter = Router();
 
@@ -48,3 +49,4 @@ apiRouter.use("/wallet", walletRouter);
 apiRouter.use("/payments", paymentRoutingRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/verification", verificationRouter);
+apiRouter.use("/ai-media", aiMediaRouter);
