@@ -16,7 +16,8 @@ async function api(path:string, init:RequestInit={}) {
 
 export default function ShopScreen(){
  const [products,setProducts]=useState<Product[]>([]),[q,setQ]=useState(""),[cart,setCart]=useState<CartItem[]>([]),[orders,setOrders]=useState<any[]>([]);
- const [tab,setTab]=useState<"shop"|"cart"|"orders">("shop"),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[selected,setSelected]=useState<Product|null>(null);\n const [shipName,setShipName]=useState(""),[shipPhone,setShipPhone]=useState(""),[shipAddress,setShipAddress]=useState("");
+ const [tab,setTab]=useState<"shop"|"cart"|"orders">("shop"),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[selected,setSelected]=useState<Product|null>(null);
+ const [shipName,setShipName]=useState(""),[shipPhone,setShipPhone]=useState(""),[shipAddress,setShipAddress]=useState("");
  const refresh=async()=>{setLoading(true);try{const [p,c,o]=await Promise.all([api("/shop/commerce/products"+(q.trim()?"?q="+encodeURIComponent(q.trim()):"")),api("/shop/cart"),api("/shop/orders")]);setProducts(p.products||[]);setCart(c.cart?.items||[]);setOrders(o.orders||[])}catch(e){Alert.alert("TwiTok Shop",e instanceof Error?e.message:"Unable to load Shop")}finally{setLoading(false)}};
  useEffect(()=>{void refresh()},[]);
  const subtotal=useMemo(()=>cart.reduce((s,i)=>s+i.priceMinor*i.quantity,0),[cart]);
