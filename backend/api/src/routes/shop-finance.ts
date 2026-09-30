@@ -6,6 +6,54 @@ import { calculateTwiTokShopFee } from "../config/shop-fees.js";
 
 export const shopFinanceRouter = Router();
 
+shopFinanceRouter.post("/seller/payout-account", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const sellerId = req.userId!.toHexString();
+    const accountNumber = String(req.body?.accountNumber ?? "").trim();
+    const bankCode = String(req.body?.bankCode ?? "").trim();
+    const accountName = String(req.body?.accountName ?? "").trim();
+    const type = String(req.body?.type ?? "nuban").trim() || "nuban";
+    if (!accountNumber || !bankCode || !accountName) return res.status(400).json({ error: "accountNumber, bankCode and accountName are required" });
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!secret) return res.status(503).json({ error: "Shop payout provider is not configured" });
+
+    const providerResponse = await fetch("https://api.paystack.co/transferrecipient", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + secret, "Content-Type": "application/json" },
+      body: JSON.stringify({ type, name: accountName, account_number: accountNumber, bank_code: bankCode, currency: "GHS" })
+    });
+    const providerData: any = await providerResponse.json();
+    if (!providerResponse.ok || !providerData?.status || !providerData?.data?.recipient_code) {
+      return res.status(502).json({ error: "Payment provider could not create the payout destination" });
+    }
+
+    const payoutAccount = {
+      sellerId,
+      type,
+      bankCode,
+      accountName,
+      accountLast4: accountNumber.slice(-4),
+      currency: "GHS",
+      provider: "PAYSTACK",
+      recipientCode: String(providerData.data.recipient_code),
+      updatedAt: new Date(),
+      createdAt: new Date()
+    };
+    await db.collection("shop_payout_accounts").updateOne({ sellerId }, { $set: payoutAccount }, { upsert: true });
+    return res.status(201).json({ payoutAccount: { ...payoutAccount, accountNumber: undefined } });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to save payout account" });
+  }
+});
+
+shopFinanceRouter.get("/seller/payout-account", requireUser, async (req, res) => {
+  const db = await getDb();
+  const account = await db.collection("shop_payout_accounts").findOne({ sellerId: req.userId!.toHexString() });
+  if (!account) return res.status(404).json({ error: "Payout account not configured" });
+  return res.json({ payoutAccount: { sellerId: account.sellerId, type: account.type, bankCode: account.bankCode, accountName: account.accountName, accountLast4: account.accountLast4, currency: account.currency, provider: account.provider } });
+});
+
 shopFinanceRouter.post("/seller/returns/:returnId/refund", requireUser, async (req, res) => {
   try {
     const db = await getDb();
