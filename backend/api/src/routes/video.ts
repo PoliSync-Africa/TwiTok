@@ -9,11 +9,9 @@ import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from
 import { listStickers } from "../video/stickers.js";
 import { rateLimit } from "../security/rate-limit.js";
 
-const mediaWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
-
 export const videoRouter = Router();
 
-videoRouter.post("/photos/uploads", requireUser, mediaWriteLimit, async (req, res) => {
+videoRouter.post("/photos/uploads", rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
     res.status(201).json(await createPhotoUploadSession(await getDb(), req.userId!, {
       mimeType: String(req.body?.mimeType ?? ""), sizeBytes: Number(req.body?.sizeBytes)
@@ -21,26 +19,26 @@ videoRouter.post("/photos/uploads", requireUser, mediaWriteLimit, async (req, re
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo upload" }); }
 });
 
-videoRouter.post("/photos/uploads/:uploadId/complete", requireUser, mediaWriteLimit, async (req, res) => {
+videoRouter.post("/photos/uploads/:uploadId/complete", rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try { res.json(await completePhotoUpload(await getDb(), req.userId!, String(req.params.uploadId))); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete photo upload" }); }
 });
 
-videoRouter.post("/posts/photos", requireUser, mediaWriteLimit, async (req, res) => {
+videoRouter.post("/posts/photos", rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try { res.status(201).json(await createPhotoPost(await getDb(), req.userId!, {
     uploadIds: req.body?.uploadIds, editPlan: req.body?.editPlan, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch
   })); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo post" }); }
 });
 
-videoRouter.post("/posts/text", requireUser, mediaWriteLimit, async (req, res) => {
+videoRouter.post("/posts/text", rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try { res.status(201).json(await createTextPost(await getDb(), req.userId!, {
     text: req.body?.text, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments
   })); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create text post" }); }
 });
 
-videoRouter.post("/uploads", requireUser, mediaWriteLimit, async (req, res) => {
+videoRouter.post("/uploads", rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
     const result = await createUploadSession(await getDb(), req.userId!, {
       mimeType: String(req.body?.mimeType ?? ""),
