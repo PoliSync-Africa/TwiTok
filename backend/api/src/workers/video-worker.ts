@@ -141,8 +141,8 @@ async function runFfmpeg(
 
   const filters = [
     "[0:v]split=4[v0][v1][v2][v3]",
-    `[v0]scale=w=360:h=640:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v360base]
-  , [v3]scale=w=1080:h=1920:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v1080base]`,
+    `[v0]scale=w=360:h=640:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v360base]`,
+    `[v3]scale=w=1080:h=1920:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v1080base]`,
     `[v1]scale=w=540:h=960:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v540base]`,
     `[v2]scale=w=720:h=1280:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,setpts=PTS/${speed}[v720base]`
   ];
