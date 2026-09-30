@@ -89,8 +89,38 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   const db = await getDb();
   const job = await db.collection("ai_media_jobs").findOne({ jobId: String(req.params.jobId), userId: req.userId });
   if (!job) return res.status(404).json({ error: "AI media job not found" });
+
+  let outputUrl = job.outputUrl ?? null;
+  let status = String(job.status ?? "PROCESSING").toUpperCase();
+
+  // Optional provider-side polling. Configure a URL template such as
+  // https://provider.example/jobs/{jobId}; the provider response may contain
+  // outputUrl/url, jobId/id, and status/state.
+  const statusEndpoint = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
+  if (!outputUrl && job.providerJobId && statusEndpoint) {
+    try {
+      const url = statusEndpoint.replace("{jobId}", encodeURIComponent(String(job.providerJobId)));
+      const providerResponse = await fetch(url, {
+        headers: { "content-type": "application/json", authorization: `Bearer ${process.env.TWITOK_AI_MEDIA_API_KEY ?? ""}` }
+      });
+      if (providerResponse.ok) {
+        const provider = await providerResponse.json() as { outputUrl?: string; url?: string; status?: string; state?: string; error?: string };
+        outputUrl = provider.outputUrl ?? provider.url ?? null;
+        status = String(provider.status ?? provider.state ?? status).toUpperCase();
+        if (outputUrl) status = "READY_FOR_REVIEW";
+        if (["FAILED", "ERROR", "CANCELLED"].includes(status)) status = status;
+        await db.collection("ai_media_jobs").updateOne(
+          { _id: job._id },
+          { $set: { outputUrl, status, updatedAt: new Date() } }
+        );
+      }
+    } catch {
+      // Keep the persisted job state if the provider status service is temporarily unavailable.
+    }
+  }
+
   res.json({
-    jobId: job.jobId, mode: job.mode, style: job.style, status: job.status,
-    outputUrl: job.outputUrl ?? null, targetResolution: job.targetResolution ?? "SOURCE_MAX", outputSpec: job.outputSpec ?? null, portraitEnhance: Boolean(job.portraitEnhance), createdAt: job.createdAt, updatedAt: job.updatedAt
+    jobId: job.jobId, mode: job.mode, style: job.style, status,
+    outputUrl, targetResolution: job.targetResolution ?? "SOURCE_MAX", outputSpec: job.outputSpec ?? null, portraitEnhance: Boolean(job.portraitEnhance), createdAt: job.createdAt, updatedAt: new Date()
   });
 });
