@@ -28,16 +28,23 @@ analyticsRouter.get("/creator/overview", requireUser, analyticsReadLimit, async 
     ).toArray();
     const videoIds = videoRows.map(v => v._id);
 
-    if (!videoIds.length) {
-      return res.json({
-        period: { days, from: from.toISOString(), to: to.toISOString() },
-        summary: { impressions: 0, views: 0, uniqueViewers: 0, completedViews: 0, completionRate: 0, rewatches: 0, watchTimeMs: 0, averageWatchTimeMs: 0, likes: 0, comments: 0, shares: 0, saves: 0, followsGained: 0, engagementRate: 0 },
-        daily: [], topVideos: [], audienceCountries: [], live: { streams: 0, endedStreams: 0, totalDurationMs: 0, giftsUsd: 0, peakViewerCount: 0 }, trafficSources: [],
-        earnings: { grossCreatorEarningsUsd: 0, cashCreditedUsd: 0, diamonds: 0 }
-      });
-    }
-
     const eventMatch = { videoId: { $in: videoIds }, createdAt: { $gte: from, $lte: to } };
+
+    const followerTotal = await db.collection("follows").countDocuments({ followingId: userId });
+    const followerGrowthRows = await db.collection("follows").aggregate([
+      { $match: { followingId: userId, createdAt: { $gte: from, $lte: to } } },
+      { $set: { day: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } } },
+      { $group: { _id: "$day", newFollowers: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]).toArray();
+    const followerCountryRows = await db.collection("follows").aggregate([
+      { $match: { followingId: userId } },
+      { $lookup: { from: "users", localField: "followerId", foreignField: "_id", as: "follower" } },
+      { $unwind: { path: "$follower", preserveNullAndEmptyArrays: true } },
+      { $group: { _id: { $ifNull: ["$follower.countryCode", "UNKNOWN"] }, followers: { $sum: 1 } } },
+      { $sort: { followers: -1 } },
+      { $limit: 20 }
+    ]).toArray();
 
     const summaryRows = await db.collection("feed_events").aggregate([
       { $match: eventMatch },
@@ -162,6 +169,12 @@ analyticsRouter.get("/creator/overview", requireUser, analyticsReadLimit, async 
       daily: daily.map(x => ({ date: x._id, views: Number(x.views ?? 0), completedViews: Number(x.completedViews ?? 0), likes: Number(x.likes ?? 0), comments: Number(x.comments ?? 0), shares: Number(x.shares ?? 0), saves: Number(x.saves ?? 0), follows: Number(x.follows ?? 0) })),
       topVideos: topVideos.map(x => ({ id: x._id.toHexString(), views: Number(x.views ?? 0), completedViews: Number(x.completedViews ?? 0), likes: Number(x.likes ?? 0), comments: Number(x.comments ?? 0), shares: Number(x.shares ?? 0), saves: Number(x.saves ?? 0), caption: x.caption ?? "", mediaType: x.mediaType ?? "VIDEO", thumbnail: x.thumbnail ?? null, publishedAt: x.publishedAt ?? null })),
       audienceCountries: audienceCountries.map(x => ({ countryCode: String(x._id ?? "UNKNOWN"), viewers: Number(x.viewers ?? 0), views: Number(x.views ?? 0) })),
+      audience: {
+        followerTotal,
+        newFollowers: followerGrowthRows.reduce((sum, x) => sum + Number(x.newFollowers ?? 0), 0),
+        dailyFollowerGrowth: followerGrowthRows.map(x => ({ date: x._id, newFollowers: Number(x.newFollowers ?? 0) })),
+        followerCountries: followerCountryRows.map(x => ({ countryCode: String(x._id ?? "UNKNOWN"), followers: Number(x.followers ?? 0) }))
+      },
       live,
       trafficSources: trafficRows.map(x => ({ source: String(x._id ?? "UNKNOWN"), views: Number(x.views ?? 0), impressions: Number(x.impressions ?? 0), tracked: true })),
       earnings: { grossCreatorEarningsUsd: Number(giftRows[0]?.grossCreatorEarningsUsd ?? 0), cashCreditedUsd: Number(giftRows[0]?.cashCreditedUsd ?? 0), diamonds: Number(giftRows[0]?.diamonds ?? 0) }
