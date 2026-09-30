@@ -229,14 +229,14 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $lookup: { from: "users", localField: "ownerId", foreignField: "_id", as: "_owner" } },
     { $addFields: {
       engagement: {
-        likeCount: { $size: "$_likes" },
-        commentCount: { $size: { $filter: { input: "$_comments", as: "comment", cond: { $ne: ["$comment.status", "DELETED"] } } } },
-        shareCount: { $size: "$_shares" },
-        saveCount: { $size: "$_saves" },
-        liked: { $in: [userId, "$_likes.userId"] },
-        saved: { $in: [userId, "$_saves.userId"] },
-        repostCount: { $size: "$_reposts" },
-        reposted: { $in: [userId, "$_reposts.userId"] }
+        likeCount: { $ifNull: [{ $arrayElemAt: ["$_likeStats.count", 0] }, 0] },
+        commentCount: { $ifNull: [{ $arrayElemAt: ["$_commentStats.count", 0] }, 0] },
+        shareCount: { $ifNull: [{ $arrayElemAt: ["$_shareStats.count", 0] }, 0] },
+        saveCount: { $ifNull: [{ $arrayElemAt: ["$_saveStats.count", 0] }, 0] },
+        liked: { $eq: [{ $ifNull: [{ $arrayElemAt: ["$_likeStats.viewerHas", 0] }, 0] }, 1] },
+        saved: { $eq: [{ $ifNull: [{ $arrayElemAt: ["$_saveStats.viewerHas", 0] }, 0] }, 1] },
+        repostCount: { $ifNull: [{ $arrayElemAt: ["$_repostStats.count", 0] }, 0] },
+        reposted: { $eq: [{ $ifNull: [{ $arrayElemAt: ["$_repostStats.viewerHas", 0] }, 0] }, 1] }
       },
       owner: { $arrayElemAt: ["$_owner", 0] }
     } },
