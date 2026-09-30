@@ -33,6 +33,9 @@ export default function CreateScreen() {
   const [autoCaptions, setAutoCaptions] = useState(true);
   const [captionLanguage, setCaptionLanguage] = useState("auto");
   const [busy, setBusy] = useState(false);
+  const [shopProducts, setShopProducts] = useState<any[]>([]);
+  const [showShopPicker, setShowShopPicker] = useState(false);
+  const [selectedShopProducts, setSelectedShopProducts] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [speed, setSpeed] = useState(1);
   const [effect, setEffect] = useState("NONE");
@@ -204,6 +207,28 @@ export default function CreateScreen() {
     setClipSettings(prev => prev.map((x, i) => i === index ? { ...(x ?? DEFAULT_CLIP_SETTING), ...patch } : x));
   }
 
+  async function openShopPicker() {
+    try {
+      const token = await getAuthToken(); if (!token) throw new Error("Sign in first.");
+      const response = await fetch(API + "/shop/commerce/products", { headers: { Authorization: "Bearer " + token } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Unable to load Shop products.");
+      setShopProducts(Array.isArray(data.products) ? data.products.filter((p:any) => p.status === "ACTIVE") : []);
+      setShowShopPicker(true);
+    } catch (e) { Alert.alert("Shop", e instanceof Error ? e.message : "Unable to load products."); }
+  }
+  function toggleShopProduct(id:string) {
+    setSelectedShopProducts(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 10 ? [...prev, id] : prev);
+  }
+  async function tagShopProducts(postId:string) {
+    if (!selectedShopProducts.length) return;
+    const token = await getAuthToken(); if (!token) return;
+    for (const productId of selectedShopProducts) {
+      const response = await fetch(API + "/shop/content/" + postId + "/products", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({productId}) });
+      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Unable to tag Shop product."); }
+    }
+  }
+
   function chooseSound(){ router.push({ pathname:"/sounds", params:{ select:"1" } }); }
 
   async function pickPhotos() {
@@ -242,7 +267,7 @@ export default function CreateScreen() {
       if (mode === "TEXT") {
         const response = await fetch(API + "/video/posts/text", { method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify({text:caption,hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),visibility,allowComments:comments,allowDuet:duet,allowStitch:stitch}) });
         const data = await response.json().catch(()=>({})); if (!response.ok) throw new Error(data.error || "Unable to publish text post.");
-        Alert.alert("Posted","Your TwiTok text post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
+        await tagShopProducts(data.postId); Alert.alert("Posted","Your TwiTok text post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
       if (mode === "PHOTO") {
         const uploadIds: string[] = [];
@@ -258,7 +283,7 @@ export default function CreateScreen() {
         }
         const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),allowDuet:duet,allowStitch:stitch,editPlan})});
         const data=await post.json().catch(()=>({})); if(!post.ok) throw new Error(data.error||"Unable to publish photo post.");
-        Alert.alert("Posted","Your TwiTok photo post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
+        await tagShopProducts(data.postId); Alert.alert("Posted","Your TwiTok photo post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
       const uploads: string[] = [];
       for (let index = 0; index < assets.length; index++) {
@@ -354,7 +379,8 @@ export default function CreateScreen() {
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
       </View> : null}
       <ScrollView contentContainerStyle={styles.content}>
-        <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
+        <Pressable style={styles.shopButton} onPress={()=>void openShopPicker()}><Text style={styles.shopButtonText}>Shop products {selectedShopProducts.length ? "(" + selectedShopProducts.length + ")" : ""}</Text></Pressable>
+      <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
         <TextInput value={location} onChangeText={setLocation} placeholder="📍 Add location" placeholderTextColor="#777" style={styles.input} maxLength={120} />
