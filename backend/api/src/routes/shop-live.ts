@@ -49,10 +49,59 @@ shopLiveRouter.get("/live/:streamId/analytics", requireUser, async (req, res) =>
   const db = await getDb();
   const stream = await ownedLive(db, streamId, req.userId!.toHexString());
   if (!stream) return res.status(404).json({ error: "LIVE stream not found or not owned by you" });
-  const rows = await db.collection("live_shop_events").aggregate([{ $match: { streamId } }, { $group: { _id: { productId: "$productId", event: "$event" }, count: { $sum: 1 } } }]).toArray();
+  const rows = await db.collection("live_shop_events").aggregate([
+    { $match: { streamId } },
+    { $group: {
+      _id: "$productId",
+      totalEvents: { $sum: 1 },
+      uniqueUsers: { $addToSet: "$userId" },
+      views: { $sum: { $cond: [{ $eq: ["$event", "VIEW"] }, 1, 0] } },
+      featureViews: { $sum: { $cond: [{ $eq: ["$event", "FEATURE_VIEW"] }, 1, 0] } },
+      addToCart: { $sum: { $cond: [{ $eq: ["$event", "ADD_TO_CART"] }, 1, 0] } },
+      buyNow: { $sum: { $cond: [{ $eq: ["$event", "BUY_NOW"] }, 1, 0] } },
+      featurePins: { $sum: { $cond: [{ $eq: ["$event", "FEATURE_PIN"] }, 1, 0] } }
+    } }
+  ]).toArray();
   const analytics: Record<string, Record<string, number>> = {};
-  for (const row of rows as any[]) { const productId = String(row._id.productId); analytics[productId] ??= {}; analytics[productId][String(row._id.event)] = Number(row.count); }
-  return res.json({ streamId, analytics });
+  let totalEvents = 0, uniqueUsers = 0, views = 0, featureViews = 0, addToCart = 0, buyNow = 0, featurePins = 0;
+  for (const row of rows as any[]) {
+    const productId = String(row._id);
+    const productViews = Number(row.views ?? 0);
+    const item = {
+      totalEvents: Number(row.totalEvents ?? 0),
+      uniqueUsers: Array.isArray(row.uniqueUsers) ? row.uniqueUsers.length : 0,
+      VIEW: productViews,
+      FEATURE_VIEW: Number(row.featureViews ?? 0),
+      ADD_TO_CART: Number(row.addToCart ?? 0),
+      BUY_NOW: Number(row.buyNow ?? 0),
+      FEATURE_PIN: Number(row.featurePins ?? 0),
+      addToCartRate: productViews ? Number(((Number(row.addToCart ?? 0) / productViews) * 100).toFixed(2)) : 0,
+      buyNowRate: productViews ? Number(((Number(row.buyNow ?? 0) / productViews) * 100).toFixed(2)) : 0
+    };
+    analytics[productId] = item;
+    totalEvents += item.totalEvents;
+    uniqueUsers += item.uniqueUsers;
+    views += item.VIEW;
+    featureViews += item.FEATURE_VIEW;
+    addToCart += item.ADD_TO_CART;
+    buyNow += item.BUY_NOW;
+    featurePins += item.FEATURE_PIN;
+  }
+  return res.json({
+    streamId,
+    analytics,
+    summary: {
+      totalEvents,
+      uniqueUsers,
+      views,
+      featureViews,
+      addToCart,
+      buyNow,
+      featurePins,
+      addToCartRate: views ? Number(((addToCart / views) * 100).toFixed(2)) : 0,
+      buyNowRate: views ? Number(((buyNow / views) * 100).toFixed(2)) : 0
+    }
+  });
 });
 
 shopLiveRouter.post("/live/:streamId/products", requireUser, writeLimit, async (req, res) => {
