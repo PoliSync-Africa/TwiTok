@@ -73,6 +73,24 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
   return res.status(201).json({ order, paymentRequired: true });
 });
 
+shopOrdersRouter.get("/orders/:orderId/shipments", requireUser, async (req, res) => {
+  const db = await getDb();
+  const order = await db.collection("shop_orders").findOne({ id: String(req.params.orderId), buyerId: req.userId!.toHexString() });
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  const groups = new Map<string, any>();
+  for (const item of order.items ?? []) {
+    const sellerId = String(item.sellerId);
+    const current = groups.get(sellerId) ?? { sellerId, items: [], status: "PENDING", carrier: null, trackingNumber: null, shippedAt: null, deliveredAt: null };
+    current.items.push(item);
+    groups.set(sellerId, current);
+  }
+  for (const shipment of groups.values()) {
+    const sellerOrder = await db.collection("shop_seller_shipments").findOne({ orderId: order.id, sellerId: shipment.sellerId });
+    if (sellerOrder) Object.assign(shipment, sellerOrder);
+  }
+  return res.json({ shipments: Array.from(groups.values()) });
+});
+
 shopOrdersRouter.get("/orders", requireUser, async (req, res) => {
   const db = await getDb();
   const orders = await db.collection("shop_orders").find({ buyerId: req.userId!.toHexString() }).sort({ createdAt: -1 }).limit(100).toArray();
