@@ -5,7 +5,6 @@ import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, St
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
-import FreeMediaEditor, { DEFAULT_MEDIA_EDIT_PLAN, type MediaEditPlan } from "../components/free-media-editor";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
@@ -22,8 +21,6 @@ const EMOJI_STICKERS = EMOJI_CATALOG.map((emoji,i) => [emojiStickerId(emoji), em
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [editorVisible, setEditorVisible] = useState(false);
-  const [editPlan, setEditPlan] = useState<MediaEditPlan>(DEFAULT_MEDIA_EDIT_PLAN);
   const [selectedClip, setSelectedClip] = useState(0);
   const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
@@ -154,10 +151,6 @@ export default function CreateScreen() {
   }
 
 
-  function applyEditPlan(next: MediaEditPlan) {
-    setEditPlan(next);
-  }
-
   function replaceAssets(next: Asset[]) {
     setAssets(next);
     setClipSettings(next.map((_, i) => clipSettings[i] ?? { ...DEFAULT_CLIP_SETTING }));
@@ -256,7 +249,7 @@ export default function CreateScreen() {
           const complete=await fetch(API+"/videos/photos/uploads/"+session.uploadId+"/complete",{method:"POST",headers:{Authorization:"Bearer "+token}}); if(!complete.ok) throw new Error("Unable to complete photo upload.");
           uploadIds.push(session.uploadId); setStatus("Uploading photo "+(index+1)+" of "+assets.length+"…");
         }
-        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),allowDuet:duet,allowStitch:stitch,editPlan})});
+        const post=await fetch(API+"/videos/posts/photos",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({uploadIds,caption,visibility,allowComments:comments,mentions:mentions.split(/[,\s]+/).map(x=>x.replace(/^@/,"").trim()).filter(Boolean).slice(0,30),location:location.trim(),hashtags:hashtags.split(/[,\s]+/).map(x=>x.replace(/^#/,"").trim()).filter(Boolean).slice(0,30),allowDuet:duet,allowStitch:stitch})});
         const data=await post.json().catch(()=>({})); if(!post.ok) throw new Error(data.error||"Unable to publish photo post.");
         Alert.alert("Posted","Your TwiTok photo post is live.",[{text:"View feed",onPress:()=>router.replace("/feed")}]); return;
       }
@@ -314,7 +307,6 @@ export default function CreateScreen() {
           autoCaptions,
           captionLanguage,
           textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : [],
-          editPlan
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
@@ -359,7 +351,6 @@ export default function CreateScreen() {
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
         <TextInput value={location} onChangeText={setLocation} placeholder="📍 Add location" placeholderTextColor="#777" style={styles.input} maxLength={120} />
-        {mode !== "TEXT" && assets.length ? <Pressable style={styles.editorButton} onPress={() => setEditorVisible(true)}><Text style={styles.editorButtonIcon}>✦</Text><View style={{flex:1}}><Text style={styles.editorButtonTitle}>Edit & AI tools</Text><Text style={styles.editorButtonSub}>Free enhance, filters, crop, effects, captions, restyle & more</Text></View><Text style={styles.editorButtonArrow}>›</Text></Pressable> : null}
          {assets.length ? <FlatList
            data={assets}
            horizontal
@@ -532,7 +523,6 @@ export default function CreateScreen() {
         {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
         {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
       </ScrollView>
-      <FreeMediaEditor visible={editorVisible} mode={mode} value={editPlan} onChange={applyEditPlan} onClose={() => setEditorVisible(false)} />
     </View>
   );
 }
