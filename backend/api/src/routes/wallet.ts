@@ -16,6 +16,46 @@ import { rateLimit as expressRateLimit } from "express-rate-limit";
 
 export const walletRouter = Router();
 
+
+const monetizationWriteLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+
+walletRouter.get("/monetization", requireUser, async (req, res) => {
+  try {
+    const user = await (await getDb()).collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { monetizationEnabled: 1, monetizationEnabledAt: 1, monetizationTermsVersion: 1, dateOfBirth: 1 } }
+    );
+    const dob = user?.dateOfBirth ? new Date(user.dateOfBirth) : null;
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
+    return res.json({
+      monetizationEnabled: user?.monetizationEnabled === true,
+      enabledAt: user?.monetizationEnabledAt ?? null,
+      termsVersion: user?.monetizationTermsVersion ?? null,
+      adultEligible: Boolean(dob && !Number.isNaN(dob.getTime()) && dob <= cutoff)
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Monetization settings lookup failed" });
+  }
+});
+
+walletRouter.patch("/monetization", requireAdultUser, monetizationWriteLimit, async (req, res) => {
+  try {
+    const enabled = req.body?.enabled === true;
+    const termsVersion = String(req.body?.termsVersion ?? "").trim();
+    if (enabled && !termsVersion) return res.status(400).json({ error: "You must accept the current monetization terms before turning Monetization on." });
+    const db = await getDb();
+    const now = new Date();
+    const update = enabled
+      ? { $set: { monetizationEnabled: true, monetizationEnabledAt: now, monetizationTermsVersion: termsVersion, updatedAt: now } }
+      : { $set: { monetizationEnabled: false, updatedAt: now } };
+    await db.collection("users").updateOne({ _id: req.userId! }, update);
+    return res.json({ monetizationEnabled: enabled, enabledAt: enabled ? now : null, termsVersion: enabled ? termsVersion : null });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update monetization settings" });
+  }
+});
+
+
 walletRouter.get("/revenuecat/config", requireUser, async (req, res) => {
   return res.json({ appUserId: req.userId!.toHexString() });
 });

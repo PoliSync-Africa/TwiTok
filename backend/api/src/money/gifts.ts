@@ -144,6 +144,9 @@ export async function sendGift(db: Db, input: {
   if (!baseGift) throw new Error("Gift not found");
   const sender = await db.collection("users").findOne({ _id: new ObjectId(input.senderId) }, { projection: { countryCode: 1 } });
   if (!sender) throw new Error("Sender account not found");
+  const receiver = await db.collection("users").findOne({ _id: new ObjectId(input.receiverId) }, { projection: { monetizationEnabled: 1 } });
+  if (!receiver) throw new Error("Receiver account not found");
+  if (receiver.monetizationEnabled !== true) throw new Error("This creator has not enabled Monetization and cannot receive Gifts yet.");
   const gift = { ...baseGift, coins: giftCoinsForCountry(baseGift.coins, String(sender.countryCode ?? "")) };
   const idempotencyKey = String(input.idempotencyKey ?? "").trim();
   if (!idempotencyKey || idempotencyKey.length > 128) throw new Error("A valid Idempotency-Key is required");
@@ -189,6 +192,8 @@ export async function sendGift(db: Db, input: {
 
   try {
     await session.withTransaction(async () => {
+      const currentReceiver = await db.collection("users").findOne({ _id: new ObjectId(input.receiverId) }, { projection: { monetizationEnabled: 1 }, session });
+      if (currentReceiver?.monetizationEnabled !== true) throw new Error("This creator has not enabled Monetization and cannot receive Gifts yet.");
       await db.collection("wallets").updateOne(
         { userId: input.senderId },
         { $setOnInsert: { userId: input.senderId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, unallocatedNetProceedsUsd: 0, createdAt: now, updatedAt: now } },

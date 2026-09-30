@@ -34,6 +34,8 @@ export default function WalletScreen() {
   const [purchasing,setPurchasing]=useState(false);
   const [rcPackages,setRcPackages]=useState<PurchasesPackage[]>([]);
   const [showCoinPicker,setShowCoinPicker]=useState(false);
+  const [monetizationEnabled,setMonetizationEnabled]=useState(false);
+  const [monetizationBusy,setMonetizationBusy]=useState(false);
 
   async function load(){
     setLoading(true);
@@ -44,14 +46,15 @@ export default function WalletScreen() {
       const rc=await fetch(API+"/wallet/revenuecat/config",{headers:h});
       const rcJson=await rc.json().catch(()=>({}));
       if(rc.ok && rcJson.appUserId) configureRevenueCat(String(rcJson.appUserId));
-      const [w,g,wd]=await Promise.all([
+      const [w,g,wd,m]=await Promise.all([
         fetch(API+"/wallet/me",{headers:h}),
         fetch(API+"/wallet/me/gifts?limit=20",{headers:h}),
-        fetch(API+"/wallet/me/withdrawals?limit=20",{headers:h})
+        fetch(API+"/wallet/me/withdrawals?limit=20",{headers:h}),
+        fetch(API+"/wallet/monetization",{headers:h})
       ]);
-      const [wj,gj,wdj]=await Promise.all([w.json(),g.json(),wd.json()]);
+      const [wj,gj,wdj,mj]=await Promise.all([w.json(),g.json(),wd.json(),m.json()]);
       if(!w.ok) throw new Error(wj.error??"Wallet unavailable");
-      setWallet(wj); setGifts(gj.gifts??[]); setWithdrawals(wdj.withdrawals??[]);
+      setWallet(wj); setGifts(gj.gifts??[]); setWithdrawals(wdj.withdrawals??[]); setMonetizationEnabled(mj.monetizationEnabled===true);
       const catalog=await fetch(API+"/wallet/catalog",{headers:h});
       const catalogJson=await catalog.json().catch(()=>({}));
       setCoinPackages(catalogJson.coinPackages??[]);
@@ -131,6 +134,25 @@ export default function WalletScreen() {
     finally{setBusy(false);}
   }
 
+  async function toggleMonetization(){
+    const token=await getAuthToken(); if(!token||monetizationBusy)return;
+    if(!monetizationEnabled){
+      Alert.alert("Turn on Monetization","This lets eligible viewers send Gifts to you and enables eligible creator earnings. You can turn it off later.",[
+        {text:"Cancel",style:"cancel"},
+        {text:"Turn On",onPress:async()=>{
+          setMonetizationBusy(true);
+          try{const r=await fetch(API+"/wallet/monetization",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({enabled:true,termsVersion:"2026-09-30"})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error??"Unable to turn Monetization on");setMonetizationEnabled(true);Alert.alert("Monetization on","Your account can now receive eligible creator Gifts.");}catch(e){Alert.alert("Monetization",e instanceof Error?e.message:"Unable to update Monetization");}finally{setMonetizationBusy(false)}}}
+      ]);
+    }else{
+      Alert.alert("Turn off Monetization","New creator Gifts and creator earnings will stop. Existing wallet funds will remain.",[
+        {text:"Cancel",style:"cancel"},
+        {text:"Turn Off",style:"destructive",onPress:async()=>{
+          setMonetizationBusy(true);
+          try{const r=await fetch(API+"/wallet/monetization",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({enabled:false})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error??"Unable to turn Monetization off");setMonetizationEnabled(false);Alert.alert("Monetization off","New creator Gifts are now disabled.");}catch(e){Alert.alert("Monetization",e instanceof Error?e.message:"Unable to update Monetization");}finally{setMonetizationBusy(false)}}}
+      ]);
+    }
+  }
+
   if(loading) return <View style={styles.center}><ActivityIndicator color="#fff"/></View>;
 
   const coinPicker = <Modal visible={showCoinPicker} transparent animationType="slide" onRequestClose={()=>!purchasing&&setShowCoinPicker(false)}>
@@ -156,7 +178,7 @@ export default function WalletScreen() {
   return <View style={styles.screen}>\n    {coinPicker}
     <View style={styles.header}><Pressable onPress={()=>router.back()}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>Wallet & Earnings</Text><Pressable onPress={()=>void load()}><Text style={styles.refresh}>↻</Text></Pressable></View>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.hero}><Text style={styles.heroLabel}>AVAILABLE EARNINGS</Text><Text style={styles.heroCash}>{"$"+cash.toFixed(2)}</Text><Text style={styles.heroHint}>Minimum cashout: $10.00</Text></View>
+      <View style={styles.hero}><Text style={styles.heroLabel}>AVAILABLE EARNINGS</Text><Text style={styles.heroCash}>{"$"+cash.toFixed(2)}</Text><Text style={styles.heroHint}>Minimum cashout: $10.00</Text></View>\n      <View style={styles.section}><View style={styles.monetizationHeader}><View style={{flex:1}}><Text style={styles.sectionTitle}>Creator Monetization</Text><Text style={styles.rowSub}>{monetizationEnabled?"On — eligible viewers can send Gifts to you.":"Off — your account is not receiving creator Gifts."}</Text></View><Pressable disabled={monetizationBusy} onPress={()=>void toggleMonetization()} style={[styles.monetizationButton,monetizationEnabled&&styles.monetizationButtonOff]}><Text style={styles.monetizationButtonText}>{monetizationBusy?"…":monetizationEnabled?"Turn Off":"Turn On"}</Text></Pressable></View></View>
       <View style={styles.stats}>
         <Stat label="Coins" value={String(Math.floor(wallet.coinBalance??0))}/>
         <Stat label="Diamonds" value={String(Number(wallet.diamondBalance??0).toFixed(2))}/>
@@ -194,6 +216,6 @@ const styles=StyleSheet.create({
  buyCard:{backgroundColor:"#ff2d55",borderRadius:15,padding:18,flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:12},buyTitle:{color:"#fff",fontSize:17,fontWeight:"900"},buySub:{color:"#ffe1e8",marginTop:3},arrow:{color:"#fff",fontSize:30},
  section:{backgroundColor:"#111",borderRadius:16,borderWidth:1,borderColor:"#242424",padding:16,marginBottom:12},sectionTitle:{color:"#fff",fontSize:17,fontWeight:"900",marginBottom:12},
  row:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingVertical:11,borderTopWidth:1,borderTopColor:"#222"},rowTitle:{color:"#fff",fontWeight:"800"},rowSub:{color:"#777",fontSize:11,marginTop:3},positive:{color:"#72e06a",fontWeight:"900"},empty:{color:"#777"},
- switchRow:{flexDirection:"row",gap:8,marginBottom:10},switch:{flex:1,padding:11,borderRadius:10,backgroundColor:"#1a1a1a",alignItems:"center"},switchActive:{backgroundColor:"#333",borderWidth:1,borderColor:"#fff"},switchText:{color:"#fff",fontWeight:"800"},providerLabel:{color:"#999",fontSize:11,fontWeight:"800",marginBottom:6},providerRow:{gap:8,paddingBottom:9},provider:{backgroundColor:"#1a1a1a",borderRadius:10,paddingHorizontal:12,paddingVertical:9,borderWidth:1,borderColor:"#333"},providerActive:{borderColor:"#fff",backgroundColor:"#333"},providerText:{color:"#fff",fontSize:11,fontWeight:"800"},input:{backgroundColor:"#181818",borderWidth:1,borderColor:"#333",borderRadius:10,padding:13,color:"#fff",marginBottom:9},withdraw:{backgroundColor:"#fff",borderRadius:10,padding:14,alignItems:"center"},withdrawText:{color:"#000",fontWeight:"900"},
+ monetizationHeader:{flexDirection:"row",alignItems:"center",gap:12},monetizationButton:{backgroundColor:"#fff",borderRadius:10,paddingHorizontal:14,paddingVertical:10},monetizationButtonOff:{backgroundColor:"#222",borderWidth:1,borderColor:"#555"},monetizationButtonText:{color:"#000",fontWeight:"900"},switchRow:{flexDirection:"row",gap:8,marginBottom:10},switch:{flex:1,padding:11,borderRadius:10,backgroundColor:"#1a1a1a",alignItems:"center"},switchActive:{backgroundColor:"#333",borderWidth:1,borderColor:"#fff"},switchText:{color:"#fff",fontWeight:"800"},providerLabel:{color:"#999",fontSize:11,fontWeight:"800",marginBottom:6},providerRow:{gap:8,paddingBottom:9},provider:{backgroundColor:"#1a1a1a",borderRadius:10,paddingHorizontal:12,paddingVertical:9,borderWidth:1,borderColor:"#333"},providerActive:{borderColor:"#fff",backgroundColor:"#333"},providerText:{color:"#fff",fontSize:11,fontWeight:"800"},input:{backgroundColor:"#181818",borderWidth:1,borderColor:"#333",borderRadius:10,padding:13,color:"#fff",marginBottom:9},withdraw:{backgroundColor:"#fff",borderRadius:10,padding:14,alignItems:"center"},withdrawText:{color:"#000",fontWeight:"900"},
  modalBackdrop:{flex:1,backgroundColor:"rgba(0,0,0,0.72)",justifyContent:"flex-end"},coinSheet:{backgroundColor:"#111",borderTopLeftRadius:24,borderTopRightRadius:24,padding:18,paddingBottom:32,borderWidth:1,borderColor:"#292929"},sheetHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},sheetTitle:{color:"#fff",fontSize:21,fontWeight:"900"},close:{color:"#fff",fontSize:32,lineHeight:32},sheetHint:{color:"#888",fontSize:12,lineHeight:18,marginTop:4,marginBottom:12},coinOption:{backgroundColor:"#1a1a1a",borderRadius:14,borderWidth:1,borderColor:"#292929",padding:15,marginTop:8,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},coinAmount:{color:"#fff",fontSize:17,fontWeight:"900"},coinSku:{color:"#777",fontSize:10,marginTop:3},coinPrice:{color:"#fff",fontSize:17,fontWeight:"900"},processing:{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,paddingTop:14},processingText:{color:"#aaa"}
 });

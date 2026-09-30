@@ -17,6 +17,8 @@ export default function CreatorWallet(){
   const [earnings,setEarnings]=useState<Earnings|null>(null);
   const [days,setDays]=useState(30);
   const [message,setMessage]=useState("");
+  const [monetizationEnabled,setMonetizationEnabled]=useState(false);
+  const [monetizationBusy,setMonetizationBusy]=useState(false);
   const token=typeof window!=="undefined"?window.localStorage.getItem("twitok_user_token"):"";
 
   useEffect(()=>{ if(!token)return;
@@ -35,6 +37,25 @@ export default function CreatorWallet(){
   const maxGift=Math.max(1,...(earnings?.gifts??[]).map(g=>Number(g.creatorEarningsUsd??0)));
   const topGifts=useMemo(()=>earnings?.gifts.slice(0,10)??[],[earnings]);
 
+  async function toggleMonetization(){
+    if(!token || monetizationBusy)return;
+    setMonetizationBusy(true);
+    try{
+      if(monetizationEnabled){
+        const r=await fetch(api+"/wallet/monetization",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({enabled:false})});
+        const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error??"Unable to turn Monetization off");
+        setMonetizationEnabled(false); setMessage("Creator Monetization is now off. Existing wallet funds remain available under the payout rules.");
+      }else{
+        const accepted=window.confirm("Turn on Creator Monetization? This allows eligible viewers to send Gifts to you and lets TwiTok credit eligible creator earnings. You can turn it off later. Continue?");
+        if(!accepted)return;
+        const r=await fetch(api+"/wallet/monetization",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({enabled:true,termsVersion:"2026-09-30"})});
+        const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error??"Unable to turn Monetization on");
+        setMonetizationEnabled(true); setMessage("Creator Monetization is now on. Eligible viewers can send Gifts to you.");
+      }
+    }catch(e){setMessage(e instanceof Error?e.message:"Unable to update Monetization");}
+    finally{setMonetizationBusy(false)}
+  }
+
   const requestWithdrawal=()=>setMessage(summary?.creatorRefundLiabilityUsd&&summary.creatorRefundLiabilityUsd>0.00000001?"Your creator refund liability must be cleared before withdrawal.":"Withdrawals are available from $10 after verified payout details are added.");
 
   return <main className="studio">
@@ -42,6 +63,11 @@ export default function CreatorWallet(){
       <div><Link href="/creator/studio" className="back">← Creator Studio</Link><h1>Creator Wallet</h1><p>Track earnings, Gifts, Diamonds, refunds and withdrawals.</p></div>
       <div className="range-tabs">{[7,30,90].map(n=><button key={n} className={days===n?"range active":"range"} onClick={()=>setDays(n)}>{n}D</button>)}</div>
     </header>
+
+    <section className="studio-panel monetization-optin">
+      <div><span>CREATOR MONETIZATION</span><h2>{monetizationEnabled?"On":"Off"}</h2><p>{monetizationEnabled?"You have chosen to participate in eligible creator earning features.":"Your account is not earning creator Gifts. Turn this on only when you want to monetize."}</p></div>
+      <button className="primary" onClick={toggleMonetization} disabled={monetizationBusy}>{monetizationBusy?"Saving...":monetizationEnabled?"Turn Monetization Off":"Turn Monetization On"}</button>
+    </section>
 
     <section className="metrics">
       <article><span>AVAILABLE</span><strong>{usd(wallet?.cashBalanceUsd??0)}</strong><small>Ready for withdrawal</small></article>
