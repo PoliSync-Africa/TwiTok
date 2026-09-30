@@ -24,7 +24,7 @@ shopOrdersRouter.post("/cart/items", requireUser, async (req, res) => {
   if (Number(product.stock ?? 0) < quantity) return res.status(409).json({ error: "Insufficient stock" });
   await db.collection("shop_carts").updateOne(
     { userId: req.userId!.toHexString() },
-    { $set: { updatedAt: new Date() }, $setOnInsert: { userId: req.userId!.toHexString(), items: [] }, $push: { items: { productId, quantity, priceMinor: Number(product.priceMinor), currency: product.currency, name: product.name, image: product.images?.[0] ?? null } } },
+    { $set: { updatedAt: new Date() }, $setOnInsert: { userId: req.userId!.toHexString(), items: [] }, $push: { items: { productId, quantity, priceMinor: Number(product.priceMinor), currency: product.currency, name: product.name, image: product.images?.[0] ?? null } } } as any,
     { upsert: true }
   );
   return res.status(201).json({ ok: true });
@@ -32,7 +32,7 @@ shopOrdersRouter.post("/cart/items", requireUser, async (req, res) => {
 
 shopOrdersRouter.delete("/cart/items/:productId", requireUser, async (req, res) => {
   const db = await getDb();
-  await db.collection("shop_carts").updateOne({ userId: req.userId!.toHexString() }, { $pull: { items: { productId: String(req.params.productId) } }, $set: { updatedAt: new Date() } });
+  await db.collection("shop_carts").updateOne({ userId: req.userId!.toHexString() }, { $pull: { items: { productId: String(req.params.productId) } }, $set: { updatedAt: new Date() } } as any);
   return res.json({ ok: true });
 });
 
