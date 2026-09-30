@@ -115,6 +115,57 @@ promotionsRouter.get("/me", requireUser, campaignReadLimit, async (req, res) => 
   } catch { return res.status(500).json({ error: "Unable to load promotions" }); }
 });
 
+promotionsRouter.get("/:campaignId", requireUser, campaignReadLimit, async (req, res) => {
+  try {
+    const campaignId = String(req.params.campaignId);
+    if (!ObjectId.isValid(campaignId)) return res.status(400).json({ error: "Invalid campaign id" });
+    const campaign = await (await getDb()).collection("promotion_campaigns").findOne({ _id: new ObjectId(campaignId), ownerId: req.userId! });
+    if (!campaign) return res.status(404).json({ error: "Promotion campaign not found" });
+    return res.json({ campaign: publicCampaign(campaign) });
+  } catch {
+    return res.status(500).json({ error: "Unable to load promotion" });
+  }
+});
+
+promotionsRouter.get("/:campaignId/analytics", requireUser, campaignReadLimit, async (req, res) => {
+  try {
+    const campaignId = String(req.params.campaignId);
+    if (!ObjectId.isValid(campaignId)) return res.status(400).json({ error: "Invalid campaign id" });
+    const db = await getDb();
+    const campaign = await db.collection("promotion_campaigns").findOne({ _id: new ObjectId(campaignId), ownerId: req.userId! });
+    if (!campaign) return res.status(404).json({ error: "Promotion campaign not found" });
+    const videoId = campaign.videoId as ObjectId;
+    const [events, payment] = await Promise.all([
+      db.collection("feed_events").aggregate([
+        { $match: { videoId, source: "PROMOTED", createdAt: { $gte: campaign.startAt ?? campaign.createdAt } } },
+        { $group: { _id: "$type", count: { $sum: 1 }, watchMs: { $sum: { $ifNull: ["$watchMs", 0] } } } }
+      ]).toArray(),
+      db.collection("promotion_payments").findOne({ campaignId: campaign._id, userId: req.userId! }, { projection: { status: 1, amountMinor: 1, currency: 1, verifiedAt: 1 } })
+    ]);
+    const byType: Record<string, number> = {};
+    let totalWatchMs = 0;
+    for (const row of events) { byType[String(row._id)] = Number(row.count ?? 0); totalWatchMs += Number(row.watchMs ?? 0); }
+    return res.json({
+      campaign: publicCampaign(campaign),
+      payment: payment ? { status: payment.status, amountMinor: payment.amountMinor, currency: payment.currency, verifiedAt: payment.verifiedAt ?? null } : null,
+      analytics: {
+        impressions: byType.IMPRESSION ?? 0,
+        views: byType.VIEW_2S ?? 0,
+        completedViews: byType.VIEW_COMPLETE ?? 0,
+        likes: byType.LIKE ?? 0,
+        comments: byType.COMMENT ?? 0,
+        shares: byType.SHARE ?? 0,
+        saves: byType.SAVE ?? 0,
+        follows: byType.FOLLOW ?? 0,
+        totalWatchMs,
+        targetViews: campaign.targetViews ?? null
+      }
+    });
+  } catch {
+    return res.status(500).json({ error: "Unable to load promotion analytics" });
+  }
+});
+
 promotionsRouter.post("/:campaignId/pay", requireUser, paymentLimit, async (req, res) => {
   try {
     if (!ObjectId.isValid(String(req.params.campaignId))) return res.status(400).json({ error: "Invalid campaign id" });
