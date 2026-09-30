@@ -11,6 +11,7 @@ import { initializeFlutterwaveCheckout, verifyFlutterwaveTransaction, verifyFlut
 import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider, resolvePayoutProvider, payoutProviders } from "../money/providers/routing.js";
 import { requireUser, requireAdultUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
+import { rateLimit } from "../security/rate-limit.js";
 
 export const walletRouter = Router();
 
@@ -48,7 +49,7 @@ walletRouter.get("/me/ledger", requireUser, async (req, res) => {
 });
 
 
-walletRouter.get("/me/earnings", requireUser, async (req, res) => {
+walletRouter.get("/me/earnings", requireUser, rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   try {
     const db = await getDb();
     const now = new Date();
