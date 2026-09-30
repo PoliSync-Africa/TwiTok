@@ -72,11 +72,9 @@ shopAffiliateRouter.get("/affiliate/creator", requireUser, async (req, res) => {
 
 shopAffiliateRouter.post("/affiliate/links/:code/click", async (req, res) => {
   const db = await getDb();
-  const result = await db.collection("shop_affiliate_links").findOneAndUpdate(
-    { code: String(req.params.code) },
-    { $inc: { clicks: 1 } },
-    { returnDocument: "after" }
-  );
-  if (!result) return res.status(404).json({ error: "Affiliate link not found" });
-  return res.json({ productId: result.productId, offerId: result.offerId });
+  const code = String(req.params.code);
+  const result = await db.collection("shop_affiliate_links").updateOne({ code }, { $inc: { clicks: 1 } });
+  if (!result.matchedCount) return res.status(404).json({ error: "Affiliate link not found" });
+  const link = await db.collection("shop_affiliate_links").findOne({ code });
+  return res.json({ productId: link?.productId, offerId: link?.offerId });
 });
