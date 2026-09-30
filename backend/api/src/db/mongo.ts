@@ -40,6 +40,13 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_payouts").createIndex({ sellerId: 1, status: 1, createdAt: -1 });
   await db.collection("shop_seller_shipments").createIndex({ orderId: 1, sellerId: 1 }, { unique: true });
   await db.collection("shop_seller_shipments").createIndex({ sellerId: 1, status: 1, updatedAt: -1 });
+  await db.collection("shop_affiliate_offers").createIndex({ productId: 1, sellerId: 1, status: 1 }, { unique: true });
+  await db.collection("shop_affiliate_offers").createIndex({ status: 1, createdAt: -1 });
+  await db.collection("shop_affiliate_memberships").createIndex({ offerId: 1, creatorId: 1 }, { unique: true });
+  await db.collection("shop_affiliate_links").createIndex({ code: 1 }, { unique: true });
+  await db.collection("shop_affiliate_links").createIndex({ creatorId: 1, createdAt: -1 });
+  await db.collection("shop_affiliate_commissions").createIndex({ orderId: 1, creatorId: 1 }, { unique: true });
+  await db.collection("shop_affiliate_commissions").createIndex({ creatorId: 1, status: 1, createdAt: -1 });
 
   return db;
 }
