@@ -160,11 +160,11 @@ export default function CreateScreen() {
     if (mode === "PHOTO" && assets.length) {
       void Promise.all(assets.map(async asset => {
         if (!asset.uri) return asset;
-        const actions: ImageManipulator.Action[] = [];
+        const actions: any[] = [];
         if (next.rotate) actions.push({ rotate: next.rotate });
-        if (next.mirror) actions.push({ flip: ImageManipulator.FlipType.Horizontal });
+        if (next.mirror) actions.push({ flip: "horizontal" });
         if (actions.length) {
-          const result = await ImageManipulator.manipulateAsync(asset.uri, actions, { compress: 1, format: ImageManipulator.SaveFormat.JPEG });
+          const result = await ImageManipulator.manipulateAsync(asset.uri, actions, { compress: 1, format: "jpeg" });
           return { ...asset, uri: result.uri, mimeType: "image/jpeg", fileSize: undefined, fileName: asset.fileName ?? "twitok-edit.jpg" };
         }
         return asset;
