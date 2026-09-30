@@ -17,14 +17,21 @@ shopOrdersRouter.get("/cart", requireUser, async (req, res) => {
 shopOrdersRouter.post("/cart/items", requireUser, async (req, res) => {
   const productId = String(req.body?.productId ?? "");
   const quantity = Math.floor(Number(req.body?.quantity ?? 1));
+  const sourceStreamId = String(req.body?.sourceStreamId ?? "").trim();
+  const sourceProductId = String(req.body?.sourceProductId ?? "").trim();
+  if (sourceStreamId && sourceProductId !== productId) return res.status(400).json({ error: "LIVE source product must match the cart product" });
   if (!productId || quantity < 1 || quantity > 100) return res.status(400).json({ error: "Valid productId and quantity are required" });
   const db = await getDb();
   const product = await db.collection("shop_products").findOne({ id: productId, status: "ACTIVE" }, { projection: { id: 1, name: 1, priceMinor: 1, currency: 1, images: 1, stock: 1, sellerId: 1 } });
   if (!product) return res.status(404).json({ error: "Product not found" });
   if (Number(product.stock ?? 0) < quantity) return res.status(409).json({ error: "Insufficient stock" });
+  if (sourceStreamId) {
+    const liveTag = await db.collection("live_shop_products").findOne({ streamId: sourceStreamId, productId });
+    if (!liveTag) return res.status(400).json({ error: "LIVE shopping product is no longer attached to this LIVE" });
+  }
   await db.collection("shop_carts").updateOne(
     { userId: req.userId!.toHexString() },
-    { $set: { updatedAt: new Date() }, $setOnInsert: { userId: req.userId!.toHexString(), items: [] }, $push: { items: { productId, quantity, priceMinor: Number(product.priceMinor), currency: product.currency, name: product.name, image: product.images?.[0] ?? null } } } as any,
+    { $set: { updatedAt: new Date() }, $setOnInsert: { userId: req.userId!.toHexString(), items: [] }, $push: { items: { productId, quantity, priceMinor: Number(product.priceMinor), currency: product.currency, name: product.name, image: product.images?.[0] ?? null, sourceStreamId: sourceStreamId || null, sourceProductId: sourceProductId || null } } } as any,
     { upsert: true }
   );
   return res.status(201).json({ ok: true });
