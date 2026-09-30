@@ -1,7 +1,12 @@
 import { Router } from "express";
+import { getShopPaymentMethods } from "../config/shop-payments.js";
 import { getShopBenchmarkFeatureGroups, TWITOK_SHOP_BENCHMARK_VERSION, TWITOK_SHOP_ORDER_STATUSES, TWITOK_SHOP_PRODUCT_STATUSES, TWITOK_SHOP_ROLES, TWITOK_SHOP_SURFACES } from "../config/shop-benchmark.js";
 
 export const shopRouter = Router();
+
+shopRouter.get("/payment-methods/:countryCode", (req, res) => {
+  res.json({ countryCode: String(req.params.countryCode).toUpperCase(), methods: getShopPaymentMethods(req.params.countryCode) });
+});
 
 shopRouter.get("/benchmark", (_req, res) => {
   res.json({
