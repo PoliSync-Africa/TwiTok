@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View, Image, Alert } from "react-native";
-import { getAuthToken } from "../src/auth";
+import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "";
 
