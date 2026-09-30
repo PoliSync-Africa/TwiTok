@@ -78,7 +78,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       audience: durationAdjustedAudience(pack.audience, TWITOK_DEFAULT_DURATION_DAYS),
       baseAudience: pack.audience,
       benchmarkPrice: pack.benchmarkUsd,
-      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays)),
+      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, TWITOK_DEFAULT_DURATION_DAYS)),
       durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), audience: durationAdjustedAudience(pack.audience, option.days), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: TWITOK_DEFAULT_DURATION_DAYS,
       recommended: Boolean("recommended" in pack && pack.recommended)
