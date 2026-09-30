@@ -8,12 +8,12 @@ const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api
 const STYLES = ["CLEAN","CINEMATIC","VIBRANT","PORTRAIT","PORTRAIT_PRO","ANIME","ILLUSTRATION","REALISTIC"] as const;
 
 export default function AiRestyleScreen() {
-  const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mediaType?: string; duration?: string }>();
+  const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mediaType?: string; duration?: string; presetStyle?: string; presetPrompt?: string }>();
   const sourceUri = String(params.uri ?? "");
   const sourceMime = String(params.mimeType ?? "");
   const mode = String(params.mediaType ?? "VIDEO").toUpperCase() === "PHOTO" ? "IMAGE" : "VIDEO";
-  const [style, setStyle] = useState<(typeof STYLES)[number]>("CLEAN");
-  const [prompt, setPrompt] = useState("");
+  const [style, setStyle] = useState<(typeof STYLES)[number]>(() => (STYLES as readonly string[]).includes(String(params.presetStyle ?? "")) ? String(params.presetStyle) as (typeof STYLES)[number] : "CLEAN");
+  const [prompt, setPrompt] = useState(String(params.presetPrompt ?? ""));
   const [busy, setBusy] = useState(false);
   const [targetResolution, setTargetResolution] = useState<"SOURCE_MAX"|"4K"|"8K"|"48K_AI">("SOURCE_MAX");
 
@@ -55,7 +55,7 @@ export default function AiRestyleScreen() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Unable to start AI generation.");
-      if (!data.outputUrl) throw new Error("AI generation has started. The result is not ready yet.");
+      if (!data.outputUrl) throw new Error("AI generation has started. The result is not ready yet. Please try again when processing finishes.");
       router.replace({ pathname: "/create", params: { aiOutputUri: data.outputUrl, aiOutputMimeType: mode === "IMAGE" ? "image/jpeg" : "video/mp4", aiOutputDuration: String(params.duration ?? "") } });
     } catch (e) {
       Alert.alert("AI Media", e instanceof Error ? e.message : "Unable to generate media.");
