@@ -14,6 +14,7 @@ export default function LiveShopScreen() {
   const [featuredProductId, setFeaturedProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -29,10 +30,16 @@ export default function LiveShopScreen() {
     const d = await r.json();
     setProducts(d.products ?? []);
     setFeaturedProductId(d.featuredProductId ?? null);
+    setLastSyncedAt(new Date());
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, [streamId]);
+  useEffect(() => {
+    void load();
+    if (!streamId) return;
+    const timer = setInterval(() => { void load(); }, isHost ? 5000 : 3000);
+    return () => clearInterval(timer);
+  }, [streamId, isHost]);
 
   async function openPicker() {
     if (!isHost) return;
@@ -137,7 +144,7 @@ export default function LiveShopScreen() {
         </View> : null;
       })() : null}
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isHost ? "LIVE product tray" : "All LIVE products"}</Text><Text style={styles.count}>{products.length}/20</Text></View>{isHost ? <Pressable style={styles.addProductButton} onPress={() => void openPicker()}><Text style={styles.addProductText}>+ Add Product</Text></Pressable> : null}</View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isHost ? "LIVE product tray" : "All LIVE products"}</Text><Text style={styles.count}>{products.length}/20{lastSyncedAt ? " · Live sync" : ""}</Text></View>{isHost ? <Pressable style={styles.addProductButton} onPress={() => void openPicker()}><Text style={styles.addProductText}>+ Add Product</Text></Pressable> : null}</View>
       {loading ? <Text style={styles.muted}>Loading products…</Text> : <ScrollView contentContainerStyle={styles.list}>
         {products.map(product => <View key={product.id} style={styles.card}>
           {product.images?.[0] ? <Image source={{ uri: product.images[0] }} style={styles.thumb} /> : <View style={styles.thumb} />}
