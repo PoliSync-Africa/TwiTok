@@ -36,6 +36,10 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_payments").createIndex({ userId: 1, createdAt: -1 });
   await db.collection("shop_orders").createIndex({ "items.sellerId": 1, status: 1, createdAt: -1 });
   await db.collection("shop_products").createIndex({ sellerId: 1, status: 1, updatedAt: -1 });
+  // High-volume feed/video access paths for large published-video corpora.
+  await db.collection("videos").createIndex({ status: 1, visibility: 1, publishedAt: -1, _id: -1 });
+  await db.collection("videos").createIndex({ ownerId: 1, status: 1, visibility: 1, publishedAt: -1 });
+  await db.collection("videos").createIndex({ countryCode: 1, status: 1, visibility: 1, publishedAt: -1 });
   await db.collection("shop_returns").createIndex({ orderId: 1, createdAt: -1 });
   await db.collection("shop_returns").createIndex({ buyerId: 1, createdAt: -1 });
   await db.collection("shop_refunds").createIndex({ orderId: 1, returnId: 1 }, { unique: true });
