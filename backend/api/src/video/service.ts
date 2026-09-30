@@ -61,7 +61,13 @@ export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: st
   if (!upload) throw new Error("Photo upload session not found");
   const verified = await verifyMediaObject(upload.objectKey, String(upload.mimeType), PHOTO_MAX_BYTES);
   if (verified.sizeBytes !== Number(upload.sizeBytes)) throw new Error("Uploaded photo size does not match the declared size");
-  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", verifiedAt: new Date(), updatedAt: new Date() } });
+  const now = new Date();
+  await db.collection("photo_uploads").updateOne({ _id: upload._id }, { $set: { status: "READY", verifiedAt: now, updatedAt: now } });
+  await db.collection("photo_processing_jobs").updateOne(
+    { uploadId, userId },
+    { $setOnInsert: { uploadId, userId, objectKey: upload.objectKey, status: "QUEUED", attempts: 0, maxAttempts: 3, createdAt: now }, $set: { nextAttemptAt: now, updatedAt: now } },
+    { upsert: true }
+  );
   return { uploadId, status: "READY" };
 }
 
