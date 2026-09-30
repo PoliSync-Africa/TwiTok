@@ -1,6 +1,11 @@
 import { ObjectId, type Db } from "mongodb";
 import type { FeedEventType } from "./service.js";
 
+const DEFAULT_CONCURRENCY = 8;
+const MAX_ATTEMPTS = 8;
+const LOCK_TIMEOUT_MS = 60_000;
+const IDLE_POLL_MS = 250;
+
 export type QueuedFeedEvent = {
   _id?: ObjectId;
   eventId: string;
@@ -10,12 +15,13 @@ export type QueuedFeedEvent = {
   watchMs: number;
   sessionId: string | null;
   source: string;
-  status: "QUEUED" | "PROCESSING" | "DONE";
+  status: "QUEUED" | "PROCESSING" | "DONE" | "FAILED";
   attempts: number;
   availableAt: Date;
   lockedAt?: Date;
   completedAt?: Date;
   createdAt: Date;
+  lastError?: string;
 };
 
 export async function initializeFeedEventQueue(db: Db) {
@@ -95,49 +101,85 @@ async function processFeedEvent(db: Db, event: QueuedFeedEvent) {
   }
 }
 
+function workerConcurrency() {
+  const configured = Number.parseInt(process.env.FEED_EVENT_WORKER_CONCURRENCY ?? "", 10);
+  if (!Number.isFinite(configured)) return DEFAULT_CONCURRENCY;
+  return Math.max(1, Math.min(32, configured));
+}
+
+async function claimFeedEvent(db: Db) {
+  const now = new Date();
+  return db.collection<QueuedFeedEvent>("feed_event_queue").findOneAndUpdate(
+    {
+      $or: [
+        { status: "QUEUED", availableAt: { $lte: now } },
+        { status: "PROCESSING", lockedAt: { $lte: new Date(Date.now() - LOCK_TIMEOUT_MS) } }
+      ]
+    },
+    { $set: { status: "PROCESSING", lockedAt: now, availableAt: now }, $inc: { attempts: 1 } },
+    { sort: { availableAt: 1, createdAt: 1 }, returnDocument: "after" }
+  );
+}
+
+async function processClaimedEvent(db: Db, claimed: QueuedFeedEvent) {
+  try {
+    await processFeedEvent(db, claimed);
+    await db.collection("feed_event_queue").updateOne(
+      { _id: claimed._id, status: "PROCESSING" },
+      { $set: { status: "DONE", completedAt: new Date() }, $unset: { lockedAt: "", lastError: "" } }
+    );
+  } catch (error) {
+    const attempts = Number(claimed.attempts ?? 1);
+    const message = error instanceof Error ? error.message.slice(0, 500) : "Unknown feed event error";
+    if (attempts >= MAX_ATTEMPTS) {
+      await db.collection("feed_event_queue").updateOne(
+        { _id: claimed._id, status: "PROCESSING" },
+        { $set: { status: "FAILED", lastError: message, completedAt: new Date() }, $unset: { lockedAt: "" } }
+      );
+      console.error("Feed event permanently failed", { eventId: claimed.eventId, attempts, error: message });
+      return;
+    }
+
+    const retryDelayMs = Math.min(60_000, 1_000 * 2 ** Math.min(attempts - 1, 6));
+    await db.collection("feed_event_queue").updateOne(
+      { _id: claimed._id, status: "PROCESSING" },
+      {
+        $set: {
+          status: "QUEUED",
+          availableAt: new Date(Date.now() + retryDelayMs),
+          lastError: message
+        },
+        $unset: { lockedAt: "" }
+      }
+    );
+    console.error("Feed event worker retry", { eventId: claimed.eventId, attempts, retryDelayMs, error: message });
+  }
+}
+
 export function startFeedEventWorker(db: Db) {
   let stopped = false;
+  const concurrency = workerConcurrency();
 
   const run = async () => {
     while (!stopped) {
-      const now = new Date();
-      const claimed = await db.collection<QueuedFeedEvent>("feed_event_queue").findOneAndUpdate(
-        { $or: [
-          { status: "QUEUED", availableAt: { $lte: now } },
-          { status: "PROCESSING", lockedAt: { $lte: new Date(Date.now() - 60_000) } }
-        ] },
-        { $set: { status: "PROCESSING", lockedAt: now, availableAt: now }, $inc: { attempts: 1 } },
-        { sort: { createdAt: 1 }, returnDocument: "after" }
-      );
-
+      const claimed = await claimFeedEvent(db);
       if (!claimed) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, IDLE_POLL_MS));
         continue;
       }
-
-      try {
-        await processFeedEvent(db, claimed);
-        await db.collection("feed_event_queue").updateOne(
-          { _id: claimed._id },
-          { $set: { status: "DONE", completedAt: new Date() } }
-        );
-      } catch (error) {
-        const attempts = Number(claimed.attempts ?? 1);
-        const retryDelayMs = Math.min(60_000, 1_000 * 2 ** Math.min(attempts, 6));
-        await db.collection("feed_event_queue").updateOne(
-          { _id: claimed._id },
-          {
-            $set: {
-              status: "QUEUED",
-              availableAt: new Date(Date.now() + retryDelayMs)
-            }
-          }
-        );
-        console.error("Feed event worker retry", error);
-      }
+      await processClaimedEvent(db, claimed);
     }
   };
 
-  void run().catch(error => console.error("Feed event worker stopped", error));
-  return () => { stopped = true; };
+  const workers = Array.from({ length: concurrency }, () => run());
+  const workerPromise = Promise.allSettled(workers);
+
+  void workerPromise.then(results => {
+    const rejected = results.find(result => result.status === "rejected");
+    if (rejected && rejected.status === "rejected") console.error("Feed event worker stopped", rejected.reason);
+  });
+
+  return () => {
+    stopped = true;
+  };
 }
