@@ -152,7 +152,7 @@ export default function LiveShopScreen() {
       const r = await fetch(API + "/shop/cart/items", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ productId, quantity: 1 })
+        body: JSON.stringify({ productId, quantity: 1, sourceStreamId: String(streamId), sourceProductId: productId })
       });
       if (!r.ok) throw new Error();
       Alert.alert("Added to cart", "The product was added to your TwiTok Shop cart.", [
