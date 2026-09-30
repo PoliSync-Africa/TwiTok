@@ -25,6 +25,33 @@ shopLiveRouter.get("/live/:streamId/products", requireUser, async (req, res) => 
   });
 });
 
+
+shopLiveRouter.post("/live/:streamId/shop-events", requireUser, writeLimit, async (req, res) => {
+  const streamId = String(req.params.streamId);
+  const productId = String(req.body?.productId ?? "").trim();
+  const event = String(req.body?.event ?? "").trim().toUpperCase();
+  const allowedEvents = new Set(["VIEW", "FEATURE_VIEW", "BUY_NOW", "ADD_TO_CART", "FEATURE_PIN"]);
+  if (!streamId || !productId || !allowedEvents.has(event)) return res.status(400).json({ error: "streamId, productId and a valid event are required" });
+  const db = await getDb();
+  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { streamId: 1 } });
+  if (!stream) return res.status(404).json({ error: "LIVE stream not found" });
+  const product = await db.collection("shop_products").findOne({ id: productId, status: "ACTIVE" }, { projection: { id: 1, sellerId: 1 } });
+  if (!product) return res.status(404).json({ error: "Active product not found" });
+  await db.collection("live_shop_events").insertOne({ streamId, productId, sellerId: String(product.sellerId), event, userId: req.userId!.toHexString(), createdAt: new Date() });
+  return res.status(201).json({ ok: true });
+});
+
+shopLiveRouter.get("/live/:streamId/analytics", requireUser, async (req, res) => {
+  const streamId = String(req.params.streamId);
+  const db = await getDb();
+  const stream = await ownedLive(db, streamId, req.userId!.toHexString());
+  if (!stream) return res.status(404).json({ error: "LIVE stream not found or not owned by you" });
+  const rows = await db.collection("live_shop_events").aggregate([{ $match: { streamId } }, { $group: { _id: { productId: "$productId", event: "$event" }, count: { $sum: 1 } } }]).toArray();
+  const analytics: Record<string, Record<string, number>> = {};
+  for (const row of rows as any[]) { const productId = String(row._id.productId); analytics[productId] ??= {}; analytics[productId][String(row._id.event)] = Number(row.count); }
+  return res.json({ streamId, analytics });
+});
+
 shopLiveRouter.post("/live/:streamId/products", requireUser, writeLimit, async (req, res) => {
   const streamId = String(req.params.streamId);
   const productId = String(req.body?.productId ?? "").trim();
@@ -69,6 +96,7 @@ shopLiveRouter.post("/live/:streamId/products/:productId/pin", requireUser, writ
   if (!tag) return res.status(404).json({ error: "Product is not attached to this LIVE" });
   await db.collection("live_shop_products").updateMany({ streamId, hostUserId: userId }, { $set: { pinned: false, updatedAt: new Date() } });
   await db.collection("live_shop_products").updateOne({ _id: tag._id }, { $set: { pinned: true, updatedAt: new Date() } });
+  await db.collection("live_shop_events").insertOne({ streamId, productId, sellerId: String(tag.sellerId), event: "FEATURE_PIN", userId, createdAt: new Date() });
   return res.json({ ok: true, featuredProductId: productId });
 });
 
