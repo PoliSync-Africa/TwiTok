@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, Image, Alert, TextInput } from "react-native";
 import { getAuthToken } from "../lib/auth";
@@ -16,6 +16,9 @@ export default function LiveShopScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [analytics, setAnalytics] = useState<Record<string, Record<string, number>>>({});
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const trackedProducts = useRef(new Set<string>());
+  const trackedFeatured = useRef(new Set<string>());
   const [pickerOpen, setPickerOpen] = useState(false);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -37,9 +40,23 @@ export default function LiveShopScreen() {
       if (analyticsResponse.ok) {
         const analyticsData = await analyticsResponse.json();
         setAnalytics(analyticsData.analytics ?? {});
+        setSummary(analyticsData.summary ?? {});
       }
     }
     setLoading(false);
+    if (!isHost) {
+      for (const product of (d.products ?? []) as Product[]) {
+        if (!trackedProducts.current.has(product.id)) {
+          trackedProducts.current.add(product.id);
+          void track("VIEW", product.id);
+        }
+      }
+      const featuredId = d.featuredProductId ? String(d.featuredProductId) : null;
+      if (featuredId && !trackedFeatured.current.has(featuredId)) {
+        trackedFeatured.current.add(featuredId);
+        void track("FEATURE_VIEW", featuredId);
+      }
+    }
   }
 
   useEffect(() => {
@@ -167,7 +184,7 @@ export default function LiveShopScreen() {
         </View> : null;
       })() : null}
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isHost ? "LIVE product tray" : "All LIVE products"}</Text><Text style={styles.count}>{products.length}/20{lastSyncedAt ? " · Live sync" : ""}</Text></View>{isHost ? <Pressable style={styles.addProductButton} onPress={() => void openPicker()}><Text style={styles.addProductText}>+ Add Product</Text></Pressable> : null}</View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isHost ? "LIVE product tray" : "All LIVE products"}</Text><Text style={styles.count}>{products.length}/20{lastSyncedAt ? " · Live sync" : ""}</Text>{isHost && <Text style={styles.analyticsSummary}>Viewers {summary.uniqueUsers ?? 0} · Views {summary.views ?? 0} · Cart {summary.addToCart ?? 0} · Buy {summary.buyNow ?? 0}</Text>}</View>{isHost ? <Pressable style={styles.addProductButton} onPress={() => void openPicker()}><Text style={styles.addProductText}>+ Add Product</Text></Pressable> : null}</View>
       {loading ? <Text style={styles.muted}>Loading products…</Text> : <ScrollView contentContainerStyle={styles.list}>
         {products.map(product => <View key={product.id} style={styles.card}>
           {product.images?.[0] ? <Image source={{ uri: product.images[0] }} style={styles.thumb} /> : <View style={styles.thumb} />}
@@ -238,6 +255,7 @@ const styles = StyleSheet.create({
   addProductButton:{backgroundColor:"#ff2d55",borderRadius:9,paddingHorizontal:11,paddingVertical:8},
   addProductText:{color:"#fff",fontSize:11,fontWeight:"900"},
   analyticsText:{color:"#777",fontSize:9,fontWeight:"700",marginTop:3},
+  analyticsSummary:{color:"#aaa",fontSize:9,fontWeight:"700",marginTop:3},
   shopButton:{position:"absolute",left:14,right:14,bottom:22,backgroundColor:"#ff2d55",borderRadius:12,paddingVertical:14,alignItems:"center"},
   modalBackdrop:{flex:1,backgroundColor:"rgba(0,0,0,0.6)",justifyContent:"flex-end"},
   modalPanel:{backgroundColor:"#111",borderTopLeftRadius:22,borderTopRightRadius:22,padding:16,paddingBottom:26,maxHeight:"82%"},
