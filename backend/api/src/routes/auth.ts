@@ -78,14 +78,14 @@ authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res)
     if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Username must be 3-24 characters, use letters, numbers, dots or underscores, and not end with a dot" });
     if (!nickname || nickname.length > 50) return res.status(400).json({ error: "Nickname is required and must be 1-50 characters" });
     if (bio.length > 80) return res.status(400).json({ error: "Bio must be 80 characters or less" });
-    const db = await getDb(), current = await db.collection("users").findOne({ _id: req.userId! }, { projection: { username: 1, nickname: 1, nameLastChangedAt: 1 } });
+    const db = await getDb(), current = await db.collection("users").findOne({ _id: req.userId! }, { projection: { username: 1, nickname: 1, nameLastChangedAt: 1, isVerified: 1 } });
     const nameChanged = username !== current?.username || nickname !== current?.nickname;
     if (nameChanged && current?.nameLastChangedAt) {
       const nextAllowed = new Date(new Date(current.nameLastChangedAt).getTime() + 28 * 24 * 60 * 60 * 1000);
       if (new Date() < nextAllowed) return res.status(429).json({ error: "You can change your name again after 28 days", nextNameChangeAt: nextAllowed.toISOString() });
     }
     if (await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } })) return res.status(409).json({ error: "That username is already taken" });
-    await db.collection("users").updateOne({ _id: req.userId! }, { $set: { username, nickname, bio, isPrivate, profileSetupComplete: true, ...(nameChanged ? { nameLastChangedAt: new Date() } : {}), updatedAt: new Date() } });
+    await db.collection("users").updateOne(\n      { _id: req.userId! },\n      {\n        $set: {\n          username, nickname, bio, isPrivate, profileSetupComplete: true,\n          ...(nameChanged ? { nameLastChangedAt: new Date() } : {}),\n          ...(nameChanged && current?.isVerified === true ? { isVerified: false, verificationStatus: "REVERIFY_REQUIRED" } : {}),\n          updatedAt: new Date()\n        },\n        ...(nameChanged && current?.isVerified === true ? { $unset: { verifiedAt: "", verifiedBy: "" } } : {})\n      }\n    );
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     if (!user) return res.status(404).json({ error: "Account not found" });
     res.json({ user });
