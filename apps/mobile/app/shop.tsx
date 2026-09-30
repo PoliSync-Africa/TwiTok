@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -15,11 +15,13 @@ async function api(path:string, init:RequestInit={}) {
 }
 
 export default function ShopScreen(){
+ const { productId } = useLocalSearchParams<{ productId?: string }>();
  const [products,setProducts]=useState<Product[]>([]),[q,setQ]=useState(""),[cart,setCart]=useState<CartItem[]>([]),[orders,setOrders]=useState<any[]>([]);
  const [tab,setTab]=useState<"shop"|"cart"|"orders">("shop"),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[selected,setSelected]=useState<Product|null>(null),[shipments,setShipments]=useState<any[]>([]);
  const [shipName,setShipName]=useState(""),[shipPhone,setShipPhone]=useState(""),[shipAddress,setShipAddress]=useState("");
  const refresh=async()=>{setLoading(true);try{const [p,c,o]=await Promise.all([api("/shop/commerce/products"+(q.trim()?"?q="+encodeURIComponent(q.trim()):"")),api("/shop/cart"),api("/shop/orders")]);setProducts(p.products||[]);setCart(c.cart?.items||[]);setOrders(o.orders||[])}catch(e){Alert.alert("TwiTok Shop",e instanceof Error?e.message:"Unable to load Shop")}finally{setLoading(false)}};
  useEffect(()=>{void refresh()},[]);
+ useEffect(()=>{ if(productId && products.length){ const found=products.find(p=>p.id===String(productId)); if(found)setSelected(found); } },[productId,products]);
  const subtotal=useMemo(()=>cart.reduce((s,i)=>s+i.priceMinor*i.quantity,0),[cart]);
  const add=async(p:Product)=>{try{setBusy(true);await api("/shop/cart/items",{method:"POST",body:JSON.stringify({productId:p.id,quantity:1})});setSelected(null);await refresh()}catch(e){Alert.alert("Cart",e instanceof Error?e.message:"Unable to add")}finally{setBusy(false)}};
  const checkout=async()=>{if(!cart.length)return;try{setBusy(true);const order=await api("/shop/checkout",{method:"POST",headers:{"Idempotency-Key":"shop_"+Date.now()+"_"+Math.random().toString(36).slice(2)},body:JSON.stringify({shippingAddress:{name:shipName.trim(),phone:shipPhone.trim(),address:shipAddress.trim()}})});const pay=await api("/shop/orders/"+order.order.id+"/pay",{method:"POST",body:JSON.stringify({channels:["card","mobile_money","bank","ussd"]})});if(pay.authorizationUrl)await Linking.openURL(pay.authorizationUrl);Alert.alert("Payment","Complete payment in the secure TwiTok payment page, then return to TwiTok.");await refresh()}catch(e){Alert.alert("Checkout",e instanceof Error?e.message:"Unable to checkout")}finally{setBusy(false)}};
