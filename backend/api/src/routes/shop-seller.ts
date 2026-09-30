@@ -48,6 +48,28 @@ shopSellerRouter.post("/seller/orders/:orderId/deliver", requireUser, async (req
   return res.json({ ok: true, status: "DELIVERED" });
 });
 
+shopSellerRouter.post("/seller/products/:productId/publish", requireUser, async (req, res) => {
+  const db = await getDb();
+  const sellerId = req.userId!.toHexString();
+  const result = await db.collection("shop_products").updateOne(
+    { id: String(req.params.productId), sellerId, status: "DRAFT" },
+    { $set: { status: "ACTIVE", updatedAt: new Date() } }
+  );
+  if (!result.modifiedCount) return res.status(404).json({ error: "Draft product not found" });
+  return res.json({ ok: true, status: "ACTIVE" });
+});
+
+shopSellerRouter.post("/seller/products/:productId/unpublish", requireUser, async (req, res) => {
+  const db = await getDb();
+  const sellerId = req.userId!.toHexString();
+  const result = await db.collection("shop_products").updateOne(
+    { id: String(req.params.productId), sellerId, status: "ACTIVE" },
+    { $set: { status: "DRAFT", updatedAt: new Date() } }
+  );
+  if (!result.modifiedCount) return res.status(404).json({ error: "Active product not found" });
+  return res.json({ ok: true, status: "DRAFT" });
+});
+
 shopSellerRouter.get("/seller/inventory", requireUser, async (req, res) => {
   const db = await getDb();
   const products = await db.collection("shop_products").find({ sellerId: req.userId!.toHexString() }).sort({ updatedAt: -1 }).limit(500).toArray();
