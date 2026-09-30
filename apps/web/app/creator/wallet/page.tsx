@@ -45,7 +45,7 @@ export default function CreatorWallet(){
 
     <section className="metrics">
       <article><span>AVAILABLE</span><strong>{usd(wallet?.cashBalanceUsd??0)}</strong><small>Ready for withdrawal</small></article>
-      <article><span>GROSS EARNINGS</span><strong>{usd(summary?.grossCreatorEarningsUsd??0)}</strong><small>{summary?.period?.days??days}-day period</small></article>
+      <article><span>GROSS EARNINGS</span><strong>{usd(summary?.grossCreatorEarningsUsd??0)}</strong><small>{earnings?.period?.days??days}-day period</small></article>
       <article><span>DIAMONDS</span><strong>{(summary?.diamonds??wallet?.diamondBalance??0).toLocaleString()}</strong><small>Creator rewards received</small></article>
       <article><span>GIFTS</span><strong>{(summary?.giftsReceived??0).toLocaleString()}</strong><small>Gift transactions</small></article>
     </section>
