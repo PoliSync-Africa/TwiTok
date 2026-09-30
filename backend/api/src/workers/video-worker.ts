@@ -164,10 +164,12 @@ async function runFfmpeg(
   ].filter(x => x !== "null").join(",") || "null";
   const aiVisual = aiTool === "RELIGHT" ? "eq=brightness=0.07:gamma=1.08" : aiTool === "COLORIZE" ? "hue=s=1.18" : "null";
   const filters = [
-    "[0:v]split=3[v0][v1][v2]",
+    "[0:v]split=5[v0][v1][v2][v3][v4]",
     `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v360base]`,
     `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v720base]`
+    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v720base]`,
+    `[v3]scale=w=1080:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v1080base]`,
+    `[v4]scale=w=2160:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v2160base]`
   ];
 
   const overlayInputs: string[] = [];
@@ -180,7 +182,9 @@ async function runFfmpeg(
   const variants = [
     { base: "v360base", out: "v360", width: 360 },
     { base: "v540base", out: "v540", width: 540 },
-    { base: "v720base", out: "v720", width: 720 }
+    { base: "v720base", out: "v720", width: 720 },
+    { base: "v1080base", out: "v1080", width: 1080 },
+    { base: "v2160base", out: "v2160", width: 2160 }
   ];
   const captionInputs: string[] = [];
   for (let index = 0; index < captions.length; index += 1) {
@@ -248,6 +252,8 @@ async function runFfmpeg(
     "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
     "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
     "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
+    "-map", "[v1080]", "-c:v:3", "libx264", "-b:v:3", "5000k", "-maxrate:v:3", "6500k", "-bufsize:v:3", "10000k",
+    "-map", "[v2160]", "-c:v:4", "libx264", "-b:v:4", "14000k", "-maxrate:v:4", "18000k", "-bufsize:v:4", "28000k",
     ...audioMap,
     ...(audioMap.length ? ["-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
     "-force_key_frames", "expr:gte(t,n_forced*2)",
@@ -256,7 +262,7 @@ async function runFfmpeg(
     "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init_%v.mp4",
     "-hls_segment_filename", path.join(outputDir, "seg_%v_%05d.m4s"),
     "-master_pl_name", "master.m3u8",
-    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0" : "v:0 v:1 v:2",
+    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0 v:3,a:0 v:4,a:0" : "v:0 v:1 v:2 v:3 v:4",
     path.join(outputDir, "stream_%v.m3u8")
   ];
   await runProcess(ffmpegBin, args);
