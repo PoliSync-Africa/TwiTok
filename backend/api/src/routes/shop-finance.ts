@@ -50,10 +50,19 @@ shopFinanceRouter.post("/seller/returns/:returnId/refund", requireUser, async (r
       updatedAt: new Date()
     };
     await db.collection("shop_refunds").insertOne(refund);
-    await db.collection("shop_returns").updateOne({ _id: request._id, status: "APPROVED" }, { $set: { status: "REFUNDED", refundedAt: new Date(), updatedAt: new Date() } });
     const remaining = await db.collection("shop_refunds").find({ orderId: order.id, status: "REFUNDED" }).toArray();
     const totalRefunded = remaining.reduce((sum: number, item: any) => sum + Number(item.amountMinor || 0), 0);
-    await db.collection("shop_orders").updateOne({ id: order.id }, { $set: { refundStatus: totalRefunded >= Number(order.totalMinor) ? "REFUNDED" : "PARTIALLY_REFUNDED", updatedAt: new Date() } });
+    const sellerIds = Array.from(new Set((order.items ?? []).map((item: any) => String(item.sellerId))));
+    const refundedSellerIds = new Set(remaining.map((item: any) => String(item.sellerId)));
+    const fullyRefunded = sellerIds.every(id => refundedSellerIds.has(id));
+    await db.collection("shop_returns").updateOne(
+      { _id: request._id, status: "APPROVED" },
+      { $set: { status: fullyRefunded ? "REFUNDED" : "REFUND_REQUESTED", ...(fullyRefunded ? { refundedAt: new Date() } : {}), updatedAt: new Date() } }
+    );
+    await db.collection("shop_orders").updateOne(
+      { id: order.id },
+      { $set: { refundStatus: totalRefunded >= Number(order.totalMinor) ? "REFUNDED" : "PARTIALLY_REFUNDED", updatedAt: new Date() } }
+    );
     return res.status(201).json({ refund });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to process Shop refund" });
