@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import FreeMediaEditor, { DEFAULT_MEDIA_EDIT_PLAN } from "../components/free-media-editor";
