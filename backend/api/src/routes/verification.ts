@@ -8,13 +8,15 @@ import { createVerificationRequest, getVerificationStatus, VERIFICATION_TYPES } 
 
 export const verificationRouter = Router();
 
+const verificationReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+
 const verificationWriteLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   key: req => req.userId?.toHexString() ?? req.ip ?? "unknown"
 });
 
-verificationRouter.get("/me", requireUser, async (req, res) => {
+verificationRouter.get("/me", requireUser, verificationReadLimit, async (req, res) => {
   try {
     return res.json(await getVerificationStatus(await getDb(), req.userId!.toHexString()));
   } catch (error) {
