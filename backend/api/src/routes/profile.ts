@@ -28,7 +28,18 @@ profileRouter.patch("/me", requireUser, async (req, res) => {
     }
     const existing = await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } });
     if (existing) return res.status(409).json({ error: "That username is already taken" });
-    await db.collection("users").updateOne(\n      { _id: req.userId! },\n      {\n        $set: {\n          username, nickname, bio, isPrivate, profileSetupComplete: true,\n          ...(nameChanged ? { nameLastChangedAt: new Date() } : {}),\n          ...(nameChanged && current?.isVerified === true ? { isVerified: false, verificationStatus: "REVERIFY_REQUIRED" } : {}),\n          updatedAt: new Date()\n        },\n        ...(nameChanged && current?.isVerified === true ? { $unset: { verifiedAt: "", verifiedBy: "" } } : {})\n      }\n    );
+    await db.collection("users").updateOne(
+      { _id: req.userId! },
+      {
+        $set: {
+          username, nickname, bio, isPrivate, profileSetupComplete: true,
+          ...(nameChanged ? { nameLastChangedAt: new Date() } : {}),
+          ...(nameChanged && current?.isVerified === true ? { isVerified: false, verificationStatus: "REVERIFY_REQUIRED" } : {}),
+          updatedAt: new Date()
+        },
+        ...(nameChanged && current?.isVerified === true ? { $unset: { verifiedAt: "", verifiedBy: "" } } : {})
+      }
+    );
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     res.json({ user });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update profile" }); }
