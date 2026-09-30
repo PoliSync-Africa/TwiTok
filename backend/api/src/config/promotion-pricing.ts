@@ -20,6 +20,21 @@ export const TWITOK_OBJECTIVES = [
   "LIVE_AUDIENCE"
 ] as const;
 
+export const TWITOK_PARTNERSHIP_PACKS = [
+  { id: "PARTNERSHIP_STARTER", benchmarkUsd: 25, durationDays: 7, deliverables: "1 sponsored post + campaign distribution" },
+  { id: "PARTNERSHIP_GROWTH", benchmarkUsd: 100, durationDays: 14, deliverables: "3 sponsored posts + campaign distribution", recommended: true },
+  { id: "PARTNERSHIP_PRO", benchmarkUsd: 500, durationDays: 30, deliverables: "10 sponsored posts + campaign distribution" },
+  { id: "PARTNERSHIP_BRAND", benchmarkUsd: 1000, durationDays: 30, deliverables: "20 sponsored posts + campaign distribution" }
+] as const;
+
+export const TWITOK_SUBSCRIBER_REACH_PACKS = [
+  { id: "SUBSCRIBER_1000", audience: 1000, benchmarkUsd: 10, durationDays: 1 },
+  { id: "SUBSCRIBER_5000", audience: 5000, benchmarkUsd: 40, durationDays: 3 },
+  { id: "SUBSCRIBER_10000", audience: 10000, benchmarkUsd: 75, durationDays: 7, recommended: true },
+  { id: "SUBSCRIBER_50000", audience: 50000, benchmarkUsd: 350, durationDays: 14 },
+  { id: "SUBSCRIBER_100000", audience: 100000, benchmarkUsd: 650, durationDays: 30 }
+] as const;
+
 export const TWITOK_OBJECTIVE_BUDGET_PACKS = [
   { id: "BUDGET_5", benchmarkUsd: 5.00, durationDays: 1 },
   { id: "BUDGET_10", benchmarkUsd: 10.00, durationDays: 1, recommended: true },
