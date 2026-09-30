@@ -34,7 +34,13 @@ function publicCampaign(c: any) {
     target: c.target,
     startAt: c.startAt,
     endAt: c.endAt,
-    metrics: c.metrics ?? { impressions: 0, views: 0, follows: 0, clicks: 0 }
+    metrics: c.metrics ?? { impressions: 0, views: 0, follows: 0, clicks: 0 },
+    packageId: c.packageId ?? null,
+    benchmarkBudgetMinor: c.benchmarkBudgetMinor ?? null,
+    discountPercent: c.discountPercent ?? 0,
+    discountLabel: c.discountLabel ?? null,
+    targetViews: c.targetViews ?? null,
+    durationDays: c.durationDays ?? null
   };
 }
 
@@ -213,7 +219,11 @@ promotionsRouter.post("/:campaignId/start", requireUser, campaignActionLimit, as
   try {
     if (!ObjectId.isValid(String(req.params.campaignId))) return res.status(400).json({ error: "Invalid campaign id" });
     const db = await getDb();
-    const result = await db.collection("promotion_campaigns").updateOne({ _id: new ObjectId(String(req.params.campaignId)), ownerId: req.userId!, status: "PAID" }, { $set: { status: "ACTIVE", startAt: new Date(), updatedAt: new Date() } });
+    const campaign = await db.collection("promotion_campaigns").findOne({ _id: new ObjectId(String(req.params.campaignId)), ownerId: req.userId!, status: "PAID" });
+    if (!campaign) return res.status(400).json({ error: "Campaign must have a verified payment before it can start" });
+    const startAt = new Date();
+    const endAt = campaign.durationDays ? new Date(startAt.getTime() + Number(campaign.durationDays) * 24 * 60 * 60 * 1000) : null;
+    const result = await db.collection("promotion_campaigns").updateOne({ _id: campaign._id, ownerId: req.userId!, status: "PAID" }, { $set: { status: "ACTIVE", startAt, endAt, updatedAt: new Date() } });
     if (!result.matchedCount) return res.status(400).json({ error: "Campaign must have a verified payment before it can start" });
     return res.json({ status: "ACTIVE" });
   } catch { return res.status(400).json({ error: "Unable to start promotion" }); }
