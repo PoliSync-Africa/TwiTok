@@ -281,8 +281,8 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     }
   }
   const selectedVideos = diversified;
-  if (!cursor && selectedVideos.length > 0) {
-    await setCachedFeedIds(db, userId, surface, selectedVideos.map((video: any) => video._id));
+  if (!cursor && videos.length > 0) {
+    await setCachedFeedIds(db, userId, surface, videos.map((video: any) => video._id));
   }
   const next = selectedVideos.length === safeLimit && selectedVideos.length > 0 ? (() => {
     const last: any = selectedVideos[selectedVideos.length - 1];
