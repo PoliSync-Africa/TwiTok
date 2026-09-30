@@ -7,8 +7,10 @@ import { rateLimit } from "../security/rate-limit.js";
 
 export const aiMediaRouter = Router();
 
+function portraitRequested(prompt: string) { return /portrait|skin|face|headshot|outfit|beauty/i.test(prompt); }
+
 const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
-const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "ANIME", "ILLUSTRATION", "REALISTIC"]);
+const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "PORTRAIT_PRO", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
 aiMediaRouter.get("/status", rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, (_req, res) => {
   res.json({ configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY) });
@@ -19,6 +21,8 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
     const mode = String(req.body?.mode ?? "").toUpperCase();
     const style = String(req.body?.style ?? "CLEAN").toUpperCase();
     const prompt = String(req.body?.prompt ?? "").trim().slice(0, 1200);
+    const requestedResolution = String(req.body?.targetResolution ?? "SOURCE_MAX").toUpperCase();
+    const targetResolution = new Set(["SOURCE_MAX", "4K", "8K", "48K_AI"]).has(requestedResolution) ? requestedResolution : "SOURCE_MAX";
     const sourceObjectKey = req.body?.sourceObjectKey ? String(req.body.sourceObjectKey) : null;
 
     if (!ALLOWED_MODES.has(mode)) return res.status(400).json({ error: "mode must be IMAGE or VIDEO" });
@@ -50,7 +54,11 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
         prompt,
         sourceUrl,
         preserveSubject: true,
-        enhanceQuality: true
+        enhanceQuality: true,
+        autoPolish: true,
+        portraitEnhance: style === "PORTRAIT" || style === "PORTRAIT_PRO" || portraitRequested(prompt),
+        preserveNaturalSkinTexture: true,
+        targetResolution
       })
     });
     if (!providerResponse.ok) throw new Error(`AI provider returned HTTP ${providerResponse.status}`);
