@@ -55,8 +55,21 @@ export default function AiRestyleScreen() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Unable to start AI generation.");
-      if (!data.outputUrl) throw new Error("AI generation has started. The result is not ready yet. Please try again when processing finishes.");
-      router.replace({ pathname: "/create", params: { aiOutputUri: data.outputUrl, aiOutputMimeType: mode === "IMAGE" ? "image/jpeg" : "video/mp4", aiOutputDuration: String(params.duration ?? "") } });
+      let outputUrl = String(data.outputUrl ?? "");
+      let job = data;
+      if (!outputUrl && data.jobId) {
+        for (let attempt = 0; attempt < 45; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const jobResponse = await fetch(API + "/ai-media/jobs/" + encodeURIComponent(String(data.jobId)), { headers: { Authorization: "Bearer " + token } });
+          job = await jobResponse.json().catch(() => ({}));
+          if (!jobResponse.ok) throw new Error(job.error || "Unable to check AI generation.");
+          if (job.status === "FAILED" || job.status === "ERROR" || job.status === "CANCELLED") throw new Error(job.error || "AI generation failed.");
+          outputUrl = String(job.outputUrl ?? "");
+          if (outputUrl) break;
+        }
+      }
+      if (!outputUrl) throw new Error("AI generation is still processing. Please try again shortly.");
+      router.replace({ pathname: "/create", params: { aiOutputUri: outputUrl, aiOutputMimeType: mode === "IMAGE" ? "image/jpeg" : "video/mp4", aiOutputDuration: String(params.duration ?? "") } });
     } catch (e) {
       Alert.alert("AI Media", e instanceof Error ? e.message : "Unable to generate media.");
     } finally {
