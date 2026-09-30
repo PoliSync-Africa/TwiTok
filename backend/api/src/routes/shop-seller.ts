@@ -54,6 +54,10 @@ shopSellerRouter.post("/seller/orders/:orderId/deliver", requireUser, async (req
     { _id: shipment._id, status: "SHIPPED" },
     { $set: { status: "DELIVERED", deliveredAt, updatedAt: deliveredAt } }
   );
+  await db.collection("shop_affiliate_commissions").updateMany(
+    { orderId: shipment.orderId, sellerId, status: "PENDING" },
+    { $set: { status: "EARNED", earnedAt: deliveredAt, updatedAt: deliveredAt } }
+  );
   return res.json({ ok: true, status: "DELIVERED" });
 });
 
