@@ -4,7 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_SUBSCRIBER_REACH_PACKS, discountedPromotionPrice, getViewPack } from "../config/promotion-pricing.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_SUBSCRIBER_REACH_PACKS, TWITOK_DURATION_OPTIONS, TWITOK_DEFAULT_DURATION_DAYS, discountedPromotionPrice, durationAdjustedPrice, durationAdjustedAudience, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -50,6 +50,8 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
     discountLabel: "8% DISCOUNT APPLIED",
     currency: "USD",
     objectives: TWITOK_OBJECTIVES,
+    audienceDefaults: { scope: "GLOBAL", countryCodes: [], usesDeviceLocationWhenGranted: true },
+    durationOptions: TWITOK_DURATION_OPTIONS,
     packages: TWITOK_VIEW_PACKS.map(pack => ({
       id: pack.id,
       views: pack.views,
@@ -97,11 +99,11 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     if (!OBJECTIVES.includes(objective as any)) return res.status(400).json({ error: "Invalid promotion objective" });
     const currency = String(req.body?.currency ?? "GHS").toUpperCase();
     if (!CURRENCIES.includes(currency as any)) return res.status(400).json({ error: "Unsupported currency" });
-    const packageId = req.body?.packageId ? String(req.body.packageId) : "";
+    const packageId = req.body?.packageId ? String(req.body.packageId) : "";\n    const requestedDurationDays = Number(req.body?.durationDays ?? TWITOK_DEFAULT_DURATION_DAYS);\n    const durationOption = TWITOK_DURATION_OPTIONS.find(option => option.days === requestedDurationDays);\n    if (!durationOption) return res.status(400).json({ error: "Promotion duration must be 1, 7, 14, 30, or 60 days" });
     const selectedPack = packageId ? getViewPack(packageId) : null;
     if (packageId && !selectedPack) return res.status(400).json({ error: "Invalid promotion package" });
     if (selectedPack && currency !== "USD") return res.status(400).json({ error: "TikTok-benchmark promotion packs are priced in USD" });
-    const discountedBudget = selectedPack ? discountedPromotionPrice(selectedPack.benchmarkUsd) : Number(req.body?.budget);
+    const baseBenchmarkUsd = selectedPack?.benchmarkUsd ?? Number(req.body?.benchmarkBudgetUsd ?? req.body?.budget);\n    const durationBenchmarkUsd = Number.isFinite(baseBenchmarkUsd) ? durationAdjustedPrice(baseBenchmarkUsd, durationOption.days) : Number(req.body?.budget);\n    const discountedBudget = selectedPack ? discountedPromotionPrice(durationBenchmarkUsd) : Number(req.body?.budget);
     const budgetMinor = moneyToMinor(discountedBudget);
     if (currency === "GHS" && budgetMinor < 500) return res.status(400).json({ error: "Minimum promotion budget is GHS 5" });
     if (currency === "USD" && budgetMinor < 100) return res.status(400).json({ error: "Minimum promotion budget is USD 1" });
