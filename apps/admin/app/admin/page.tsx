@@ -61,6 +61,7 @@ export default async function AdminHome() {
           <Link href="/admin/youth">Youth Safety</Link>
           <Link href="/admin/live">LIVE</Link>
           <Link href="/admin/creators">Creators</Link>
+          <Link href="/admin/verification">Verification</Link>
           <Link href="/admin/communities">Communities</Link>
           <Link href="/admin/marketplace">Marketplace</Link>
           <Link href="/admin/analytics">Analytics</Link>

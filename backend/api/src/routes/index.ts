@@ -21,6 +21,7 @@ import { promotionsRouter } from "./promotions.js";
 import { walletRouter } from "./wallet.js";
 import { paymentRoutingRouter } from "./payment-routing.js";
 import { analyticsRouter } from "./analytics.js";
+import { verificationRouter } from "./verification.js";
 
 export const apiRouter = Router();
 
@@ -46,3 +47,4 @@ apiRouter.use("/promotions", promotionsRouter);
 apiRouter.use("/wallet", walletRouter);
 apiRouter.use("/payments", paymentRoutingRouter);
 apiRouter.use("/analytics", analyticsRouter);
+apiRouter.use("/verification", verificationRouter);

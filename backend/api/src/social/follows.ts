@@ -42,7 +42,7 @@ export async function getProfile(db: Db, username: string, viewerId?: ObjectId) 
 
   return {
     id: user._id.toHexString(), username: user.username, nickname: user.nickname,
-    countryCode: user.countryCode, bio: user.bio ?? "", accountType: user.accountType, profilePhotoUrl: user.profilePhotoKey ? (await createPresignedPlayback(user.profilePhotoKey, 900)).url : null, isPrivate: Boolean(user.isPrivate),
+    countryCode: user.countryCode, bio: user.bio ?? "", accountType: user.accountType, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, profilePhotoUrl: user.profilePhotoKey ? (await createPresignedPlayback(user.profilePhotoKey, 900)).url : null, isPrivate: Boolean(user.isPrivate),
     followers, following, likes, isFollowing: Boolean(relationship), followPending: pending, createdAt: user.createdAt
   };
 }

@@ -49,5 +49,5 @@ export async function authenticateUser(db: Db, identifier: string, password: str
   const user = await db.collection("users").findOne({ $or: [{ email: normalized }, { username: normalized }, { phone: identifier.trim() }] });
   if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
   if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid login credentials");
-  return { _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
+  return { _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }
