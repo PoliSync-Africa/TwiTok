@@ -177,6 +177,8 @@ export async function sendGift(db: Db, input: {
   let netValueConsumed = 0;
   let creatorEarningsUsd = 0;
   let platformAllocationUsd = 0;
+  let creatorLiabilityOffsetUsd = 0;
+  let creatorCashCreditUsd = 0;
   let fundingAllocations: Array<{
     lotId: string;
     providerTransactionId: string;
@@ -194,7 +196,7 @@ export async function sendGift(db: Db, input: {
       );
       await db.collection("wallets").updateOne(
         { userId: input.receiverId },
-        { $setOnInsert: { userId: input.receiverId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, unallocatedNetProceedsUsd: 0, createdAt: now, updatedAt: now } },
+        { $setOnInsert: { userId: input.receiverId, coinBalance: 0, diamondBalance: 0, cashBalanceUsd: 0, unallocatedNetProceedsUsd: 0, refundLiabilityUsd: 0, creatorRefundLiabilityUsd: 0, createdAt: now, updatedAt: now } },
         { upsert: true, session }
       );
 
@@ -282,9 +284,23 @@ export async function sendGift(db: Db, input: {
       );
       if (debit.modifiedCount !== 1) throw new Error("Coin funding ledger changed; retry the Gift");
 
+      const creatorWallet = await db.collection("wallets").findOne({ userId: input.receiverId }, { session });
+      const creatorLiability = Math.max(0, Number(creatorWallet?.creatorRefundLiabilityUsd ?? 0));
+      const liabilityOffsetUsd = roundMoney(Math.min(creatorEarningsUsd, creatorLiability));
+      const creatorCashCreditUsdForGift = roundMoney(creatorEarningsUsd - liabilityOffsetUsd);
+      creatorLiabilityOffsetUsd = liabilityOffsetUsd;
+      creatorCashCreditUsd = creatorCashCreditUsdForGift;
+
       await db.collection("wallets").updateOne(
         { userId: input.receiverId },
-        { $inc: { diamondBalance: diamonds, cashBalanceUsd: creatorEarningsUsd }, $set: { updatedAt: now } },
+        {
+          $inc: {
+            diamondBalance: diamonds,
+            cashBalanceUsd: creatorCashCreditUsdForGift,
+            creatorRefundLiabilityUsd: -liabilityOffsetUsd
+          },
+          $set: { updatedAt: now }
+        },
         { session }
       );
 
@@ -293,6 +309,8 @@ export async function sendGift(db: Db, input: {
         giftId: gift.giftId, giftName: gift.name, quantity, coinsSpent: coins,
         diamondsAwarded: diamonds, netProceedsAllocatedUsd: netValueConsumed, creatorEarningsUsd, platformAllocationUsd,
         platformSharePercent: 70, creatorSharePercent: 30,
+        creatorLiabilityOffsetUsd: liabilityOffsetUsd,
+        creatorCashCreditUsd,
         fundingAllocations,
         context: input.context, videoId: input.videoId ?? null, createdAt: now
       }, { session });
@@ -316,7 +334,7 @@ export async function sendGift(db: Db, input: {
 
       await db.collection("wallet_ledger").insertMany([
         { transactionId: randomUUID(), userId: input.senderId, type: "GIFT_SENT", coinsDelta: -coins, diamondsDelta: 0, cashDeltaUsd: 0, referenceId: transactionId, createdAt: now },
-        { transactionId: randomUUID(), userId: input.receiverId, type: "GIFT_RECEIVED", coinsDelta: 0, diamondsDelta: diamonds, cashDeltaUsd: creatorEarningsUsd, referenceId: transactionId, createdAt: now }
+        { transactionId: randomUUID(), userId: input.receiverId, type: "GIFT_RECEIVED", coinsDelta: 0, diamondsDelta: diamonds, cashDeltaUsd: creatorCashCreditUsdForGift, creatorEarningsUsd, creatorLiabilityOffsetUsd: liabilityOffsetUsd, referenceId: transactionId, createdAt: now }
       ], { session });
     });
   } finally {
@@ -332,6 +350,8 @@ export async function sendGift(db: Db, input: {
     diamondsAwarded: diamonds,
     netProceedsAllocatedUsd: netValueConsumed,
     creatorEarningsUsd,
+    creatorLiabilityOffsetUsd,
+    creatorCashCreditUsd,
     platformAllocationUsd,
     fundingAllocations,
     creatorSharePercent: 30,
