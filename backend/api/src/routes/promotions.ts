@@ -4,6 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, discountedPromotionPrice, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -37,6 +38,22 @@ function publicCampaign(c: any) {
   };
 }
 
+promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, res) => {
+  return res.json({
+    discountPercent: TWITOK_PROMOTION_DISCOUNT * 100,
+    discountLabel: "8% DISCOUNT APPLIED",
+    currency: "USD",
+    packages: TWITOK_VIEW_PACKS.map(pack => ({
+      id: pack.id,
+      views: pack.views,
+      durationDays: pack.durationDays,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(pack.benchmarkUsd),
+      recommended: Boolean("recommended" in pack && pack.recommended)
+    }))
+  });
+});
+
 promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
   try {
     const videoId = String(req.body?.videoId ?? "");
@@ -49,7 +66,12 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     if (!OBJECTIVES.includes(objective as any)) return res.status(400).json({ error: "Invalid promotion objective" });
     const currency = String(req.body?.currency ?? "GHS").toUpperCase();
     if (!CURRENCIES.includes(currency as any)) return res.status(400).json({ error: "Unsupported currency" });
-    const budgetMinor = moneyToMinor(req.body?.budget);
+    const packageId = req.body?.packageId ? String(req.body.packageId) : "";
+    const selectedPack = packageId ? getViewPack(packageId) : null;
+    if (packageId && !selectedPack) return res.status(400).json({ error: "Invalid promotion package" });
+    if (selectedPack && currency !== "USD") return res.status(400).json({ error: "TikTok-benchmark promotion packs are priced in USD" });
+    const discountedBudget = selectedPack ? discountedPromotionPrice(selectedPack.benchmarkUsd) : Number(req.body?.budget);
+    const budgetMinor = moneyToMinor(discountedBudget);
     if (currency === "GHS" && budgetMinor < 500) return res.status(400).json({ error: "Minimum promotion budget is GHS 5" });
     if (currency === "USD" && budgetMinor < 100) return res.status(400).json({ error: "Minimum promotion budget is USD 1" });
 
@@ -64,6 +86,12 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     const campaign = {
       _id: new ObjectId(), ownerId: req.userId!, videoId: new ObjectId(videoId), objective, currency,
       budgetMinor, spentMinor: 0, status: "DRAFT", target,
+      packageId: selectedPack?.id ?? null,
+      benchmarkBudgetMinor: selectedPack ? Math.round(selectedPack.benchmarkUsd * 100) : null,
+      discountPercent: selectedPack ? TWITOK_PROMOTION_DISCOUNT * 100 : 0,
+      discountLabel: selectedPack ? "8% DISCOUNT APPLIED" : null,
+      targetViews: selectedPack?.views ?? null,
+      durationDays: selectedPack?.durationDays ?? null,
       metrics: { impressions: 0, views: 0, follows: 0, clicks: 0 },
       createdAt: new Date(), updatedAt: new Date()
     };
