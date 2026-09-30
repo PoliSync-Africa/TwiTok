@@ -37,7 +37,12 @@ export async function createWithdrawal(
   try {
     await session.withTransaction(async () => {
       const wallet = await db.collection("wallets").findOne({ userId: input.userId }, { session });
-      if (!wallet || (wallet.cashBalanceUsd ?? 0) < input.amountUsd) throw new Error("Insufficient USD wallet balance");
+      const cashBalanceUsd = Number(wallet?.cashBalanceUsd ?? 0);
+      const creatorRefundLiabilityUsd = Number(wallet?.creatorRefundLiabilityUsd ?? 0);
+      if (!wallet || !Number.isFinite(cashBalanceUsd) || cashBalanceUsd < input.amountUsd) throw new Error("Insufficient USD wallet balance");
+      if (Number.isFinite(creatorRefundLiabilityUsd) && creatorRefundLiabilityUsd > 0.00000001) {
+        throw new Error("Creator refund liability must be cleared before withdrawal");
+      }
 
       await db.collection("wallets").updateOne(
         { userId: input.userId },
