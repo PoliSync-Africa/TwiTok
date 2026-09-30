@@ -53,7 +53,7 @@ export const TWITOK_OBJECTIVES = [
   "LIVE_AUDIENCE"
 ] as const;
 
-export const TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT = 30;
+export const TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT = 35;
 
 export const TWITOK_PARTNERSHIP_PACKS = [
   { id: "PARTNERSHIP_STARTER", benchmarkUsd: 25, durationDays: 7, minCreators: 1, maxCreators: null, deliverables: "1 sponsored post + campaign distribution" },
