@@ -65,7 +65,6 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
     partnershipPlatformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
-    partnershipPlatformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
     partnershipPlans: TWITOK_PARTNERSHIP_PLANS.map(plan => ({
       id: plan.id,
       durationDays: plan.durationDays,
