@@ -6,7 +6,7 @@ import { getAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 type Video = { id:string; thumbnail?:string|null; playback?:string|null; caption?:string; status?:string };
-type Profile = { id:string; username:string; nickname?:string; bio?:string; countryCode?:string; followers:number; following:number; likes:number; isFollowing:boolean; followPending:boolean; isPrivate:boolean; profilePhotoUrl?:string|null };
+type Profile = { id:string; username:string; nickname?:string; bio?:string; countryCode?:string; followers:number; following:number; likes:number; isFollowing:boolean; followPending:boolean; isPrivate:boolean; isVerified?:boolean; verificationType?:string|null; profilePhotoUrl?:string|null };
 
 export default function ProfileScreen() {
   const { username } = useLocalSearchParams<{username:string}>();
