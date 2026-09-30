@@ -15,7 +15,7 @@ export async function initializeFeedIndexes(db: Db) {
   ]);
 }
 
-export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId: string; type: FeedEventType; watchMs?: number; sessionId?: string }) {
+export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId: string; type: FeedEventType; watchMs?: number; sessionId?: string; source?: string }) {
   if (!ObjectId.isValid(input.videoId)) throw new Error("Invalid video id");
   const videoId = new ObjectId(input.videoId);
   const video = await db.collection("videos").findOne(
@@ -27,7 +27,7 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
   if (!Number.isFinite(watchMs) || watchMs < 0 || watchMs > 24 * 60 * 60 * 1000) throw new Error("Invalid watch duration");
   await db.collection("feed_events").insertOne({
     userId, videoId, type: input.type, watchMs,
-    sessionId: input.sessionId ? String(input.sessionId).slice(0, 128) : null, createdAt: new Date()
+    sessionId: input.sessionId ? String(input.sessionId).slice(0, 128) : null, source: input.source ? String(input.source).slice(0, 40).toUpperCase() : "UNKNOWN", createdAt: new Date()
   });
   if (input.type === "IMPRESSION") {
     await db.collection("promotion_campaigns").updateOne(
