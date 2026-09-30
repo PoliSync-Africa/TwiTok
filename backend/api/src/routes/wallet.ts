@@ -47,6 +47,69 @@ walletRouter.get("/me/ledger", requireUser, async (req, res) => {
   } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Ledger lookup failed" }); }
 });
 
+
+walletRouter.get("/me/earnings", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const now = new Date();
+    const rawDays = Number(req.query.days ?? 30);
+    const days = [7, 30, 90].includes(rawDays) ? rawDays : 30;
+    const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const userId = req.userId!.toHexString();
+
+    const [summaryRows, gifts, withdrawals, wallet] = await Promise.all([
+      db.collection("gift_transactions").aggregate([
+        { $match: { receiverId: userId, createdAt: { $gte: from, $lt: now } } },
+        { $group: {
+          _id: null,
+          giftsReceived: { $sum: 1 },
+          diamonds: { $sum: "$diamondsAwarded" },
+          grossCreatorEarningsUsd: { $sum: "$creatorEarningsUsd" },
+          cashCreditedUsd: { $sum: "$creatorCashCreditUsd" },
+          liabilityOffsetUsd: { $sum: "$creatorLiabilityOffsetUsd" }
+        } }
+      ]).toArray(),
+      db.collection("gift_transactions").find(
+        { receiverId: userId, createdAt: { $gte: from, $lt: now } },
+        { projection: { _id: 0, transactionId: 1, giftId: 1, giftName: 1, quantity: 1, coinsSpent: 1, diamondsAwarded: 1, creatorEarningsUsd: 1, creatorCashCreditUsd: 1, creatorLiabilityOffsetUsd: 1, context: 1, videoId: 1, createdAt: 1 } }
+      ).sort({ createdAt: -1 }).limit(100).toArray(),
+      db.collection("withdrawals").find(
+        { userId, createdAt: { $gte: from, $lt: now } },
+        { projection: { _id: 0, amountUsd: 1, status: 1, provider: 1, createdAt: 1, completedAt: 1 } }
+      ).sort({ createdAt: -1 }).limit(100).toArray(),
+      ensureWallet(db, userId)
+    ]);
+
+    const summary = summaryRows[0] ?? {};
+    const withdrawalTotals = withdrawals.reduce((acc, row) => {
+      const status = String(row.status ?? "UNKNOWN").toUpperCase();
+      const amount = Number(row.amountUsd ?? 0);
+      acc.count += 1;
+      if (status === "PAID") acc.paidUsd += amount;
+      else if (status === "PENDING" || status === "PROCESSING") acc.pendingUsd += amount;
+      else if (status === "FAILED" || status === "REVERSED") acc.failedUsd += amount;
+      return acc;
+    }, { count: 0, paidUsd: 0, pendingUsd: 0, failedUsd: 0 });
+
+    return res.json({
+      period: { days, from: from.toISOString(), to: now.toISOString() },
+      summary: {
+        giftsReceived: Number(summary.giftsReceived ?? 0),
+        diamonds: Number(summary.diamonds ?? 0),
+        grossCreatorEarningsUsd: Number(summary.grossCreatorEarningsUsd ?? 0),
+        cashCreditedUsd: Number(summary.cashCreditedUsd ?? 0),
+        liabilityOffsetUsd: Number(summary.liabilityOffsetUsd ?? 0),
+        currentCashBalanceUsd: Number(wallet.cashBalanceUsd ?? 0),
+        creatorRefundLiabilityUsd: Number(wallet.creatorRefundLiabilityUsd ?? 0)
+      },
+      withdrawals: { ...withdrawalTotals, recent: withdrawals },
+      gifts
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Earnings analytics lookup failed" });
+  }
+});
+
 walletRouter.get("/me/gifts", requireUser, async (req, res) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
