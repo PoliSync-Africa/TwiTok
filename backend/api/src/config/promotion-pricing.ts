@@ -1,14 +1,13 @@
 export const TWITOK_PROMOTION_DISCOUNT = 0.08;
 
 export const TWITOK_DURATION_OPTIONS = [
-  { days: 1, priceIncreasePercent: 0, audienceIncreasePercent: 0 },
-  { days: 7, priceIncreasePercent: 80, audienceIncreasePercent: 30 },
+  { days: 7, priceIncreasePercent: 0, audienceIncreasePercent: 30 },
   { days: 14, priceIncreasePercent: 75, audienceIncreasePercent: 35 },
   { days: 30, priceIncreasePercent: 70, audienceIncreasePercent: 37 },
   { days: 60, priceIncreasePercent: 60, audienceIncreasePercent: 40 }
 ] as const;
 
-export const TWITOK_DEFAULT_DURATION_DAYS = 1;
+export const TWITOK_DEFAULT_DURATION_DAYS = 7;
 
 export function getDurationOption(days: number) {
   return TWITOK_DURATION_OPTIONS.find(option => option.days === days) ?? TWITOK_DURATION_OPTIONS[0];
