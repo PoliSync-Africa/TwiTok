@@ -153,7 +153,8 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
   return (
     <>
       <View style={styles.scrim} />
-      <View style={styles.shopShortcut}><Pressable onPress={() => router.push("/shop")}><Text style={styles.shopShortcutText}>Shop</Text></Pressable></View>\n      <View style={styles.rightRail}>
+      <View style={styles.shopShortcut}><Pressable onPress={() => router.push("/shop")}><Text style={styles.shopShortcutText}>Shop</Text></Pressable></View>
+      <View style={styles.rightRail}>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
@@ -269,7 +270,9 @@ const styles = StyleSheet.create({
   heartBurst: { color: "#fff", fontSize: 92, fontWeight: "900", textShadowColor: "#ff2d55", textShadowRadius: 16, opacity: 0.95 },
   speedBadge: { backgroundColor: "rgba(0,0,0,0.68)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22 },
   speedBadgeText: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  shopShortcut:{position:"absolute",top:58,right:14,zIndex:20,backgroundColor:"rgba(0,0,0,0.6)",borderRadius:18,paddingHorizontal:12,paddingVertical:7},\n  shopShortcutText:{color:"#fff",fontSize:12,fontWeight:"900"},\n  rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
+  shopShortcut:{position:"absolute",top:58,right:14,zIndex:20,backgroundColor:"rgba(0,0,0,0.6)",borderRadius:18,paddingHorizontal:12,paddingVertical:7},
+  shopShortcutText:{color:"#fff",fontSize:12,fontWeight:"900"},
+  rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
   action: { alignItems: "center", minWidth: 52 },
   actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
