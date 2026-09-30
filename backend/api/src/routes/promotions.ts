@@ -67,7 +67,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
     partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => ({
       id: pack.id,
       benchmarkPrice: pack.benchmarkUsd,
-      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays)),
+      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, TWITOK_DEFAULT_DURATION_DAYS)),
       durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: pack.durationDays,
       deliverables: pack.deliverables,
@@ -75,7 +75,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
     })),
     subscriberReachPackages: TWITOK_SUBSCRIBER_REACH_PACKS.map(pack => ({
       id: pack.id,
-      audience: durationAdjustedAudience(pack.audience, pack.durationDays),
+      audience: durationAdjustedAudience(pack.audience, TWITOK_DEFAULT_DURATION_DAYS),
       baseAudience: pack.audience,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays)),
