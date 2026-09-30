@@ -40,7 +40,10 @@ function publicCampaign(c: any) {
     discountPercent: c.discountPercent ?? 0,
     discountLabel: c.discountLabel ?? null,
     targetViews: c.targetViews ?? null,
-    durationDays: c.durationDays ?? null
+    baseTargetViews: c.baseTargetViews ?? null,
+    durationDays: c.durationDays ?? null,
+    priceIncreasePercent: c.priceIncreasePercent ?? 0,
+    audienceIncreasePercent: c.audienceIncreasePercent ?? 0
   };
 }
 
@@ -131,8 +134,11 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
       benchmarkBudgetMinor: selectedPack ? Math.round(selectedPack.benchmarkUsd * 100) : null,
       discountPercent: selectedPack ? TWITOK_PROMOTION_DISCOUNT * 100 : 0,
       discountLabel: selectedPack ? "8% DISCOUNT APPLIED" : null,
-      targetViews: selectedPack?.views ?? null,
-      durationDays: selectedPack?.durationDays ?? null,
+      targetViews: selectedPack ? durationAdjustedAudience(selectedPack.views, durationOption.days) : null,
+      baseTargetViews: selectedPack?.views ?? null,
+      durationDays: durationOption.days,
+      priceIncreasePercent: durationPriceIncreasePercent(durationOption.days),
+      audienceIncreasePercent: durationOption.audienceIncreasePercent,
       metrics: { impressions: 0, views: 0, follows: 0, clicks: 0 },
       createdAt: new Date(), updatedAt: new Date()
     };
