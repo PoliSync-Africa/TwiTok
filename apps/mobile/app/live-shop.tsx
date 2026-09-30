@@ -105,7 +105,6 @@ export default function LiveShopScreen() {
       });
       if (!r.ok) throw new Error();
       setFeaturedProductId(productId);
-      void track("FEATURE_PIN", productId);
       setProducts(items => items.map(p => ({ ...p, pinned: p.id === productId })));
     } catch { Alert.alert("TwiTok Shop", "Could not feature this product."); }
     finally { setBusy(null); }
