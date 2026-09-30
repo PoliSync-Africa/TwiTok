@@ -137,11 +137,26 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
         recentWatchMs: { $sum: { $ifNull: ["$watchMs", 0] } }
       } }
     ], as: "_velocity" } },
-    { $lookup: { from: "video_likes", localField: "_id", foreignField: "videoId", as: "_likes" } },
-    { $lookup: { from: "video_comments", localField: "_id", foreignField: "videoId", as: "_comments" } },
-    { $lookup: { from: "video_shares", localField: "_id", foreignField: "videoId", as: "_shares" } },
-    { $lookup: { from: "video_saves", localField: "_id", foreignField: "videoId", as: "_saves" } },
-    { $lookup: { from: "video_reposts", localField: "_id", foreignField: "videoId", as: "_reposts" } },
+    { $lookup: { from: "video_likes", let: { candidateVideoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $eq: ["$videoId", "$candidateVideoId"] } } },
+      { $group: { _id: null, count: { $sum: 1 }, viewerHas: { $max: { $cond: [{ $eq: ["$userId", userId] }, 1, 0] } } } }
+    ], as: "_likeStats" } },
+    { $lookup: { from: "video_comments", let: { candidateVideoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $and: [{ $eq: ["$videoId", "$candidateVideoId"] }, { $ne: ["$status", "DELETED"] }] } } },
+      { $group: { _id: null, count: { $sum: 1 } } }
+    ], as: "_commentStats" } },
+    { $lookup: { from: "video_shares", let: { candidateVideoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $eq: ["$videoId", "$candidateVideoId"] } } },
+      { $group: { _id: null, count: { $sum: 1 } } }
+    ], as: "_shareStats" } },
+    { $lookup: { from: "video_saves", let: { candidateVideoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $eq: ["$videoId", "$candidateVideoId"] } } },
+      { $group: { _id: null, count: { $sum: 1 }, viewerHas: { $max: { $cond: [{ $eq: ["$userId", userId] }, 1, 0] } } } }
+    ], as: "_saveStats" } },
+    { $lookup: { from: "video_reposts", let: { candidateVideoId: "$_id" }, pipeline: [
+      { $match: { $expr: { $eq: ["$videoId", "$candidateVideoId"] } } },
+      { $group: { _id: null, count: { $sum: 1 }, viewerHas: { $max: { $cond: [{ $eq: ["$userId", userId] }, 1, 0] } } } }
+    ], as: "_repostStats" } },
     { $addFields: {
       _interest: { $size: { $setIntersection: [
         { $map: { input: { $ifNull: ["$hashtags", []] }, as: "tag", in: { $toLower: "$$tag" } } },
@@ -193,11 +208,11 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
       _engagement: { $add: [
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.eventScore", 0] }, 0] }, 1] },
         { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$viewerEvents.totalWatchMs", 0] }, 0] }, 0.00002] },
-        { $multiply: [{ $size: "$_likes" }, 0.15] },
-        { $multiply: [{ $size: "$_comments" }, 0.25] },
-        { $multiply: [{ $size: "$_shares" }, 0.35] },
-        { $multiply: [{ $size: "$_saves" }, 0.3] },
-        { $multiply: [{ $size: "$_reposts" }, 0.2] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_likeStats.count", 0] }, 0] }, 0.15] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_commentStats.count", 0] }, 0] }, 0.25] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_shareStats.count", 0] }, 0] }, 0.35] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_saveStats.count", 0] }, 0] }, 0.3] },
+        { $multiply: [{ $ifNull: [{ $arrayElemAt: ["$_repostStats.count", 0] }, 0] }, 0.2] },
         { $multiply: ["$_interest", 2.5] },
         { $multiply: ["$_velocityScore", 1.5] },
         { $cond: [{ $lte: ["$_freshness", 24] }, 2, 0] },
