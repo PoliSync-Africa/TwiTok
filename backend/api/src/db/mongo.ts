@@ -22,7 +22,10 @@ export async function getDb(): Promise<Db> {
   await db.collection("promotion_campaigns").createIndex({ status: 1, startAt: 1, endAt: 1 });
   await db.collection("promotion_payments").createIndex({ reference: 1 }, { unique: true });
   await db.collection("promotion_payments").createIndex({ userId: 1, createdAt: -1 });
-  await db.collection("shop_products").createIndex({ status: 1, createdAt: -1 });
+  await db.collection("video_shop_products").createIndex({ videoId: 1, sortOrder: 1 }),
+    db.collection("video_shop_products").createIndex({ productId: 1, createdAt: -1 }),
+    db.collection("video_shop_products").createIndex({ creatorId: 1, createdAt: -1 }),
+    db.collection("shop_products").createIndex({ status: 1, createdAt: -1 });
   await db.collection("shop_products").createIndex({ name: "text", description: "text" });
   await db.collection("shop_products").createIndex({ sellerId: 1, createdAt: -1 });
   await db.collection("shop_carts").createIndex({ userId: 1 }, { unique: true });
