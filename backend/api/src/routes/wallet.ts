@@ -81,6 +81,7 @@ walletRouter.get("/me/earnings", requireUser, async (req, res) => {
     ]);
 
     const summary = summaryRows[0] ?? {};
+    if (!wallet) return res.status(500).json({ error: "Wallet lookup failed" });
     const withdrawalTotals = withdrawals.reduce((acc, row) => {
       const status = String(row.status ?? "UNKNOWN").toUpperCase();
       const amount = Number(row.amountUsd ?? 0);
