@@ -15,6 +15,7 @@ export default function LiveShopScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [analytics, setAnalytics] = useState<Record<string, Record<string, number>>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -31,6 +32,13 @@ export default function LiveShopScreen() {
     setProducts(d.products ?? []);
     setFeaturedProductId(d.featuredProductId ?? null);
     setLastSyncedAt(new Date());
+    if (isHost) {
+      const analyticsResponse = await fetch(API + "/shop/live/" + encodeURIComponent(streamId) + "/analytics", { headers: { Authorization: "Bearer " + token } });
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json();
+        setAnalytics(analyticsData.analytics ?? {});
+      }
+    }
     setLoading(false);
   }
 
@@ -164,7 +172,7 @@ export default function LiveShopScreen() {
       {loading ? <Text style={styles.muted}>Loading products…</Text> : <ScrollView contentContainerStyle={styles.list}>
         {products.map(product => <View key={product.id} style={styles.card}>
           {product.images?.[0] ? <Image source={{ uri: product.images[0] }} style={styles.thumb} /> : <View style={styles.thumb} />}
-          <View style={styles.info}><Text style={styles.name} numberOfLines={2}>{product.name}</Text><Text style={styles.itemPrice}>{product.currency} {(product.priceMinor / 100).toFixed(2)}</Text><Text style={styles.stock}>{product.stock > 0 ? product.stock + " in stock" : "Out of stock"}</Text></View>
+          <View style={styles.info}><Text style={styles.name} numberOfLines={2}>{product.name}</Text><Text style={styles.itemPrice}>{product.currency} {(product.priceMinor / 100).toFixed(2)}</Text><Text style={styles.stock}>{product.stock > 0 ? product.stock + " in stock" : "Out of stock"}</Text>{isHost && analytics[product.id] ? <Text style={styles.analyticsText}>Views {analytics[product.id].VIEW ?? 0} · Cart {analytics[product.id].ADD_TO_CART ?? 0} · Buy {analytics[product.id].BUY_NOW ?? 0}</Text> : null}</View>
           {isHost ? <View style={styles.actions}>
             <Pressable disabled={busy === product.id} style={[styles.pin, product.pinned && styles.pinned]} onPress={() => void pin(product.id)}><Text style={styles.pinText}>{product.pinned ? "Pinned" : "Pin"}</Text></Pressable>
             <Pressable disabled={busy === product.id} style={styles.remove} onPress={() => void remove(product.id)}><Text style={styles.removeText}>Remove</Text></Pressable>
@@ -230,6 +238,7 @@ const styles = StyleSheet.create({
   addText:{color:"#fff",fontSize:10,fontWeight:"900"},
   addProductButton:{backgroundColor:"#ff2d55",borderRadius:9,paddingHorizontal:11,paddingVertical:8},
   addProductText:{color:"#fff",fontSize:11,fontWeight:"900"},
+  analyticsText:{color:"#777",fontSize:9,fontWeight:"700",marginTop:3},
   shopButton:{position:"absolute",left:14,right:14,bottom:22,backgroundColor:"#ff2d55",borderRadius:12,paddingVertical:14,alignItems:"center"},
   modalBackdrop:{flex:1,backgroundColor:"rgba(0,0,0,0.6)",justifyContent:"flex-end"},
   modalPanel:{backgroundColor:"#111",borderTopLeftRadius:22,borderTopRightRadius:22,padding:16,paddingBottom:26,maxHeight:"82%"},
