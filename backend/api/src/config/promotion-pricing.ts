@@ -14,9 +14,19 @@ export function getDurationOption(days: number) {
   return TWITOK_DURATION_OPTIONS.find(option => option.days === days) ?? TWITOK_DURATION_OPTIONS[0];
 }
 
+export function durationPriceMultiplier(days: number) {
+  const selected = getDurationOption(days);
+  return TWITOK_DURATION_OPTIONS
+    .filter(option => option.days <= selected.days)
+    .reduce((multiplier, option) => multiplier * (1 + option.priceIncreasePercent / 100), 1);
+}
+
+export function durationPriceIncreasePercent(days: number) {
+  return Number(((durationPriceMultiplier(days) - 1) * 100).toFixed(2));
+}
+
 export function durationAdjustedPrice(benchmarkUsd: number, days: number) {
-  const option = getDurationOption(days);
-  return Number((benchmarkUsd * (1 + option.priceIncreasePercent / 100)).toFixed(2));
+  return Number((benchmarkUsd * durationPriceMultiplier(days)).toFixed(2));
 }
 
 export function durationAdjustedAudience(baseAudience: number, days: number) {
