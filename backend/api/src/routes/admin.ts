@@ -50,3 +50,184 @@ adminRouter.get("/overview",requireOwner,adminReadLimit,async(req,res)=>{
     return res.json({users,videos,reports,live,creators,streams,wallets,pendingWithdrawals:withdrawals,money:ledgerTotals[0]??{grossUsd:0,platformUsd:0,creatorUsd:0}});
   } catch { return res.status(500).json({error:"Unable to load administrator overview"}); }
 });
+
+function parseFinanceDate(value: unknown, fallback: Date) {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date;
+}
+
+adminRouter.get("/finance/summary", requireOwner, adminReadLimit, async (req, res) => {
+  try {
+    const now = new Date();
+    const defaultFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const from = parseFinanceDate(req.query.from, defaultFrom);
+    const requestedTo = parseFinanceDate(req.query.to, now);
+    const to = requestedTo > from ? requestedTo : now;
+    const maxRangeMs = 366 * 24 * 60 * 60 * 1000;
+    const boundedFrom = to.getTime() - from.getTime() > maxRangeMs
+      ? new Date(to.getTime() - maxRangeMs)
+      : from;
+
+    const db = await getDb();
+    const [ledger, withdrawals, liabilities] = await Promise.all([
+      db.collection("platform_financial_ledger").aggregate([
+        { $match: { createdAt: { $gte: boundedFrom, $lt: to } } },
+        {
+          $facet: {
+            totals: [
+              {
+                $group: {
+                  _id: null,
+                  coinSalesGrossUsd: { $sum: { $cond: [{ $eq: ["$eventType", "COIN_PURCHASE"] }, "$grossUsd", 0] } },
+                  providerFeesUsd: { $sum: { $cond: [{ $eq: ["$eventType", "COIN_PURCHASE"] }, "$providerFeeUsd", 0] } },
+                  providerTaxesUsd: { $sum: { $cond: [{ $eq: ["$eventType", "COIN_PURCHASE"] }, "$providerTaxUsd", 0] } },
+                  coinNetProceedsUsd: { $sum: { $cond: [{ $eq: ["$eventType", "COIN_PURCHASE"] }, "$netProceedsUsd", 0] } },
+                  deferredPlatformUsd: { $sum: { $cond: [{ $eq: ["$eventType", "COIN_PURCHASE"] }, "$deferredPlatformUsd", 0] } },
+                  giftNetProceedsUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$netProceedsUsd", 0] } },
+                  creatorAllocationUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$creatorAllocationUsd", 0] } },
+                  creatorCashCreditUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$creatorCashCreditUsd", 0] } },
+                  creatorLiabilityOffsetUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$creatorLiabilityOffsetUsd", 0] } },
+                  platformAllocationUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$platformAllocationUsd", 0] } },
+                  refundsUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$netRefundUsd", 0] } },
+                  creatorRefundUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$creatorRefundUsd", 0] } },
+                  creatorRecoveredUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$creatorRecoveredUsd", 0] } },
+                  creatorRefundLiabilityUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$creatorLiabilityUsd", 0] } },
+                  platformRefundUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$platformRefundUsd", 0] } },
+                  platformRefundLiabilityUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$platformLiabilityUsd", 0] } }
+                }
+              }
+            ],
+            daily: [
+              {
+                $group: {
+                  _id: {
+                    $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: "UTC" }
+                  },
+                  coinSalesGrossUsd: { $sum: { $cond: [{ $eq: ["$eventType", "COIN_PURCHASE"] }, "$grossUsd", 0] } },
+                  giftNetProceedsUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$netProceedsUsd", 0] } },
+                  platformAllocationUsd: { $sum: { $cond: [{ $eq: ["$eventType", "GIFT_SETTLEMENT"] }, "$platformAllocationUsd", 0] } },
+                  refundsUsd: { $sum: { $cond: [{ $eq: ["$eventType", "REFUND"] }, "$netRefundUsd", 0] } }
+                }
+              },
+              { $sort: { _id: 1 } }
+            ]
+          }
+        }
+      ]).toArray(),
+      db.collection("withdrawals").aggregate([
+        { $match: { createdAt: { $gte: boundedFrom, $lt: to } } },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            amountUsd: { $sum: "$amountUsd" }
+          }
+        }
+      ]).toArray(),
+      db.collection("wallets").aggregate([
+        {
+          $group: {
+            _id: null,
+            creatorRefundLiabilityUsd: { $sum: { $ifNull: ["$creatorRefundLiabilityUsd", 0] } },
+            buyerRefundLiabilityUsd: { $sum: { $ifNull: ["$refundLiabilityUsd", 0] } },
+            cashBalanceUsd: { $sum: { $ifNull: ["$cashBalanceUsd", 0] } },
+            diamondBalance: { $sum: { $ifNull: ["$diamondBalance", 0] } }
+          }
+        }
+      ]).toArray()
+    ]);
+
+    const totals = ledger[0]?.totals?.[0] ?? {};
+    const withdrawalByStatus = Object.fromEntries(
+      (withdrawals as Array<{ _id?: string; count?: number; amountUsd?: number }>).map(row => [
+        String(row._id ?? "UNKNOWN"),
+        { count: Number(row.count ?? 0), amountUsd: Number(row.amountUsd ?? 0) }
+      ])
+    );
+    const estimatedPlatformContributionUsd = Number((
+      Number(totals.platformAllocationUsd ?? 0)
+      - Number(totals.platformRefundUsd ?? 0)
+      - Number(totals.providerFeesUsd ?? 0)
+      - Number(totals.providerTaxesUsd ?? 0)
+    ).toFixed(8));
+
+    return res.json({
+      period: { from: boundedFrom.toISOString(), to: to.toISOString() },
+      revenue: {
+        coinSalesGrossUsd: Number(totals.coinSalesGrossUsd ?? 0),
+        providerFeesUsd: Number(totals.providerFeesUsd ?? 0),
+        providerTaxesUsd: Number(totals.providerTaxesUsd ?? 0),
+        coinNetProceedsUsd: Number(totals.coinNetProceedsUsd ?? 0),
+        deferredPlatformUsd: Number(totals.deferredPlatformUsd ?? 0),
+        giftNetProceedsUsd: Number(totals.giftNetProceedsUsd ?? 0),
+        creatorAllocationUsd: Number(totals.creatorAllocationUsd ?? 0),
+        creatorCashCreditUsd: Number(totals.creatorCashCreditUsd ?? 0),
+        creatorLiabilityOffsetUsd: Number(totals.creatorLiabilityOffsetUsd ?? 0),
+        platformAllocationUsd: Number(totals.platformAllocationUsd ?? 0),
+        refundsUsd: Number(totals.refundsUsd ?? 0),
+        creatorRefundUsd: Number(totals.creatorRefundUsd ?? 0),
+        creatorRecoveredUsd: Number(totals.creatorRecoveredUsd ?? 0),
+        creatorRefundLiabilityUsd: Number(totals.creatorRefundLiabilityUsd ?? 0),
+        platformRefundUsd: Number(totals.platformRefundUsd ?? 0),
+        platformRefundLiabilityUsd: Number(totals.platformRefundLiabilityUsd ?? 0),
+        estimatedPlatformContributionUsd
+      },
+      withdrawals: withdrawalByStatus,
+      liabilities: liabilities[0] ?? {
+        creatorRefundLiabilityUsd: 0,
+        buyerRefundLiabilityUsd: 0,
+        cashBalanceUsd: 0,
+        diamondBalance: 0
+      },
+      daily: ledger[0]?.daily ?? []
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to load finance summary" });
+  }
+});
+
+adminRouter.get("/finance/ledger", requireOwner, adminReadLimit, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const skip = Math.max(0, Number(req.query.skip ?? 0));
+    const db = await getDb();
+    const rows = await db.collection("platform_financial_ledger")
+      .find({})
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .project({
+        _id: 0,
+        transactionId: 1,
+        eventType: 1,
+        provider: 1,
+        providerTransactionId: 1,
+        userId: 1,
+        giftTransactionId: 1,
+        sku: 1,
+        grossUsd: 1,
+        providerFeeUsd: 1,
+        providerTaxUsd: 1,
+        netProceedsUsd: 1,
+        creatorAllocationUsd: 1,
+        creatorCashCreditUsd: 1,
+        creatorLiabilityOffsetUsd: 1,
+        platformAllocationUsd: 1,
+        deferredPlatformUsd: 1,
+        netRefundUsd: 1,
+        creatorRefundUsd: 1,
+        creatorRecoveredUsd: 1,
+        creatorLiabilityUsd: 1,
+        platformRefundUsd: 1,
+        platformLiabilityUsd: 1,
+        status: 1,
+        createdAt: 1
+      })
+      .toArray();
+    const total = await db.collection("platform_financial_ledger").countDocuments();
+    return res.json({ rows, total, limit, skip });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to load finance ledger" });
+  }
+});
