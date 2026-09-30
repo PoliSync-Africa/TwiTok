@@ -159,7 +159,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   const effect = allowedEffects.has(String(input.effect ?? "NONE")) ? String(input.effect ?? "NONE") : "NONE";
   const rawEditPlan = (input as any).editPlan && typeof (input as any).editPlan === "object" ? (input as any).editPlan : {};
   const editPlan = {
-    quality: ["ORIGINAL","CLEAN","HD"].includes(String(rawEditPlan.quality)) ? String(rawEditPlan.quality) : "HD",
+    quality: ["ORIGINAL","CLEAN","HD","ULTRA"].includes(String(rawEditPlan.quality)) ? String(rawEditPlan.quality) : "ULTRA",
     filter: ["NONE","VIVID","WARM","COOL","NOIR","VINTAGE","CINEMATIC"].includes(String(rawEditPlan.filter)) ? String(rawEditPlan.filter) : "NONE",
     crop: ["ORIGINAL","9:16","1:1","4:5","16:9"].includes(String(rawEditPlan.crop)) ? String(rawEditPlan.crop) : "ORIGINAL",
     rotate: [0,90,180,270].includes(Number(rawEditPlan.rotate)) ? Number(rawEditPlan.rotate) : 0,
