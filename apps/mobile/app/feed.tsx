@@ -33,8 +33,6 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   const lastTap = useRef(0);
   const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [speedHold, setSpeedHold] = useState(false);
-  const [shopOpen, setShopOpen] = useState(false);
-  const [shopBusy, setShopBusy] = useState<string | null>(null);
   const source = item.playback?.hlsUrl || item.playback?.mp4Url || null;
   const startedAt = useRef<number | null>(null);
   const player = useVideoPlayer(source, p => {
@@ -97,25 +95,6 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
     if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
   }, []);
 
-  async function addShopProduct(productId: string) {
-    const token = await getAuthToken();
-    if (!token || shopBusy) return;
-    setShopBusy(productId);
-    try {
-      const r = await fetch(API + "/shop/cart/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ productId, quantity: 1 })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error ?? "Unable to add product to cart");
-      setShopOpen(false);
-      router.push("/shop?tab=cart");
-    } catch {} finally {
-      setShopBusy(null);
-    }
-  }
-
   async function action(kind: "like"|"save"|"share"|"repost") {
     const token = await getAuthToken();
     if (!token || busy) return;
@@ -171,7 +150,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   );
 }
 
-function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {\n  const [shopOpen, setShopOpen] = useState(false);\n  const [shopBusy, setShopBusy] = useState<string | null>(null);\n\n  async function addShopProduct(productId: string) {\n    const token = await getAuthToken();\n    if (!token || shopBusy) return;\n    setShopBusy(productId);\n    try {\n      const r = await fetch(API + "/shop/cart/items", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ productId, quantity: 1 }) });\n      const d = await r.json().catch(() => ({}));\n      if (!r.ok) throw new Error(d.error ?? "Unable to add product to cart");\n      setShopOpen(false);\n      router.push("/shop?tab=cart");\n    } catch {} finally { setShopBusy(null); }\n  }
   return (
     <>
       <View style={styles.scrim} />
