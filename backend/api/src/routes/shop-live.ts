@@ -62,6 +62,7 @@ shopLiveRouter.get("/live/:streamId/analytics", requireUser, async (req, res) =>
       featurePins: { $sum: { $cond: [{ $eq: ["$event", "FEATURE_PIN"] }, 1, 0] } }
     } }
   ]).toArray();
+  const globalUsers = await db.collection("live_shop_events").distinct("userId", { streamId });
   const analytics: Record<string, Record<string, number>> = {};
   let totalEvents = 0, uniqueUsers = 0, views = 0, featureViews = 0, addToCart = 0, buyNow = 0, featurePins = 0;
   for (const row of rows as any[]) {
@@ -92,7 +93,7 @@ shopLiveRouter.get("/live/:streamId/analytics", requireUser, async (req, res) =>
     analytics,
     summary: {
       totalEvents,
-      uniqueUsers,
+      uniqueUsers: globalUsers.length,
       views,
       featureViews,
       addToCart,
