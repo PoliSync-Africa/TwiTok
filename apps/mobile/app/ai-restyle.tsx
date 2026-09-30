@@ -5,7 +5,7 @@ import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
-const STYLES = ["CLEAN","CINEMATIC","VIBRANT","PORTRAIT","ANIME","ILLUSTRATION","REALISTIC"] as const;
+const STYLES = ["CLEAN","CINEMATIC","VIBRANT","PORTRAIT","PORTRAIT_PRO","ANIME","ILLUSTRATION","REALISTIC"] as const;
 
 export default function AiRestyleScreen() {
   const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mediaType?: string; duration?: string }>();
@@ -15,6 +15,7 @@ export default function AiRestyleScreen() {
   const [style, setStyle] = useState<(typeof STYLES)[number]>("CLEAN");
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [targetResolution, setTargetResolution] = useState<"SOURCE_MAX"|"4K"|"8K"|"48K_AI">("SOURCE_MAX");
 
   async function start() {
     setBusy(true);
@@ -50,7 +51,7 @@ export default function AiRestyleScreen() {
       const response = await fetch(API + "/ai-media/restyle", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ mode, style, prompt: prompt.trim(), sourceObjectKey })
+        body: JSON.stringify({ mode, style, prompt: prompt.trim(), sourceObjectKey, targetResolution })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Unable to start AI generation.");
@@ -73,7 +74,7 @@ export default function AiRestyleScreen() {
       <Text style={styles.hero}>{sourceUri ? "Restyle your media" : "Create with AI"}</Text>
       <Text style={styles.helper}>AI is optional. Your original media stays unchanged. Choose a style and describe what you want.</Text>
       <View style={styles.row}>{STYLES.map(item => <Pressable key={item} style={[styles.chip, style === item && styles.selected]} onPress={() => setStyle(item)}><Text style={styles.chipText}>{item}</Text></Pressable>)}</View>
-      <TextInput value={prompt} onChangeText={setPrompt} placeholder={sourceUri ? "Example: cleaner skin tones, cinematic lighting, natural detail" : "Describe the image or video you want"} placeholderTextColor="#777" style={styles.input} multiline maxLength={1200} />
+      <Text style={styles.resolutionLabel}>Output quality</Text><View style={styles.row}>{(["SOURCE_MAX","4K","8K","48K_AI"] as const).map(item => <Pressable key={item} style={[styles.chip, targetResolution === item && styles.selected]} onPress={() => setTargetResolution(item)}><Text style={styles.chipText}>{item === "SOURCE_MAX" ? "Best source" : item}</Text></Pressable>)}</View><TextInput value={prompt} onChangeText={setPrompt} placeholder={sourceUri ? "Example: cleaner skin tones, cinematic lighting, natural detail" : "Describe the image or video you want"} placeholderTextColor="#777" style={styles.input} multiline maxLength={1200} />
       <Pressable style={[styles.generate, busy && styles.disabled]} onPress={() => void start()} disabled={busy}>
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.generateText}>{sourceUri ? "Restyle with AI" : "Generate with AI"}</Text>}
       </Pressable>
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
   chip:{borderWidth:1,borderColor:"#333",borderRadius:20,paddingHorizontal:14,paddingVertical:9},
   selected:{backgroundColor:"#20B2AA",borderColor:"#20B2AA"},
   chipText:{color:"#fff",fontSize:12,fontWeight:"800"},
-  input:{minHeight:130,borderWidth:1,borderColor:"#333",borderRadius:16,padding:16,color:"#fff",fontSize:16,textAlignVertical:"top",marginBottom:18},
+  resolutionLabel:{color:"#aaa",fontSize:13,fontWeight:"800",marginBottom:8},input:{minHeight:130,borderWidth:1,borderColor:"#333",borderRadius:16,padding:16,color:"#fff",fontSize:16,textAlignVertical:"top",marginBottom:18},
   generate:{backgroundColor:"#20B2AA",borderRadius:16,padding:16,alignItems:"center"},
   disabled:{opacity:.6},
   generateText:{color:"#fff",fontWeight:"900",fontSize:16},
