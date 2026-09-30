@@ -41,6 +41,7 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_refunds").createIndex({ orderId: 1, returnId: 1 }, { unique: true });
   await db.collection("shop_refunds").createIndex({ sellerId: 1, status: 1, createdAt: -1 });
   await db.collection("shop_payouts").createIndex({ sellerId: 1, status: 1, createdAt: -1 });
+  await db.collection("shop_payout_accounts").createIndex({ sellerId: 1 }, { unique: true });
   await db.collection("shop_seller_shipments").createIndex({ orderId: 1, sellerId: 1 }, { unique: true });
   await db.collection("shop_seller_shipments").createIndex({ sellerId: 1, status: 1, updatedAt: -1 });
   await db.collection("shop_affiliate_offers").createIndex({ productId: 1, sellerId: 1, status: 1 }, { unique: true });
