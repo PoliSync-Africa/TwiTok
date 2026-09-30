@@ -4,7 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, discountedPromotionPrice, getViewPack } from "../config/promotion-pricing.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, discountedPromotionPrice, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -13,7 +13,7 @@ const paymentLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, key: req => 
 const campaignReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const campaignActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-const OBJECTIVES = ["MORE_VIEWS", "MORE_FOLLOWERS", "WEBSITE_TRAFFIC", "LIVE_AUDIENCE"] as const;
+const OBJECTIVES = TWITOK_OBJECTIVES;
 const CURRENCIES = ["GHS", "USD"] as const;
 
 function moneyToMinor(value: unknown) {
@@ -49,6 +49,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
     discountPercent: TWITOK_PROMOTION_DISCOUNT * 100,
     discountLabel: "8% DISCOUNT APPLIED",
     currency: "USD",
+    objectives: TWITOK_OBJECTIVES,
     packages: TWITOK_VIEW_PACKS.map(pack => ({
       id: pack.id,
       views: pack.views,
@@ -56,6 +57,14 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
       recommended: Boolean("recommended" in pack && pack.recommended)
+    })),
+    objectivePackages: TWITOK_OBJECTIVE_BUDGET_PACKS.map(pack => ({
+      id: pack.id,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationDays: pack.durationDays,
+      recommended: Boolean("recommended" in pack && pack.recommended),
+      note: "Budget-based promotion. Follower/profile results are estimates, not guaranteed."
     }))
   });
 });
