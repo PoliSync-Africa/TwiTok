@@ -275,6 +275,8 @@ const styles = StyleSheet.create({
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
   activeIcon: { color: "#ff2d55" },
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
+  usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
+  feedVerified:{color:"#1da1f2",fontSize:15,fontWeight:"900"},
   username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
   caption: { color: "#fff", fontSize: 15, lineHeight: 21 },
   soundMeta: { flexDirection: "row", alignItems: "center", marginTop: 10, maxWidth: "88%" },
