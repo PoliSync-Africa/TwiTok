@@ -46,6 +46,8 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
   const cart = await db.collection("shop_carts").findOne({ userId });
   const items = Array.isArray(cart?.items) ? cart.items : [];
   if (!items.length) return res.status(400).json({ error: "Cart is empty" });
+  const sourceStreamId = String(req.body?.sourceStreamId ?? "").trim();
+  const sourceProductId = String(req.body?.sourceProductId ?? "").trim();
   const address = req.body?.shippingAddress;
   if (!address || typeof address !== "object") return res.status(400).json({ error: "Shipping address is required" });
   const currency = String(items[0].currency ?? "").toUpperCase();
@@ -116,6 +118,12 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
     seller.settlementMinor = Math.max(0, seller.grossMinor - seller.platformFeeMinor - seller.creatorCommissionMinor);
   }
 
+  if (sourceStreamId) {
+    if (!sourceProductId || !reservedItems.some(item => item.productId === sourceProductId)) return res.status(400).json({ error: "LIVE shopping attribution must match a cart product" });
+    const liveTag = await db.collection("live_shop_products").findOne({ streamId: sourceStreamId, productId: sourceProductId });
+    if (!liveTag) return res.status(400).json({ error: "LIVE shopping product is no longer attached to this LIVE" });
+  }
+
   const order = {
     id: randomUUID(),
     buyerId: userId,
@@ -129,6 +137,8 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
     sellerSettlementMinor: sellerBreakdown.reduce((sum, seller) => sum + seller.settlementMinor, 0),
     sellerBreakdown,
     affiliate,
+    sourceStreamId: sourceStreamId || null,
+    sourceProductId: sourceProductId || null,
     shippingAddress: address,
     paymentStatus: "PENDING",
     status: "PENDING_PAYMENT",
