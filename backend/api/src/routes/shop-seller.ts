@@ -11,7 +11,11 @@ shopSellerRouter.get("/seller/orders", requireUser, async (req, res) => {
     "items.sellerId": sellerId,
     paymentStatus: "PAID"
   }).sort({ createdAt: -1 }).limit(100).toArray();
-  return res.json({ orders });
+  const enriched = await Promise.all(orders.map(async (order: any) => ({
+    ...order,
+    sellerShipment: await db.collection("shop_seller_shipments").findOne({ orderId: order.id, sellerId })
+  })));
+  return res.json({ orders: enriched });
 });
 
 shopSellerRouter.get("/seller/orders/:orderId", requireUser, async (req, res) => {
