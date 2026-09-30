@@ -58,12 +58,14 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       durationDays: pack.durationDays,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, audienceIncreasePercent: option.audienceIncreasePercent })),
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
     partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => ({
       id: pack.id,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: pack.durationDays,
       deliverables: pack.deliverables,
       recommended: Boolean("recommended" in pack && pack.recommended)
@@ -80,6 +82,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       id: pack.id,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: pack.durationDays,
       recommended: Boolean("recommended" in pack && pack.recommended),
       note: "Budget-based promotion. Follower/profile results are estimates, not guaranteed."
@@ -99,11 +102,16 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     if (!OBJECTIVES.includes(objective as any)) return res.status(400).json({ error: "Invalid promotion objective" });
     const currency = String(req.body?.currency ?? "GHS").toUpperCase();
     if (!CURRENCIES.includes(currency as any)) return res.status(400).json({ error: "Unsupported currency" });
-    const packageId = req.body?.packageId ? String(req.body.packageId) : "";\n    const requestedDurationDays = Number(req.body?.durationDays ?? TWITOK_DEFAULT_DURATION_DAYS);\n    const durationOption = TWITOK_DURATION_OPTIONS.find(option => option.days === requestedDurationDays);\n    if (!durationOption) return res.status(400).json({ error: "Promotion duration must be 1, 7, 14, 30, or 60 days" });
+    const packageId = req.body?.packageId ? String(req.body.packageId) : "";
+    const requestedDurationDays = Number(req.body?.durationDays ?? TWITOK_DEFAULT_DURATION_DAYS);
+    const durationOption = TWITOK_DURATION_OPTIONS.find(option => option.days === requestedDurationDays);
+    if (!durationOption) return res.status(400).json({ error: "Promotion duration must be 1, 7, 14, 30, or 60 days" });
     const selectedPack = packageId ? getViewPack(packageId) : null;
     if (packageId && !selectedPack) return res.status(400).json({ error: "Invalid promotion package" });
     if (selectedPack && currency !== "USD") return res.status(400).json({ error: "TikTok-benchmark promotion packs are priced in USD" });
-    const baseBenchmarkUsd = selectedPack?.benchmarkUsd ?? Number(req.body?.benchmarkBudgetUsd ?? req.body?.budget);\n    const durationBenchmarkUsd = Number.isFinite(baseBenchmarkUsd) ? durationAdjustedPrice(baseBenchmarkUsd, durationOption.days) : Number(req.body?.budget);\n    const discountedBudget = selectedPack ? discountedPromotionPrice(durationBenchmarkUsd) : Number(req.body?.budget);
+    const baseBenchmarkUsd = selectedPack?.benchmarkUsd ?? Number(req.body?.benchmarkBudgetUsd ?? req.body?.budget);
+    const durationBenchmarkUsd = Number.isFinite(baseBenchmarkUsd) ? durationAdjustedPrice(baseBenchmarkUsd, durationOption.days) : Number(req.body?.budget);
+    const discountedBudget = selectedPack ? discountedPromotionPrice(durationBenchmarkUsd) : Number((Number(req.body?.budget) * (1 + durationOption.priceIncreasePercent / 100)).toFixed(2));
     const budgetMinor = moneyToMinor(discountedBudget);
     if (currency === "GHS" && budgetMinor < 500) return res.status(400).json({ error: "Minimum promotion budget is GHS 5" });
     if (currency === "USD" && budgetMinor < 100) return res.status(400).json({ error: "Minimum promotion budget is USD 1" });
