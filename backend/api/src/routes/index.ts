@@ -28,6 +28,7 @@ import { shopRouter } from "./shop.js";
 import { shopCommerceRouter } from "./shop-commerce.js";
 import { shopOrdersRouter } from "./shop-orders.js";
 import { shopPaymentsRouter } from "./shop-payments.js";
+import { shopSellerRouter } from "./shop-seller.js";
 
 export const apiRouter = Router();
 
@@ -68,3 +69,4 @@ apiRouter.use("/shop", shopRouter);
 apiRouter.use("/shop/commerce", shopCommerceRouter);
 apiRouter.use("/shop", shopOrdersRouter);
 apiRouter.use("/shop", shopPaymentsRouter);
+apiRouter.use("/shop", shopSellerRouter);
