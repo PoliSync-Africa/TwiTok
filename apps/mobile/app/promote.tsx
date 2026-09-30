@@ -21,6 +21,7 @@ export default function PromoteScreen() {
   const [budget, setBudget] = useState("4.60");
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<string | null>("VIEWS_800");
+  const [objectivePackages, setObjectivePackages] = useState<any[]>([]);
   const [countries, setCountries] = useState("GH");
   const [interests, setInterests] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +39,7 @@ export default function PromoteScreen() {
   }
 
   async function loadPackages() {
-    try { const data = await request("/promotions/packages"); setPackages(data.packages ?? []); }
+    try { const data = await request("/promotions/packages"); setPackages(data.packages ?? []); setObjectivePackages(data.objectivePackages ?? []); }
     catch (e) { Alert.alert("Promotions", e instanceof Error ? e.message : "Unable to load promotion packages"); }
   }
 
@@ -56,7 +57,7 @@ export default function PromoteScreen() {
     if (!videoId.trim()) return Alert.alert("Video required", "Enter the video ID you want to promote.");
     setBusy(true);
     try {
-      const selected = packages.find(p => p.id === selectedPackage);
+      const selected = objective === "MORE_VIEWS" ? packages.find(p => p.id === selectedPackage) : objectivePackages.find(p => p.id === selectedPackage);
       const campaign = await request("/promotions", { method: "POST", body: JSON.stringify({
         videoId: videoId.trim(), objective, currency, budget: selected ? selected.price : budget, packageId: selected?.id ?? undefined,
         target: { countryCodes: countries.split(",").map(x => x.trim().toUpperCase()).filter(Boolean), interests: interests.split(",").map(x => x.trim()).filter(Boolean) }
@@ -118,10 +119,10 @@ export default function PromoteScreen() {
     <View style={styles.row}>{["GHS","USD"].map(x => <Pressable key={x} onPress={() => setCurrency(x)} style={[styles.choice, currency === x && styles.active]}><Text>{x}</Text></Pressable>)}</View>
     <Text style={styles.label}>Promotion package</Text>
     <Text style={styles.discount}>8% DISCOUNT APPLIED</Text>
-    <View style={styles.packages}>{packages.map((pack) => <Pressable key={pack.id} onPress={() => { setSelectedPackage(pack.id); setBudget(String(pack.price)); setCurrency("USD"); }} style={[styles.package, selectedPackage === pack.id && styles.packageActive]}>
-      <Text style={styles.packageViews}>{Number(pack.views).toLocaleString()}+ estimated views</Text>
+    <View style={styles.packages}>{(objective === "MORE_VIEWS" ? packages : objectivePackages).map((pack) => <Pressable key={pack.id} onPress={() => { setSelectedPackage(pack.id); setBudget(String(pack.price)); setCurrency("USD"); }} style={[styles.package, selectedPackage === pack.id && styles.packageActive]}>
+      <Text style={styles.packageViews}>{objective === "MORE_VIEWS" ? `${Number(pack.views).toLocaleString()}+ estimated views` : `${String(objective).replaceAll("_"," ")} • budget tier`}</Text>
       <Text style={styles.packagePrice}><Text style={styles.oldPrice}>$ {Number(pack.benchmarkPrice).toFixed(2)}</Text>  $ {Number(pack.price).toFixed(2)}</Text>
-      <Text style={styles.packageDiscount}>8% DISCOUNT APPLIED • {pack.durationDays} day{pack.durationDays === 1 ? "" : "s"}</Text>
+      <Text style={styles.packageDiscount}>8% DISCOUNT APPLIED • {pack.durationDays} day{pack.durationDays === 1 ? "" : "s"}{objective !== "MORE_VIEWS" ? " • results not guaranteed" : ""}</Text>
     </Pressable>)}</View>
     <Text style={styles.label}>Custom budget</Text>
     <TextInput style={styles.input} keyboardType="decimal-pad" value={budget} onChangeText={(value) => { setBudget(value); setSelectedPackage(null); }} />
