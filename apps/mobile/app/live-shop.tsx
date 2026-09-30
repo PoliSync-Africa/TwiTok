@@ -168,7 +168,7 @@ export default function LiveShopScreen() {
           {isHost ? <View style={styles.actions}>
             <Pressable disabled={busy === product.id} style={[styles.pin, product.pinned && styles.pinned]} onPress={() => void pin(product.id)}><Text style={styles.pinText}>{product.pinned ? "Pinned" : "Pin"}</Text></Pressable>
             <Pressable disabled={busy === product.id} style={styles.remove} onPress={() => void remove(product.id)}><Text style={styles.removeText}>Remove</Text></Pressable>
-          </View> : <Pressable disabled={!product.stock || busy === product.id} style={styles.add} onPress={() => { void track("ADD_TO_CART", product.id); void addToCart(product.id); }}><Text style={styles.addText}>{busy === product.id ? "…" : "Add"}</Text></Pressable>}
+          </View> : <Pressable disabled={!product.stock || busy === product.id} style={styles.add} onPress={() => void addToCart(product.id)}><Text style={styles.addText}>{busy === product.id ? "…" : "Add"}</Text></Pressable>}
         </View>)}
         {!products.length && <Text style={styles.muted}>{isHost ? "No products attached to this LIVE yet." : "No Shop products are featured yet."}</Text>}
       </ScrollView>}
