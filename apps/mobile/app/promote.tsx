@@ -114,7 +114,7 @@ export default function PromoteScreen() {
     <Text style={styles.subtitle}>Pay TwiTok to give your real video more opportunities to reach relevant viewers.</Text>
     <TextInput style={styles.input} placeholder="Video ID" value={videoId} onChangeText={setVideoId} autoCapitalize="none" />
     <Text style={styles.label}>Goal</Text>
-    <View style={styles.row}>{["MORE_VIEWS","MORE_FOLLOWERS","WEBSITE_TRAFFIC","LIVE_AUDIENCE"].map(x => <Pressable key={x} onPress={() => setObjective(x)} style={[styles.choice, objective === x && styles.active]}><Text>{x.replaceAll("_"," ")}</Text></Pressable>)}</View>
+    <View style={styles.row}>{["MORE_VIEWS","MORE_FOLLOWERS","WEBSITE_TRAFFIC","LIVE_AUDIENCE"].map(x => <Pressable key={x} onPress={() => { setObjective(x); const first = x === "MORE_VIEWS" ? packages[0] : objectivePackages[0]; if (first) { setSelectedPackage(first.id); setBudget(String(first.price)); setCurrency("USD"); } }} style={[styles.choice, objective === x && styles.active]}><Text>{x.replaceAll("_"," ")}</Text></Pressable>)}</View>
     <Text style={styles.label}>Currency</Text>
     <View style={styles.row}>{["GHS","USD"].map(x => <Pressable key={x} onPress={() => setCurrency(x)} style={[styles.choice, currency === x && styles.active]}><Text>{x}</Text></Pressable>)}</View>
     <Text style={styles.label}>Promotion package</Text>
