@@ -22,6 +22,9 @@ export async function getDb(): Promise<Db> {
   await db.collection("promotion_campaigns").createIndex({ status: 1, startAt: 1, endAt: 1 });
   await db.collection("promotion_payments").createIndex({ reference: 1 }, { unique: true });
   await db.collection("promotion_payments").createIndex({ userId: 1, createdAt: -1 });
+  await db.collection("shop_products").createIndex({ status: 1, createdAt: -1 });
+  await db.collection("shop_products").createIndex({ name: "text", description: "text" });
+  await db.collection("shop_products").createIndex({ sellerId: 1, createdAt: -1 });
 
   return db;
 }
