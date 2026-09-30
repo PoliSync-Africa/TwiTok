@@ -60,6 +60,13 @@ export async function getDb(): Promise<Db> {
   await db.collection("live_shop_products").createIndex({ hostUserId: 1, createdAt: -1 });
   await db.collection("live_shop_events").createIndex({ streamId: 1, createdAt: -1 });
   await db.collection("live_shop_events").createIndex({ streamId: 1, productId: 1, event: 1, createdAt: -1 });
+  // Feed engagement indexes: keep per-video counters and viewer-state lookups bounded.
+  await db.collection("feed_events").createIndex({ videoId: 1, userId: 1, createdAt: -1 });
+  await db.collection("video_likes").createIndex({ videoId: 1, userId: 1 });
+  await db.collection("video_comments").createIndex({ videoId: 1, status: 1 });
+  await db.collection("video_shares").createIndex({ videoId: 1 });
+  await db.collection("video_saves").createIndex({ videoId: 1, userId: 1 });
+  await db.collection("video_reposts").createIndex({ videoId: 1, userId: 1 });
 
   return db;
 }
