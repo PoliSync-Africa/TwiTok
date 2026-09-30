@@ -11,7 +11,7 @@ type Analytics = {
   audienceCountries: Array<{countryCode:string;viewers:number;views:number}>;
   audience: { followerTotal:number; newFollowers:number; dailyFollowerGrowth:Array<{date:string;newFollowers:number}>; followerCountries:Array<{countryCode:string;followers:number}> };
   live: {streams:number;endedStreams:number;totalDurationMs:number;giftsUsd:number;peakViewerCount:number};
-  trafficSources: Array<{source:string;views:number;tracked:boolean}>;
+  trafficSources: Array<{source:string;views:number;impressions?:number;tracked:boolean}>;
   earnings: {grossCreatorEarningsUsd:number;cashCreditedUsd:number;diamonds:number};
 };
 
