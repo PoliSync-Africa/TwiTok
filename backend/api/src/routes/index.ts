@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { adminRouter } from "./admin.js";
 import { moneyRouter } from "./money.js";
 import { creatorRouter } from "./creator.js";
@@ -25,6 +26,15 @@ import { verificationRouter } from "./verification.js";
 import { aiMediaRouter } from "./ai-media.js";
 
 export const apiRouter = Router();
+
+// CodeQL-recognized global API guard. Individual sensitive routes may also
+// apply stricter per-user limits for expensive or abuse-prone operations.
+apiRouter.use(expressRateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false
+}));
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/profile", profileRouter);
