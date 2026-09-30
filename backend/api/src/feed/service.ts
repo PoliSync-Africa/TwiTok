@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { createPresignedPlayback, mediaConfigured } from "../media/storage.js";
+import { getCachedFeedIds, setCachedFeedIds } from "./cache.js";
 
 export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
@@ -91,8 +92,12 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
+  const cachedIds = cursor ? [] : await getCachedFeedIds(db, userId, surface);
+  const candidateQuery = cachedIds.length
+    ? { $and: [query, { _id: { $in: cachedIds } }] }
+    : query;
   const videos = await db.collection("videos").aggregate([
-    { $match: query },
+    { $match: candidateQuery },
     { $lookup: { from: "feed_events", let: { candidateVideoId: "$_id" }, pipeline: [
       { $match: { $expr: { $and: [
         { $eq: ["$userId", userId] },
@@ -276,6 +281,9 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     }
   }
   const selectedVideos = diversified;
+  if (!cursor && selectedVideos.length > 0) {
+    await setCachedFeedIds(db, userId, surface, selectedVideos.map((video: any) => video._id));
+  }
   const next = selectedVideos.length === safeLimit && selectedVideos.length > 0 ? (() => {
     const last: any = selectedVideos[selectedVideos.length - 1];
     return Buffer.from(JSON.stringify({
