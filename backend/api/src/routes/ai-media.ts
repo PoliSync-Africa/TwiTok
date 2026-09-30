@@ -18,7 +18,7 @@ const aiMediaReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => 
 const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
-aiMediaRouter.get("/status", requireUser, aiMediaReadLimit, (_req, res) => {
+aiMediaRouter.get("/status", requireUser, rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), (_req, res) => {
   res.json({ configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY) });
 });
 
@@ -81,7 +81,7 @@ aiMediaRouter.post("/restyle", requireUser, aiMediaWriteLimit, async (req, res) 
   }
 });
 
-aiMediaRouter.get("/jobs/:jobId", requireUser, aiMediaReadLimit, async (req, res) => {
+aiMediaRouter.get("/jobs/:jobId", requireUser, rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   const db = await getDb();
   const job = await db.collection("ai_media_jobs").findOne({ jobId: String(req.params.jobId), userId: req.userId });
   if (!job) return res.status(404).json({ error: "AI media job not found" });
