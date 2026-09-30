@@ -4,7 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_SUBSCRIBER_REACH_PACKS, TWITOK_DURATION_OPTIONS, TWITOK_DEFAULT_DURATION_DAYS, discountedPromotionPrice, durationAdjustedPrice, durationAdjustedAudience, getViewPack } from "../config/promotion-pricing.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_SUBSCRIBER_REACH_PACKS, TWITOK_DURATION_OPTIONS, TWITOK_DEFAULT_DURATION_DAYS, discountedPromotionPrice, durationAdjustedPrice, durationAdjustedAudience, durationPriceIncreasePercent, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -58,7 +58,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       durationDays: pack.durationDays,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
-      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, audienceIncreasePercent: option.audienceIncreasePercent })),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
     partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => ({
@@ -111,7 +111,7 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     if (selectedPack && currency !== "USD") return res.status(400).json({ error: "TikTok-benchmark promotion packs are priced in USD" });
     const baseBenchmarkUsd = selectedPack?.benchmarkUsd ?? Number(req.body?.benchmarkBudgetUsd ?? req.body?.budget);
     const durationBenchmarkUsd = Number.isFinite(baseBenchmarkUsd) ? durationAdjustedPrice(baseBenchmarkUsd, durationOption.days) : Number(req.body?.budget);
-    const discountedBudget = selectedPack ? discountedPromotionPrice(durationBenchmarkUsd) : Number((Number(req.body?.budget) * (1 + durationOption.priceIncreasePercent / 100)).toFixed(2));
+    const discountedBudget = selectedPack ? discountedPromotionPrice(durationBenchmarkUsd) : Number((durationAdjustedPrice(Number(req.body?.budget), durationOption.days) * (1 - TWITOK_PROMOTION_DISCOUNT)).toFixed(2));
     const budgetMinor = moneyToMinor(discountedBudget);
     if (currency === "GHS" && budgetMinor < 500) return res.status(400).json({ error: "Minimum promotion budget is GHS 5" });
     if (currency === "USD" && budgetMinor < 100) return res.status(400).json({ error: "Minimum promotion budget is USD 1" });
