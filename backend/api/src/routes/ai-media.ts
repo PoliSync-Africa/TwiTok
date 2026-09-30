@@ -13,8 +13,6 @@ const aiMediaWriteLimit = rateLimit({
   key: req => req.userId?.toHexString() ?? req.ip ?? "unknown"
 });
 
-const aiMediaReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
-
 const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
