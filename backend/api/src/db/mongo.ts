@@ -35,6 +35,9 @@ export async function getDb(): Promise<Db> {
   await db.collection("shop_products").createIndex({ sellerId: 1, status: 1, updatedAt: -1 });
   await db.collection("shop_returns").createIndex({ orderId: 1, createdAt: -1 });
   await db.collection("shop_returns").createIndex({ buyerId: 1, createdAt: -1 });
+  await db.collection("shop_refunds").createIndex({ orderId: 1, returnId: 1 }, { unique: true });
+  await db.collection("shop_refunds").createIndex({ sellerId: 1, status: 1, createdAt: -1 });
+  await db.collection("shop_payouts").createIndex({ sellerId: 1, status: 1, createdAt: -1 });
 
   return db;
 }
