@@ -16,7 +16,7 @@ export default function HomeScreen() {
           <Text style={styles.secondaryText}>Create account</Text>
         </Pressable>
       </Link>
-      <Link href="/feed" asChild>
+      <Pressable style={styles.secondary} onPress={() => router.push("/shop")}><Text style={styles.secondaryText}>Open TwiTok Shop</Text></Pressable>\n      <Link href="/feed" asChild>
         <Pressable style={styles.secondary}>
           <Text style={styles.secondaryText}>Continue to feed</Text>
         </Pressable>
