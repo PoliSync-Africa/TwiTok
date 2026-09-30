@@ -119,7 +119,7 @@ export default function CreatorAnalytics() {
 
       <article className="studio-panel">
         <span>TRAFFIC SOURCES</span><h2>Where views come from</h2>
-        {data?.trafficSources?.length ? <div className="country-list">{data.trafficSources.map(s=><div className="country-row" key={s.source}><div><strong>{s.source.replace(/_/g," ")}</strong><small>{compact(s.impressions)} impressions</small></div><b>{compact(s.views)}</b><i><em style={{width:Math.max(4,(s.views/Math.max(1,data.summary.views))*100)+"%"}}/></i></div>)}</div> : <p>No traffic-source data yet.</p>}
+        {data?.trafficSources?.length ? <div className="country-list">{data.trafficSources.map(s=><div className="country-row" key={s.source}><div><strong>{s.source.replace(/_/g," ")}</strong><small>{compact(s.impressions ?? 0)} impressions</small></div><b>{compact(s.views)}</b><i><em style={{width:Math.max(4,(s.views/Math.max(1,data.summary.views))*100)+"%"}}/></i></div>)}</div> : <p>No traffic-source data yet.</p>}
       </article>
     </section>
   </main>;
