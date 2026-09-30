@@ -116,8 +116,15 @@ export default function PromoteScreen() {
     <View style={styles.row}>{["MORE_VIEWS","MORE_FOLLOWERS","WEBSITE_TRAFFIC","LIVE_AUDIENCE"].map(x => <Pressable key={x} onPress={() => setObjective(x)} style={[styles.choice, objective === x && styles.active]}><Text>{x.replaceAll("_"," ")}</Text></Pressable>)}</View>
     <Text style={styles.label}>Currency</Text>
     <View style={styles.row}>{["GHS","USD"].map(x => <Pressable key={x} onPress={() => setCurrency(x)} style={[styles.choice, currency === x && styles.active]}><Text>{x}</Text></Pressable>)}</View>
-    <Text style={styles.label}>Budget</Text>
-    <TextInput style={styles.input} keyboardType="decimal-pad" value={budget} onChangeText={setBudget} />
+    <Text style={styles.label}>Promotion package</Text>
+    <Text style={styles.discount}>8% DISCOUNT APPLIED</Text>
+    <View style={styles.packages}>{packages.map((pack) => <Pressable key={pack.id} onPress={() => { setSelectedPackage(pack.id); setBudget(String(pack.price)); setCurrency("USD"); }} style={[styles.package, selectedPackage === pack.id && styles.packageActive]}>
+      <Text style={styles.packageViews}>{Number(pack.views).toLocaleString()}+ estimated views</Text>
+      <Text style={styles.packagePrice}><Text style={styles.oldPrice}>$ {Number(pack.benchmarkPrice).toFixed(2)}</Text>  $ {Number(pack.price).toFixed(2)}</Text>
+      <Text style={styles.packageDiscount}>8% DISCOUNT APPLIED • {pack.durationDays} day{pack.durationDays === 1 ? "" : "s"}</Text>
+    </Pressable>)}</View>
+    <Text style={styles.label}>Custom budget</Text>
+    <TextInput style={styles.input} keyboardType="decimal-pad" value={budget} onChangeText={(value) => { setBudget(value); setSelectedPackage(null); }} />
     <Text style={styles.label}>Countries</Text>
     <TextInput style={styles.input} placeholder="GH, NG, KE" value={countries} onChangeText={setCountries} autoCapitalize="characters" />
     <Text style={styles.label}>Interests</Text>
