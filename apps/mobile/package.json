@@ -22,5 +22,8 @@
     "expo-audio": "57.0.5",
     "expo-camera": "57.0.5",
     "react-native-purchases": "^10.10.2"
+  },
+  "overrides": {
+    "electron-to-chromium": "1.5.439"
   }
 }
