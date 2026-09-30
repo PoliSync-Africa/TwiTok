@@ -71,7 +71,7 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
       return res.status(409).json({ error: `Insufficient stock for ${item.name}` });
     }
     subtotalMinor += Number(item.priceMinor) * quantity;
-    reservedItems.push({ productId: String(item.productId), sellerId: String(product.sellerId), quantity, name: item.name, priceMinor: Number(item.priceMinor) });
+    reservedItems.push({ productId: String(item.productId), sellerId: String(product.sellerId), quantity, name: item.name, priceMinor: Number(item.priceMinor), sourceStreamId: String(item.sourceStreamId ?? "").trim() || null, sourceProductId: String(item.sourceProductId ?? "").trim() || null });
   }
   const shippingMinor = Math.max(0, Math.round(Number(req.body?.shippingMinor ?? 0)));
   const totalMinor = subtotalMinor + shippingMinor;
@@ -125,10 +125,13 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
     seller.settlementMinor = Math.max(0, seller.grossMinor - seller.platformFeeMinor - seller.creatorCommissionMinor);
   }
 
-  if (sourceStreamId) {
-    if (!sourceProductId || !reservedItems.some(item => item.productId === sourceProductId)) return res.status(400).json({ error: "LIVE shopping attribution must match a cart product" });
-    const liveTag = await db.collection("live_shop_products").findOne({ streamId: sourceStreamId, productId: sourceProductId });
-    if (!liveTag) return res.status(400).json({ error: "LIVE shopping product is no longer attached to this LIVE" });
+  const liveAttributions = reservedItems
+    .filter(item => item.sourceStreamId && item.sourceProductId)
+    .map(item => ({ streamId: String(item.sourceStreamId), productId: String(item.sourceProductId), quantity: Number(item.quantity), amountMinor: Number(item.priceMinor) * Number(item.quantity) }));
+  for (const attribution of liveAttributions) {
+    if (attribution.productId !== attribution.productId) continue;
+    const liveTag = await db.collection("live_shop_products").findOne({ streamId: attribution.streamId, productId: attribution.productId });
+    if (!liveTag) return res.status(400).json({ error: "A LIVE shopping product in your cart is no longer attached to that LIVE" });
   }
 
   const order = {
@@ -144,8 +147,9 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
     sellerSettlementMinor: sellerBreakdown.reduce((sum, seller) => sum + seller.settlementMinor, 0),
     sellerBreakdown,
     affiliate,
-    sourceStreamId: sourceStreamId || null,
-    sourceProductId: sourceProductId || null,
+    sourceStreamId: sourceStreamId || liveAttributions[0]?.streamId || null,
+    sourceProductId: sourceProductId || liveAttributions[0]?.productId || null,
+    liveAttributions,
     shippingAddress: address,
     paymentStatus: "PENDING",
     status: "PENDING_PAYMENT",
