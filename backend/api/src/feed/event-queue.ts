@@ -21,6 +21,7 @@ export type QueuedFeedEvent = {
 export async function initializeFeedEventQueue(db: Db) {
   await Promise.all([
     db.collection("feed_event_queue").createIndex({ status: 1, availableAt: 1 }),
+    db.collection("feed_event_queue").createIndex({ status: 1, lockedAt: 1 }),
     db.collection("feed_event_queue").createIndex({ eventId: 1 }, { unique: true }),
     db.collection("feed_event_queue").createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 }),
     db.collection("feed_events").createIndex({ eventId: 1 }, { unique: true, sparse: true })
@@ -101,8 +102,11 @@ export function startFeedEventWorker(db: Db) {
     while (!stopped) {
       const now = new Date();
       const claimed = await db.collection<QueuedFeedEvent>("feed_event_queue").findOneAndUpdate(
-        { status: "QUEUED", availableAt: { $lte: now } },
-        { $set: { status: "PROCESSING", lockedAt: now }, $inc: { attempts: 1 } },
+        { $or: [
+          { status: "QUEUED", availableAt: { $lte: now } },
+          { status: "PROCESSING", lockedAt: { $lte: new Date(Date.now() - 60_000) } }
+        ] },
+        { $set: { status: "PROCESSING", lockedAt: now, availableAt: now }, $inc: { attempts: 1 } },
         { sort: { createdAt: 1 }, returnDocument: "after" }
       );
 
