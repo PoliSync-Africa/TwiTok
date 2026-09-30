@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   activeIcon: { color: "#ff2d55" },
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
   usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
-  feedVerified:{width:17,height:17,borderRadius:8.5,backgroundColor:"#1877F2",alignItems:"center",justifyContent:"center"},feedVerifiedCheck:{color:"#fff",fontSize:11,fontWeight:"900",lineHeight:13},
+  feedVerified:{width:17,height:17,borderRadius:8.5,backgroundColor:"#20B2AA",alignItems:"center",justifyContent:"center"},feedVerifiedCheck:{color:"#fff",fontSize:11,fontWeight:"900",lineHeight:13},
   username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
   caption: { color: "#fff", fontSize: 15, lineHeight: 21 },
   soundMeta: { flexDirection: "row", alignItems: "center", marginTop: 10, maxWidth: "88%" },
