@@ -25,7 +25,7 @@ videoRouter.post("/photos/uploads/:uploadId/complete", requireUser, async (req, 
 
 videoRouter.post("/posts/photos", requireUser, async (req, res) => {
   try { res.status(201).json(await createPhotoPost(await getDb(), req.userId!, {
-    uploadIds: req.body?.uploadIds, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch
+    uploadIds: req.body?.uploadIds, editPlan: req.body?.editPlan, caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch
   })); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create photo post" }); }
 });
@@ -143,7 +143,7 @@ videoRouter.post("/drafts", requireUser, async (req, res) => {
     res.status(201).json(await createVideoDraft(await getDb(), req.userId!, {
       uploadId: String(req.body?.uploadId ?? ""),
       clipUploadIds: req.body?.clipUploadIds, clipTrimRanges: req.body?.clipTrimRanges, clipTransitions: req.body?.clipTransitions, clipSettings: req.body?.clipSettings,
-      caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch,
+      caption: req.body?.caption, hashtags: req.body?.hashtags, mentions: req.body?.mentions, location: req.body?.location, visibility: req.body?.visibility, allowComments: req.body?.allowComments, allowDuet: req.body?.allowDuet, allowStitch: req.body?.allowStitch, editPlan: req.body?.editPlan,
       coverTimeMs: req.body?.coverTimeMs, trimStartMs: req.body?.trimStartMs, trimEndMs: req.body?.trimEndMs, speed: req.body?.speed, soundId: req.body?.soundId,
       originalVolume: req.body?.originalVolume, addedSoundVolume: req.body?.addedSoundVolume, textOverlays: req.body?.textOverlays, captions: req.body?.captions,
       autoCaptions: req.body?.autoCaptions === true, captionLanguage: req.body?.captionLanguage, effect: req.body?.effect, stickers: req.body?.stickers
