@@ -9,7 +9,7 @@ type Video = {
   id: string;
   caption: string;
   ownerId?: string;
-  owner?: { username?: string; nickname?: string; countryCode?: string } | null;
+  owner?: { username?: string; nickname?: string; countryCode?: string; isVerified?: boolean; verificationType?: string|null } | null;
   playback?: { mp4Url?: string; hlsUrl?: string } | null;
   thumbnail?: string | null;
   mediaType?: "VIDEO"|"PHOTO"|"TEXT";
@@ -164,7 +164,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
       </View>
       <View style={styles.meta}>
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
-        <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text></Pressable>
+        <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<Text style={styles.feedVerified}>✓</Text>}</View></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
