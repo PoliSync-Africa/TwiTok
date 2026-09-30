@@ -315,6 +315,24 @@ export async function sendGift(db: Db, input: {
         context: input.context, videoId: input.videoId ?? null, createdAt: now
       }, { session });
 
+      await db.collection("platform_financial_ledger").insertOne({
+        transactionId: randomUUID(),
+        eventType: "GIFT_SETTLEMENT",
+        providerTransactionIds: fundingAllocations.map((allocation) => allocation.providerTransactionId),
+        giftTransactionId: transactionId,
+        senderId: input.senderId,
+        creatorId: input.receiverId,
+        netProceedsUsd: netValueConsumed,
+        creatorAllocationUsd: creatorEarningsUsd,
+        creatorCashCreditUsd,
+        creatorLiabilityOffsetUsd,
+        platformAllocationUsd,
+        creatorSharePercent: 30,
+        platformSharePercent: 70,
+        status: "SETTLED",
+        createdAt: now
+      }, { session });
+
       if (fundingAllocations.length) {
         await db.collection("gift_coin_allocations").insertMany(
           fundingAllocations.map((allocation) => ({

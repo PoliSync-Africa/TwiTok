@@ -30,7 +30,10 @@ export async function initializeWalletIndexes(db: Db) {
     db.collection("gift_coin_allocations").createIndex({ providerTransactionId: 1, createdAt: 1 }),
     db.collection("platform_refund_ledger").createIndex({ transactionId: 1 }, { unique: true }),
     db.collection("platform_refund_ledger").createIndex({ refundEventId: 1, giftTransactionId: 1 }, { unique: true }),
-    db.collection("platform_refund_ledger").createIndex({ providerTransactionId: 1, createdAt: -1 })
+    db.collection("platform_refund_ledger").createIndex({ providerTransactionId: 1, createdAt: -1 }),
+    db.collection("platform_financial_ledger").createIndex({ transactionId: 1 }, { unique: true }),
+    db.collection("platform_financial_ledger").createIndex({ eventType: 1, createdAt: -1 }),
+    db.collection("platform_financial_ledger").createIndex({ providerTransactionId: 1, createdAt: -1 })
   ]);
 }
 
@@ -88,6 +91,26 @@ export async function creditPurchasedCoins(db: Db, input: {
         transactionId: randomUUID(), userId: input.userId, type: "COIN_PURCHASE",
         coinsDelta: input.coins, diamondsDelta: 0, cashDeltaUsd: 0,
         referenceId: input.providerTransactionId, createdAt: now
+      }, { session });
+
+      const grossUsd = Number(input.grossUsd ?? 0);
+      const providerCostUsd = Math.max(0, Number((grossUsd - netProceedsUsd).toFixed(8)));
+      await db.collection("platform_financial_ledger").insertOne({
+        transactionId: randomUUID(),
+        eventType: "COIN_PURCHASE",
+        provider: input.provider,
+        providerTransactionId: input.providerTransactionId,
+        userId: input.userId,
+        sku: input.sku,
+        grossUsd: Number.isFinite(grossUsd) ? grossUsd : 0,
+        providerFeeUsd: providerCostUsd,
+        providerTaxUsd: 0,
+        netProceedsUsd,
+        creatorAllocationUsd: 0,
+        platformAllocationUsd: 0,
+        deferredPlatformUsd: netProceedsUsd,
+        status: "DEFERRED",
+        createdAt: now
       }, { session });
     });
   } finally { await session.endSession(); }
