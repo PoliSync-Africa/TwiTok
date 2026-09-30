@@ -20,6 +20,7 @@ import { storiesRouter } from "./stories.js";
 import { promotionsRouter } from "./promotions.js";
 import { walletRouter } from "./wallet.js";
 import { paymentRoutingRouter } from "./payment-routing.js";
+import { analyticsRouter } from "./analytics.js";
 
 export const apiRouter = Router();
 
@@ -44,3 +45,4 @@ apiRouter.use("/stories", storiesRouter);
 apiRouter.use("/promotions", promotionsRouter);
 apiRouter.use("/wallet", walletRouter);
 apiRouter.use("/payments", paymentRoutingRouter);
+apiRouter.use("/analytics", analyticsRouter);
