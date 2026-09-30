@@ -129,9 +129,10 @@ async function runFfmpeg(
     captions: Array<{ text: string; startMs: number; endMs: number }>;
     effect: string;
     stickers: Array<{ stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number }>;
+    editPlan?: { quality?: string; filter?: string; crop?: string; rotate?: number; mirror?: boolean; aiTool?: string; aiPrompt?: string };
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers, editPlan } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -139,11 +140,34 @@ async function runFfmpeg(
   ];
   if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
 
+  const plan = editPlan ?? {};
+  const quality = String(plan.quality ?? "HD");
+  const aiTool = String(plan.aiTool ?? "NONE");
+  const filterName = String(plan.filter ?? "NONE");
+  const polish = quality === "HD" || aiTool === "HD_ENHANCE" ? "hqdn3d=1.2:1.2:6:6,unsharp=5:5:0.7:5:5:0.0,eq=contrast=1.05:saturation=1.08:brightness=0.015" : quality === "CLEAN" || aiTool === "RESTORE" ? "hqdn3d=1:1:4:4,unsharp=5:5:0.45:5:5:0.0" : "null";
+  const filterMap: Record<string,string> = {
+    NONE:"null", VIVID:"eq=contrast=1.08:saturation=1.3", WARM:"colorbalance=rs=.08:gs=.03:bs=-.03",
+    COOL:"colorbalance=rs=-.03:gs=.03:bs=.08", NOIR:"hue=s=0,eq=contrast=1.15:brightness=-.02",
+    VINTAGE:"eq=contrast=.95:saturation=.78:brightness=.02", CINEMATIC:"eq=contrast=1.12:saturation=1.08:gamma=1.03"
+  };
+  const cropMap: Record<string,string> = {
+    "9:16":"crop=min(iw\,ih*0.5625):min(ih\,iw*1.7778)",
+    "1:1":"crop=min(iw\,ih):min(iw\,ih)",
+    "4:5":"crop=min(iw\,ih*0.8):min(ih\,iw*1.25)",
+    "16:9":"crop=min(iw\,ih*1.7778):min(ih\,iw*0.5625)"
+  };
+  const rotate = Number(plan.rotate ?? 0);
+  const geometry = [
+    cropMap[String(plan.crop ?? "ORIGINAL")] ?? "null",
+    plan.mirror ? "hflip" : "null",
+    rotate === 90 ? "transpose=1" : rotate === 180 ? "transpose=1,transpose=1" : rotate === 270 ? "transpose=2" : "null"
+  ].filter(x => x !== "null").join(",") || "null";
+  const aiVisual = aiTool === "RELIGHT" ? "eq=brightness=0.07:gamma=1.08" : aiTool === "COLORIZE" ? "hue=s=1.18" : "null";
   const filters = [
     "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360base]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720base]`
+    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v360base]`,
+    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v540base]`,
+    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v720base]`
   ];
 
   const overlayInputs: string[] = [];
@@ -363,7 +387,8 @@ async function processJob(db: Db, job: any) {
       textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : [],
       captions: Array.isArray(video.captions) ? video.captions : [],
       effect: String(video.effect ?? "NONE"),
-      stickers: Array.isArray(video.stickers) ? video.stickers : []
+      stickers: Array.isArray(video.stickers) ? video.stickers : [],
+      editPlan: video.editPlan ?? undefined
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));
