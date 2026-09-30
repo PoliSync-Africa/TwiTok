@@ -39,7 +39,7 @@ export async function createUser(db: Db, input: { username?: string; password: s
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
   if (!input.email && !input.phone) throw new Error("Email or phone is required");
   const now = new Date();
-  const user = { sessionVersion: 0, username, nickname: username, email: input.email?.trim().toLowerCase(), phone: input.phone?.trim(), dateOfBirth: dob, countryCode: input.countryCode.trim().toUpperCase(), accountType: "PERSONAL", isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
+  const user = { sessionVersion: 0, username, nickname: username, email: input.email?.trim().toLowerCase(), phone: input.phone?.trim(), dateOfBirth: dob, countryCode: input.countryCode.trim().toUpperCase(), accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
   const result = await db.collection("users").insertOne({ ...user, passwordHash: await bcrypt.hash(input.password, 12) });
   return { ...user, _id: result.insertedId.toHexString() };
 }
@@ -49,5 +49,5 @@ export async function authenticateUser(db: Db, identifier: string, password: str
   const user = await db.collection("users").findOne({ $or: [{ email: normalized }, { username: normalized }, { phone: identifier.trim() }] });
   if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
   if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid login credentials");
-  return { _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
+  return { _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }
