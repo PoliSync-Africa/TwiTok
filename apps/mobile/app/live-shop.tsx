@@ -140,7 +140,10 @@ export default function LiveShopScreen() {
         return featured ? <View style={styles.featured}>
           {featured.images?.[0] ? <Image source={{ uri: featured.images[0] }} style={styles.featuredImage} /> : null}
           <View style={styles.featuredInfo}><Text style={styles.badge}>FEATURED</Text><Text style={styles.featuredName} numberOfLines={2}>{featured.name}</Text><Text style={styles.price}>{featured.currency} {(featured.priceMinor / 100).toFixed(2)}</Text><Text style={styles.stock}>{featured.stock > 0 ? "In stock" : "Out of stock"}</Text></View>
-          <Pressable disabled={!featured.stock || busy === featured.id} style={styles.buy} onPress={() => void addToCart(featured.id)}><Text style={styles.buyText}>{busy === featured.id ? "Adding…" : "Add to Cart"}</Text></Pressable>
+          <View style={styles.featuredActions}>
+            <Pressable disabled={!featured.stock} style={styles.buySecondary} onPress={() => router.push({ pathname: "/shop", params: { productId: featured.id } })}><Text style={styles.buySecondaryText}>Buy Now</Text></Pressable>
+            <Pressable disabled={!featured.stock || busy === featured.id} style={styles.buy} onPress={() => void addToCart(featured.id)}><Text style={styles.buyText}>{busy === featured.id ? "Adding…" : "Add to Cart"}</Text></Pressable>
+          </View>
         </View> : null;
       })() : null}
 
@@ -189,7 +192,10 @@ const styles = StyleSheet.create({
   badge:{color:"#ff2d55",fontSize:9,fontWeight:"900"},
   featuredName:{color:"#fff",fontSize:13,fontWeight:"900",marginTop:3},
   price:{color:"#fff",fontSize:13,fontWeight:"900",marginTop:4},
-  buy:{backgroundColor:"#ff2d55",borderRadius:9,paddingHorizontal:10,paddingVertical:9},
+  featuredActions:{gap:6},
+  buySecondary:{borderWidth:1,borderColor:"#666",borderRadius:9,paddingHorizontal:10,paddingVertical:8,alignItems:"center"},
+  buySecondaryText:{color:"#fff",fontSize:10,fontWeight:"900"},
+  buy:{backgroundColor:"#ff2d55",borderRadius:9,paddingHorizontal:10,paddingVertical:9,alignItems:"center"},
   buyText:{color:"#fff",fontSize:10,fontWeight:"900"},
   stock:{color:"#888",fontSize:10,marginTop:2},
   sectionHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:8},
