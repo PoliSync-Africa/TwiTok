@@ -70,3 +70,4 @@ h2 { font-size:19px; margin:0; }
 .ledger-row small{color:#777}
 @media (max-width:1050px){.finance-stats{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:760px){.finance-actions{justify-content:flex-start;margin-top:18px}.finance-stats{grid-template-columns:repeat(2,1fr)}.trend-row{grid-template-columns:58px minmax(80px,1fr) 72px}.trend-row small{display:none}}
+.verification-admin-list{display:grid;gap:14px;margin-top:18px}.verification-admin-card ul{margin:10px 0 16px;padding-left:20px}.verification-admin-card a{color:#e4bd55}.verification-admin-card .primary{border:0;border-radius:9px;background:#d8ad43;color:#0a0a0a;font-weight:800;padding:10px 14px;cursor:pointer}.verification-admin-card .primary:disabled,.verification-admin-card .logout:disabled{opacity:.5;cursor:not-allowed}
