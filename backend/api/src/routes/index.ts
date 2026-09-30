@@ -24,6 +24,7 @@ import { paymentRoutingRouter } from "./payment-routing.js";
 import { analyticsRouter } from "./analytics.js";
 import { verificationRouter } from "./verification.js";
 import { aiMediaRouter } from "./ai-media.js";
+import { shopRouter } from "./shop.js";
 
 export const apiRouter = Router();
 
@@ -60,3 +61,4 @@ apiRouter.use("/payments", paymentRoutingRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/verification", verificationRouter);
 apiRouter.use("/ai-media", aiMediaRouter);
+apiRouter.use("/shop", shopRouter);
