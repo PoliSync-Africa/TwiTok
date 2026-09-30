@@ -150,7 +150,22 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   );
 }
 
-function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {\n  const [shopOpen, setShopOpen] = useState(false);\n  const [shopBusy, setShopBusy] = useState<string | null>(null);\n\n  async function addShopProduct(productId: string) {\n    const token = await getAuthToken();\n    if (!token || shopBusy) return;\n    setShopBusy(productId);\n    try {\n      const r = await fetch(API + "/shop/cart/items", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ productId, quantity: 1 }) });\n      const d = await r.json().catch(() => ({}));\n      if (!r.ok) throw new Error(d.error ?? "Unable to add product to cart");\n      setShopOpen(false);\n      router.push("/shop?tab=cart");\n    } catch {} finally { setShopBusy(null); }\n  }
+function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shopBusy, setShopBusy] = useState<string | null>(null);
+
+  async function addShopProduct(productId: string) {
+    const token = await getAuthToken();
+    if (!token || shopBusy) return;
+    setShopBusy(productId);
+    try {
+      const r = await fetch(API + "/shop/cart/items", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ productId, quantity: 1 }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "Unable to add product to cart");
+      setShopOpen(false);
+      router.push("/shop?tab=cart");
+    } catch {} finally { setShopBusy(null); }
+  }
   return (
     <>
       <View style={styles.scrim} />
