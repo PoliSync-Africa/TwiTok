@@ -67,17 +67,19 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
     partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => ({
       id: pack.id,
       benchmarkPrice: pack.benchmarkUsd,
-      price: discountedPromotionPrice(pack.benchmarkUsd),
-      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, audienceIncreasePercent: option.audienceIncreasePercent })),
+      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays)),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: pack.durationDays,
       deliverables: pack.deliverables,
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
     subscriberReachPackages: TWITOK_SUBSCRIBER_REACH_PACKS.map(pack => ({
       id: pack.id,
-      audience: pack.audience,
+      audience: durationAdjustedAudience(pack.audience, pack.durationDays),
+      baseAudience: pack.audience,
       benchmarkPrice: pack.benchmarkUsd,
-      price: discountedPromotionPrice(pack.benchmarkUsd),
+      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, pack.durationDays)),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), audience: durationAdjustedAudience(pack.audience, option.days), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: pack.durationDays,
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
@@ -85,7 +87,7 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       id: pack.id,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
-      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, audienceIncreasePercent: option.audienceIncreasePercent })),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
       durationDays: pack.durationDays,
       recommended: Boolean("recommended" in pack && pack.recommended),
       note: "Budget-based promotion. Follower/profile results are estimates, not guaranteed."
