@@ -6,11 +6,11 @@ import Link from "next/link";
 type RequestRow={requestId:string;userId:string;username:string|null;nickname:string|null;countryCode:string|null;accountType:string|null;type:string;legalName:string;displayName:string;website:string|null;supportingLinks:string[];reason:string;status:string;createdAt:string};
 
 export default function VerificationAdminPage(){
-  const api=process.env.NEXT_PUBLIC_TWITOK_API_URL??"http://localhost:4000/api/v1";
+  
   const [rows,setRows]=useState<RequestRow[]>([]);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
-  useEffect(()=>{fetch(api+"/admin/verification/requests?status=PENDING",{credentials:"include"}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error??"Unable to load requests");setRows(d.requests??[])}).catch(e=>setError(e instanceof Error?e.message:"Unable to load requests"))},[api]);
+  useEffect(()=>{fetch("/api/admin/verification/requests?status=PENDING").then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error??"Unable to load requests");setRows(d.requests??[])}).catch(e=>setError(e instanceof Error?e.message:"Unable to load requests"))},[api]);
   async function review(requestId:string,decision:"APPROVE"|"REJECT"){
     setBusy(requestId);setError("");
     const notes=window.prompt(decision==="APPROVE"?"Optional approval note":"Reason for rejection")??"";
