@@ -55,7 +55,7 @@ shopFinanceRouter.post("/seller/payouts", requireUser, async (req, res) => {
   const wallet = await db.collection("shop_payouts").find({ sellerId, status: { $in: ["REQUESTED", "PROCESSING", "PAID"] } }).toArray();
   const delivered = await db.collection("shop_orders").find({ "items.sellerId": sellerId, status: "DELIVERED", paymentStatus: "PAID", currency }).toArray();
   const refunds = await db.collection("shop_refunds").find({ sellerId, status: "REFUNDED", currency }).toArray();
-  const earned = delivered.reduce((sum: number, o: any) => sum + Number(o.sellerSettlementMinor || 0), 0);
+  const earned = delivered.reduce((sum: number, o: any) => { const seller = o.sellerBreakdown?.find((s: any) => s.sellerId === sellerId); return sum + Number(seller?.settlementMinor || 0); }, 0);
   const alreadyPaid = wallet.reduce((sum: number, p: any) => sum + Number(p.amountMinor || 0), 0);
   const refunded = refunds.reduce((sum: number, r: any) => sum + Number(r.amountMinor || 0), 0);
   const available = Math.max(0, earned - alreadyPaid - refunded);
