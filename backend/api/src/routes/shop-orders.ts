@@ -129,7 +129,6 @@ shopOrdersRouter.post("/checkout", requireUser, orderLimit, async (req, res) => 
     .filter(item => item.sourceStreamId && item.sourceProductId)
     .map(item => ({ streamId: String(item.sourceStreamId), productId: String(item.sourceProductId), quantity: Number(item.quantity), amountMinor: Number(item.priceMinor) * Number(item.quantity) }));
   for (const attribution of liveAttributions) {
-    if (attribution.productId !== attribution.productId) continue;
     const liveTag = await db.collection("live_shop_products").findOne({ streamId: attribution.streamId, productId: attribution.productId });
     if (!liveTag) return res.status(400).json({ error: "A LIVE shopping product in your cart is no longer attached to that LIVE" });
   }
