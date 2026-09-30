@@ -13,7 +13,7 @@ const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "PORTRAIT_PRO", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
 aiMediaRouter.get("/status", rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, (_req, res) => {
-  res.json({ configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY) });
+  res.json({\n    configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY),\n    statusPollingConfigured: Boolean(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY)\n  });
 });
 
 aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
@@ -47,7 +47,7 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
       return res.status(503).json({ error: "AI media generation is not configured yet", code: "AI_MEDIA_NOT_CONFIGURED" });
     }
 
-    const providerResponse = await fetch(endpoint, {
+    const controller = new AbortController();\n    const timeout = setTimeout(() => controller.abort(), 30_000);\n    let providerResponse: Response;\n    try {\n      providerResponse = await fetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -97,7 +97,7 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   // https://provider.example/jobs/{jobId}; the provider response may contain
   // outputUrl/url, jobId/id, and status/state.
   const statusEndpoint = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
-  if (!outputUrl && job.providerJobId && statusEndpoint) {
+  if (!outputUrl && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
     try {
       const url = statusEndpoint.replace("{jobId}", encodeURIComponent(String(job.providerJobId)));
       const providerResponse = await fetch(url, {
