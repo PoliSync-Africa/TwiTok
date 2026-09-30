@@ -4,7 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, discountedPromotionPrice, getViewPack } from "../config/promotion-pricing.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PACKS, TWITOK_SUBSCRIBER_REACH_PACKS, discountedPromotionPrice, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -56,6 +56,22 @@ promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, r
       durationDays: pack.durationDays,
       benchmarkPrice: pack.benchmarkUsd,
       price: discountedPromotionPrice(pack.benchmarkUsd),
+      recommended: Boolean("recommended" in pack && pack.recommended)
+    })),
+    partnershipPackages: TWITOK_PARTNERSHIP_PACKS.map(pack => ({
+      id: pack.id,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationDays: pack.durationDays,
+      deliverables: pack.deliverables,
+      recommended: Boolean("recommended" in pack && pack.recommended)
+    })),
+    subscriberReachPackages: TWITOK_SUBSCRIBER_REACH_PACKS.map(pack => ({
+      id: pack.id,
+      audience: pack.audience,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationDays: pack.durationDays,
       recommended: Boolean("recommended" in pack && pack.recommended)
     })),
     objectivePackages: TWITOK_OBJECTIVE_BUDGET_PACKS.map(pack => ({
