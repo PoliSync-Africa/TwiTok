@@ -6,7 +6,6 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 import FreeMediaEditor, { DEFAULT_MEDIA_EDIT_PLAN, type MediaEditPlan } from "../components/free-media-editor";
-import * as ImageManipulator from "expo-image-manipulator";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
@@ -157,19 +156,6 @@ export default function CreateScreen() {
 
   function applyEditPlan(next: MediaEditPlan) {
     setEditPlan(next);
-    if (mode === "PHOTO" && assets.length) {
-      void Promise.all(assets.map(async asset => {
-        if (!asset.uri) return asset;
-        const actions: any[] = [];
-        if (next.rotate) actions.push({ rotate: next.rotate });
-        if (next.mirror) actions.push({ flip: "horizontal" });
-        if (actions.length) {
-          const result = await ImageManipulator.manipulateAsync(asset.uri, actions, { compress: 1, format: "jpeg" });
-          return { ...asset, uri: result.uri, mimeType: "image/jpeg", fileSize: undefined, fileName: asset.fileName ?? "twitok-edit.jpg" };
-        }
-        return asset;
-      })).then(replaced => replaceAssets(replaced)).catch(() => undefined);
-    }
   }
 
   function replaceAssets(next: Asset[]) {
