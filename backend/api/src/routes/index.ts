@@ -31,6 +31,7 @@ import { shopPaymentsRouter } from "./shop-payments.js";
 import { shopSellerRouter } from "./shop-seller.js";
 import { shopReturnsRouter } from "./shop-returns.js";
 import { shopFinanceRouter } from "./shop-finance.js";
+import { shopAffiliateRouter } from "./shop-affiliate.js";
 
 export const apiRouter = Router();
 
@@ -74,3 +75,4 @@ apiRouter.use("/shop", shopPaymentsRouter);
 apiRouter.use("/shop", shopSellerRouter);
 apiRouter.use("/shop", shopReturnsRouter);
 apiRouter.use("/shop", shopFinanceRouter);
+apiRouter.use("/shop", shopAffiliateRouter);
