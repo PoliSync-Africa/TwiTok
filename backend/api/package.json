@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "worker:video": "tsx src/workers/video-worker.ts",
+    "worker:photo": "tsx src/workers/photo-worker.ts",
     "test:types": "tsc --noEmit",
     "worker:stt": "tsx src/workers/transcription-worker.ts",
     "worker:translate": "tsx src/workers/translation-worker.ts"
