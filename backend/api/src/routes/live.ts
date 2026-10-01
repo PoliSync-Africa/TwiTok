@@ -114,7 +114,8 @@ liveRouter.post("/streams/:streamId/gifts", requireUser, liveActionLimit, async 
       receiverId,
       giftId,
       quantity,
-      context: "LIVE"
+      context: "LIVE",
+      idempotencyKey
     });
 
     if (!result.duplicate) {
