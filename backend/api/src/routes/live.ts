@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, leaveLiveGuest, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, leaveLiveGuest, leaveLiveViewer, respondLiveGuestInvite, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { sendGift } from "../money/gifts.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
