@@ -27,6 +27,12 @@ export async function initializeLiveIndexes(db: Db) {
   ]);
 }
 
+
+export function getLivePlaybackUrl(streamId: string) {
+  const playbackBase = process.env.TWITOK_LIVE_PLAYBACK_URL?.replace(/\/$/, "") || "";
+  return playbackBase ? playbackBase + "/" + encodeURIComponent(streamId) + "/index.m3u8" : null;
+}
+
 export async function createLiveStream(db: Db, input: { streamId:string; hostUserId:string; title:string; category?:string; coverUrl?:string }) {
   const now = new Date();
   const stream = {
@@ -63,7 +69,7 @@ export async function createLiveIngestSession(db: Db, streamId: string, hostUser
     streamId,
     ingestUrl: ingestBase ? ingestBase + "/" + streamId : null,
     streamKey: ingestSecret,
-    playbackUrl: playbackBase ? playbackBase + "/" + streamId + "/index.m3u8" : null,
+    playbackUrl: getLivePlaybackUrl(streamId),
     expiresAt
   };
 }
@@ -82,6 +88,7 @@ export async function setLiveStatus(db: Db, streamId: string, status: "LIVE"|"EN
   if (status === "LIVE") update.startedAt = now;
   if (status === "ENDED") update.endedAt = now;
   await db.collection("live_streams").updateOne({ streamId }, { $set: update });
+  if (status === "ENDED") await db.collection("live_ingest_sessions").updateOne({ streamId, status: "ACTIVE" }, { $set: { status: "REVOKED", updatedAt: now } });
   return db.collection("live_streams").findOne({ streamId });
 }
 
