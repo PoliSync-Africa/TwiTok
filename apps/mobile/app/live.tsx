@@ -202,6 +202,7 @@ export default function LiveViewerScreen() {
     <View style={styles.top}>
       <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
       <View><Text style={styles.live}>● LIVE</Text><Text style={styles.viewers}>{viewerCount.toLocaleString()} viewers</Text></View>
+      {isHost && <Pressable style={styles.studioButton} onPress={() => router.push({ pathname:"/live-studio", params:{ streamId:String(streamId) } })}><Text style={styles.studioButtonText}>Studio</Text></Pressable>}
       <Pressable style={styles.shop} onPress={() => router.push({ pathname:"/live-shop", params:{ streamId:String(streamId), mode:isHost?"host":"viewer" } })}><Text style={styles.shopText}>Shop</Text></Pressable>
     </View>
     <View style={styles.overlay}>
@@ -241,6 +242,8 @@ const styles=StyleSheet.create({
  close:{color:"#fff",fontSize:34,textShadowColor:"#000",textShadowRadius:5},
  live:{color:"#ff2d55",fontWeight:"900",fontSize:13,textShadowColor:"#000",textShadowRadius:5},
  viewers:{color:"#fff",fontSize:11,textShadowColor:"#000",textShadowRadius:5},
+ studioButton:{backgroundColor:"rgba(0,0,0,.62)",borderColor:"#fff",borderWidth:1,borderRadius:18,paddingHorizontal:12,paddingVertical:7},
+ studioButtonText:{color:"#fff",fontWeight:"900",fontSize:11},
  shop:{backgroundColor:"rgba(255,45,85,.92)",borderRadius:18,paddingHorizontal:15,paddingVertical:8},
  shopText:{color:"#fff",fontWeight:"900",fontSize:12},
  overlay:{position:"absolute",left:12,right:12,bottom:18},
