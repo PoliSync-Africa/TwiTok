@@ -205,9 +205,10 @@ export async function inviteLiveGuest(db: Db, streamId: string, hostUserId: stri
   if (!userId || userId === hostUserId) throw new Error("A valid guest user is required");
   if (await isLiveRestricted(db, streamId, userId)) throw new Error("This user is restricted from joining the LIVE");
   const activeCount = await db.collection("live_guests").countDocuments({ streamId, status: "ACTIVE" });
+  const guestLimit = Math.min(LIVE_GUEST_MAX, Math.max(1, Number(stream.studio?.guestLimit ?? LIVE_GUEST_MAX)));
   const existing = await getLiveGuestState(db, streamId, userId);
   if (existing?.status === "ACTIVE") return existing;
-  if (activeCount >= LIVE_GUEST_MAX) throw new Error("This LIVE already has the maximum number of guests");
+  if (activeCount >= guestLimit) throw new Error("This LIVE already has the configured maximum number of guests");
   const now = new Date();
   const guest = {
     streamId,
@@ -240,7 +241,9 @@ export async function respondLiveGuestInvite(db: Db, streamId: string, userId: s
   }
   if (await isLiveRestricted(db, streamId, userId)) throw new Error("You are restricted from joining this LIVE");
   const activeCount = await db.collection("live_guests").countDocuments({ streamId, status: "ACTIVE" });
-  if (activeCount >= LIVE_GUEST_MAX) throw new Error("The LIVE guest slots are full");
+  const streamWithStudio = await db.collection("live_streams").findOne({ streamId }, { projection: { studio: 1 } });
+  const guestLimit = Math.min(LIVE_GUEST_MAX, Math.max(1, Number(streamWithStudio?.studio?.guestLimit ?? LIVE_GUEST_MAX)));
+  if (activeCount >= guestLimit) throw new Error("The LIVE guest slots are full");
   await db.collection("live_guests").updateOne(
     { streamId, userId, status: "INVITED" },
     { $set: { status: "ACTIVE", respondedAt: now, joinedAt: now, updatedAt: now } }
