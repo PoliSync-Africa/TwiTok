@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, leaveLiveGuest, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { sendGift } from "../money/gifts.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
@@ -198,6 +198,64 @@ liveRouter.delete("/streams/:streamId/reaction", requireUser, liveActionLimit, a
   catch { return res.status(400).json({ error: "Unable to remove LIVE reaction" }); }
 });
 
+
+liveRouter.get("/streams/:streamId/guests", async (req, res) => {
+  try {
+    const streamId = String(req.params.streamId);
+    const db = await getDb();
+    const stream = await db.collection("live_streams").findOne(
+      { streamId, status: { $in: ["LIVE", "ENDED"] } },
+      { projection: { _id: 0, streamId: 1 } }
+    );
+    if (!stream) return res.status(404).json({ error: "LIVE stream not found" });
+    return res.json({ guests: await listLiveGuests(db, streamId) });
+  } catch {
+    return res.status(500).json({ error: "Unable to load LIVE guests" });
+  }
+});
+
+liveRouter.post("/streams/:streamId/guests/invite", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const streamId = String(req.params.streamId);
+    const userId = String(req.body?.userId ?? "").trim();
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+    const db = await getDb();
+    const guest = await inviteLiveGuest(db, streamId, req.userId!.toHexString(), userId);
+    broadcastToUser(userId, { type: "live.guest.invited", streamId, hostUserId: req.userId!.toHexString() });
+    return res.status(201).json({ guest });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to invite LIVE guest" });
+  }
+});
+
+liveRouter.post("/streams/:streamId/guests/respond", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const response = String(req.body?.response ?? "").toUpperCase();
+    if (response !== "ACCEPT" && response !== "DECLINE") return res.status(400).json({ error: "response must be ACCEPT or DECLINE" });
+    const db = await getDb();
+    const result = await respondLiveGuestInvite(db, String(req.params.streamId), req.userId!.toHexString(), response);
+    const invite = await db.collection("live_guests").findOne({ streamId: String(req.params.streamId), userId: req.userId!.toHexString() }, { projection: { hostUserId: 1 } });
+    if (invite?.hostUserId) broadcastToUser(String(invite.hostUserId), { type: "live.guest.response", streamId: String(req.params.streamId), userId: req.userId!.toHexString(), status: result.status });
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to respond to LIVE guest invitation" });
+  }
+});
+
+liveRouter.delete("/streams/:streamId/guests/:userId", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const streamId = String(req.params.streamId);
+    const targetUserId = String(req.params.userId);
+    const db = await getDb();
+    const result = await leaveLiveGuest(db, streamId, req.userId!.toHexString(), targetUserId);
+    const target = await db.collection("live_guests").findOne({ streamId, userId: targetUserId }, { projection: { hostUserId: 1 } });
+    if (target?.hostUserId) broadcastToUser(String(target.hostUserId), { type: "live.guest.left", streamId, userId: targetUserId });
+    if (targetUserId !== req.userId!.toHexString()) broadcastToUser(targetUserId, { type: "live.guest.removed", streamId });
+    return res.json(result);
+  } catch (error) {
+    return res.status(403).json({ error: error instanceof Error ? error.message : "Unable to remove LIVE guest" });
+  }
+});
 
 liveRouter.post("/streams/:streamId/moderators", requireUser, liveActionLimit, async (req, res) => {
   try {
