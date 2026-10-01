@@ -156,6 +156,36 @@ async function processClaimedEvent(db: Db, claimed: QueuedFeedEvent) {
   }
 }
 
+export async function getFeedEventQueueHealth(db: Db) {
+  const now = new Date();
+  const staleAt = new Date(Date.now() - LOCK_TIMEOUT_MS);
+  const [queued, processing, failed, oldestQueued, oldestProcessing] = await Promise.all([
+    db.collection("feed_event_queue").countDocuments({ status: "QUEUED", availableAt: { $lte: now } }),
+    db.collection("feed_event_queue").countDocuments({ status: "PROCESSING" }),
+    db.collection("feed_event_queue").countDocuments({ status: "FAILED" }),
+    db.collection<QueuedFeedEvent>("feed_event_queue").findOne(
+      { status: "QUEUED", availableAt: { $lte: now } },
+      { sort: { availableAt: 1, createdAt: 1 }, projection: { createdAt: 1 } }
+    ),
+    db.collection<QueuedFeedEvent>("feed_event_queue").findOne(
+      { status: "PROCESSING" },
+      { sort: { lockedAt: 1 }, projection: { lockedAt: 1 } }
+    )
+  ]);
+
+  return {
+    queued,
+    processing,
+    failed,
+    staleProcessing: processing > 0
+      ? await db.collection("feed_event_queue").countDocuments({ status: "PROCESSING", lockedAt: { $lte: staleAt } })
+      : 0,
+    oldestQueuedAt: oldestQueued?.createdAt?.toISOString() ?? null,
+    oldestProcessingAt: oldestProcessing?.lockedAt?.toISOString() ?? null,
+    queueLagSeconds: oldestQueued ? Math.max(0, Math.floor((Date.now() - oldestQueued.createdAt.getTime()) / 1000)) : 0
+  };
+}
+
 export function startFeedEventWorker(db: Db) {
   let stopped = false;
   const concurrency = workerConcurrency();
