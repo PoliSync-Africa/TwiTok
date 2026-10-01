@@ -85,7 +85,67 @@ export async function removeLiveReaction(db: Db, streamId: string, userId: strin
   return { streamId, removed: true };
 }
 
-async function isLiveRestricted(db: Db, streamId: string, userId: string) {\n  const blocked = await db.collection("live_blocks").findOne({ streamId, userId });\n  if (blocked) return true;\n  const mute = await db.collection("live_mutes").findOne({ streamId, userId, expiresAt: { $gt: new Date() } });\n  return Boolean(mute);\n}\n\nexport async function addLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {\n  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId });\n  if (!stream) throw new Error("Only the host can manage LIVE moderators");\n  const now = new Date();\n  await db.collection("live_moderators").updateOne({ streamId, userId }, { $set: { streamId, userId, createdAt: now } }, { upsert: true });\n  return { streamId, userId, moderator: true };\n}\n\nexport async function removeLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {\n  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId });\n  if (!stream) throw new Error("Only the host can manage LIVE moderators");\n  await db.collection("live_moderators").deleteOne({ streamId, userId });\n  return { streamId, userId, moderator: false };\n}\n\nasync function canModerateLive(db: Db, streamId: string, userId: string) {\n  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1 } });\n  if (!stream) return false;\n  if (String(stream.hostUserId) === userId) return true;\n  return Boolean(await db.collection("live_moderators").findOne({ streamId, userId }));\n}\n\nexport async function setLiveMute(db: Db, streamId: string, moderatorId: string, userId: string, durationSeconds = 300) {\n  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can mute viewers");\n  const now = new Date();\n  const expiresAt = new Date(now.getTime() + Math.min(86400, Math.max(10, durationSeconds)) * 1000);\n  await db.collection("live_mutes").updateOne({ streamId, userId }, { $set: { streamId, userId, moderatorId, createdAt: now, expiresAt } }, { upsert: true });\n  return { streamId, userId, expiresAt };\n}\n\nexport async function setLiveBlock(db: Db, streamId: string, moderatorId: string, userId: string) {\n  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can block viewers");\n  await db.collection("live_blocks").updateOne({ streamId, userId }, { $set: { streamId, userId, moderatorId, createdAt: new Date() } }, { upsert: true });\n  await db.collection("live_viewers").deleteOne({ streamId, userId });\n  return { streamId, userId, blocked: true };\n}\n\nexport async function removeLiveBlock(db: Db, streamId: string, moderatorId: string, userId: string) {\n  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can unblock viewers");\n  await db.collection("live_blocks").deleteOne({ streamId, userId });\n  return { streamId, userId, blocked: false };\n}\n\nexport async function reportLiveUser(db: Db, streamId: string, reporterId: string, targetUserId: string, reason: string) {\n  const cleanReason = reason.trim().slice(0, 500);\n  if (!cleanReason) throw new Error("A report reason is required");\n  const stream = await db.collection("live_streams").findOne({ streamId });\n  if (!stream) throw new Error("LIVE stream not found");\n  const report = { reportId: new ObjectId().toHexString(), streamId, reporterId, targetUserId, reason: cleanReason, createdAt: new Date() };\n  await db.collection("live_reports").insertOne(report);\n  return report;\n}\n\nexport async function refreshLiveViewer(db: Db, streamId: string, userId: string) {
+async function isLiveRestricted(db: Db, streamId: string, userId: string) {
+  const blocked = await db.collection("live_blocks").findOne({ streamId, userId });
+  if (blocked) return true;
+  const mute = await db.collection("live_mutes").findOne({ streamId, userId, expiresAt: { $gt: new Date() } });
+  return Boolean(mute);
+}
+
+export async function addLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {
+  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId });
+  if (!stream) throw new Error("Only the host can manage LIVE moderators");
+  const now = new Date();
+  await db.collection("live_moderators").updateOne({ streamId, userId }, { $set: { streamId, userId, createdAt: now } }, { upsert: true });
+  return { streamId, userId, moderator: true };
+}
+
+export async function removeLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {
+  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId });
+  if (!stream) throw new Error("Only the host can manage LIVE moderators");
+  await db.collection("live_moderators").deleteOne({ streamId, userId });
+  return { streamId, userId, moderator: false };
+}
+
+async function canModerateLive(db: Db, streamId: string, userId: string) {
+  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1 } });
+  if (!stream) return false;
+  if (String(stream.hostUserId) === userId) return true;
+  return Boolean(await db.collection("live_moderators").findOne({ streamId, userId }));
+}
+
+export async function setLiveMute(db: Db, streamId: string, moderatorId: string, userId: string, durationSeconds = 300) {
+  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can mute viewers");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + Math.min(86400, Math.max(10, durationSeconds)) * 1000);
+  await db.collection("live_mutes").updateOne({ streamId, userId }, { $set: { streamId, userId, moderatorId, createdAt: now, expiresAt } }, { upsert: true });
+  return { streamId, userId, expiresAt };
+}
+
+export async function setLiveBlock(db: Db, streamId: string, moderatorId: string, userId: string) {
+  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can block viewers");
+  await db.collection("live_blocks").updateOne({ streamId, userId }, { $set: { streamId, userId, moderatorId, createdAt: new Date() } }, { upsert: true });
+  await db.collection("live_viewers").deleteOne({ streamId, userId });
+  return { streamId, userId, blocked: true };
+}
+
+export async function removeLiveBlock(db: Db, streamId: string, moderatorId: string, userId: string) {
+  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can unblock viewers");
+  await db.collection("live_blocks").deleteOne({ streamId, userId });
+  return { streamId, userId, blocked: false };
+}
+
+export async function reportLiveUser(db: Db, streamId: string, reporterId: string, targetUserId: string, reason: string) {
+  const cleanReason = reason.trim().slice(0, 500);
+  if (!cleanReason) throw new Error("A report reason is required");
+  const stream = await db.collection("live_streams").findOne({ streamId });
+  if (!stream) throw new Error("LIVE stream not found");
+  const report = { reportId: new ObjectId().toHexString(), streamId, reporterId, targetUserId, reason: cleanReason, createdAt: new Date() };
+  await db.collection("live_reports").insertOne(report);
+  return report;
+}
+
+export async function refreshLiveViewer(db: Db, streamId: string, userId: string) {
   const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { streamId: 1 } });
   if (!stream) return null;
   const now = new Date();
