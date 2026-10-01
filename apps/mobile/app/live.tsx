@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { AudioSession, LiveKitRoom, Track, VideoTrack, useTracks } from "@livekit/react-native";
+import { AudioSession, LiveKitRoom, VideoTrack, useTracks } from "@livekit/react-native";
+import { Track } from "livekit-client";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 
