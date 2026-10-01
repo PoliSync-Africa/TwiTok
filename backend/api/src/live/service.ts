@@ -10,7 +10,8 @@ export async function initializeLiveIndexes(db: Db) {
     db.collection("live_viewers").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
     db.collection("live_viewers").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("live_comments").createIndex({ streamId: 1, createdAt: -1 }),
-    db.collection("live_reactions").createIndex({ streamId: 1, userId: 1 }, { unique: true })
+    db.collection("live_reactions").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
+    db.collection("live_reactions").createIndex({ streamId: 1, reaction: 1 })
   ]);
 }
 
@@ -40,7 +41,14 @@ export async function setLiveStatus(db: Db, streamId: string, status: "LIVE"|"EN
 
 
 const LIVE_COMMENT_MAX = 300;
-const LIVE_REACTION_TYPES = new Set(["LIKE", "LOVE", "LAUGH", "WOW", "CELEBRATE"]);
+const LIVE_REACTION_MAX_LENGTH = 64;
+
+function normalizeLiveReaction(reaction: string) {
+  const value = reaction.normalize("NFKC").trim();
+  if (!value || value.length > LIVE_REACTION_MAX_LENGTH) throw new Error("Reaction must contain 1-64 characters");
+  if (/[\\u0000-\\u001F\\u007F]/u.test(value)) throw new Error("Reaction contains unsupported control characters");
+  return value;
+}
 
 export async function addLiveComment(db: Db, streamId: string, userId: string, text: string) {
   const clean = text.trim();
@@ -54,8 +62,7 @@ export async function addLiveComment(db: Db, streamId: string, userId: string, t
 }
 
 export async function setLiveReaction(db: Db, streamId: string, userId: string, reaction: string) {
-  const type = reaction.trim().toUpperCase();
-  if (!LIVE_REACTION_TYPES.has(type)) throw new Error("Unsupported LIVE reaction");
+  const type = normalizeLiveReaction(reaction);
   const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { streamId: 1 } });
   if (!stream) return null;
   const now = new Date();
