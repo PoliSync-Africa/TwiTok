@@ -17,7 +17,8 @@ export async function initializeLiveIndexes(db: Db) {
     db.collection("live_mutes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("live_reports").createIndex({ streamId: 1, createdAt: -1 }),
     db.collection("live_gift_events").createIndex({ transactionId: 1 }, { unique: true }),
-    db.collection("live_gift_events").createIndex({ streamId: 1, createdAt: -1 })
+    db.collection("live_gift_events").createIndex({ streamId: 1, createdAt: -1 }),
+    db.collection("live_gift_events").createIndex({ streamId: 1, senderId: 1, createdAt: -1 })
   ]);
 }
 
@@ -85,6 +86,32 @@ export async function setLiveReaction(db: Db, streamId: string, userId: string, 
 export async function removeLiveReaction(db: Db, streamId: string, userId: string) {
   await db.collection("live_reactions").deleteOne({ streamId, userId });
   return { streamId, removed: true };
+}
+
+
+export async function getLiveGiftLeaderboard(db: Db, streamId: string, limit = 20) {
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+  const rows = await db.collection("live_gift_events").aggregate([
+    { $match: { streamId } },
+    {
+      $group: {
+        _id: "$senderId",
+        gifts: { $sum: 1 },
+        quantity: { $sum: "$quantity" },
+        coinsSpent: { $sum: "$coinsSpent" }
+      }
+    },
+    { $sort: { coinsSpent: -1, quantity: -1, _id: 1 } },
+    { $limit: safeLimit }
+  ]).toArray();
+
+  return rows.map((row, index) => ({
+    rank: index + 1,
+    userId: String(row._id),
+    gifts: Number(row.gifts),
+    quantity: Number(row.quantity),
+    coinsSpent: Number(row.coinsSpent)
+  }));
 }
 
 export async function getLiveReactionSummary(db: Db, streamId: string) {
