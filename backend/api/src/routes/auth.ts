@@ -85,18 +85,19 @@ authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res)
       if (new Date() < nextAllowed) return res.status(429).json({ error: "You can change your name again after 28 days", nextNameChangeAt: nextAllowed.toISOString() });
     }
     if (await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } })) return res.status(409).json({ error: "That username is already taken" });
-    await db.collection("users").updateOne(
-      { _id: req.userId! },
-      {
-        $set: {
-          username, nickname, bio, isPrivate, profileSetupComplete: true,
-          ...(nameChanged ? { nameLastChangedAt: new Date() } : {}),
-          ...(nameChanged && current?.isVerified === true ? { isVerified: false, verificationStatus: "REVERIFY_REQUIRED" } : {}),
-          updatedAt: new Date()
-        },
-        ...(nameChanged && current?.isVerified === true ? { $unset: { verifiedAt: "", verifiedBy: "" } } : {})
+    const userUpdate: Record<string, any> = {
+      $set: {
+        username, nickname, bio, isPrivate, profileSetupComplete: true,
+        updatedAt: new Date()
       }
-    );
+    };
+    if (nameChanged) userUpdate.$set.nameLastChangedAt = new Date();
+    if (nameChanged && current?.isVerified === true) {
+      userUpdate.$set.isVerified = false;
+      userUpdate.$set.verificationStatus = "REVERIFY_REQUIRED";
+      userUpdate.$unset = { verifiedAt: "", verifiedBy: "" };
+    }
+    await db.collection("users").updateOne({ _id: req.userId! }, userUpdate);
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     if (!user) return res.status(404).json({ error: "Account not found" });
     res.json({ user });
