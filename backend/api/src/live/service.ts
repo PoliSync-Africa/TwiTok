@@ -40,6 +40,21 @@ export async function createLiveStream(db: Db, input: { streamId:string; hostUse
     status: "SCHEDULED",
     viewerCount: 0,
     giftsUsd: 0,
+    studio: {
+      background: "NONE",
+      backgroundUrl: null,
+      effect: "NONE",
+      beauty: 0,
+      layout: "SOLO",
+      guestLimit: 15,
+      commentsFilterEnabled: true,
+      autoCaptions: true,
+      giftAlerts: true,
+      lowLatency: true,
+      recordingEnabled: false,
+      screenShareEnabled: false,
+      updatedAt: now
+    },
     createdAt: now,
     updatedAt: now
   };
