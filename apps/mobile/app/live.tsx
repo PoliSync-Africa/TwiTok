@@ -18,7 +18,14 @@ const GIFTS: Gift[] = [
   { giftId:"royal_crown",name:"Royal Crown",coins:240,emoji:"👑" }
 ];
 
-function LiveKitVideoSurface() {\n  const tracks = useTracks([Track.Source.Camera]);\n  const camera = tracks.find(t => t.source === Track.Source.Camera);\n  if (!camera) return <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>Connecting to LIVE video…</Text></View>;\n  return <VideoTrack trackRef={camera} style={StyleSheet.absoluteFill} objectFit="cover" />;\n}\n\nexport default function LiveViewerScreen() {
+function LiveKitVideoSurface() {
+  const tracks = useTracks([Track.Source.Camera]);
+  const camera = tracks.find(t => t.source === Track.Source.Camera);
+  if (!camera) return <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>Connecting to LIVE video…</Text></View>;
+  return <VideoTrack trackRef={camera} style={StyleSheet.absoluteFill} objectFit="cover" />;
+}
+
+export default function LiveViewerScreen() {
   const { streamId, mode } = useLocalSearchParams<{ streamId?: string; mode?: string }>();
   const isHost = mode === "host";
   const [manifest, setManifest] = useState<string | null>(null);
