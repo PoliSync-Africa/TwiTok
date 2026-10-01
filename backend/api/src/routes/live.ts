@@ -9,9 +9,98 @@ import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 import { createNotification } from "../social/notifications.js";
 import { AccessToken } from "livekit-server-sdk";
+import { createPresignedUpload, mediaConfigured } from "../media/storage.js";
 
 export const liveRouter = Router();
 const liveActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const LIVE_STUDIO_BACKGROUNDS = new Set(["NONE", "BLUR", "STUDIO", "SUNSET", "CITY", "GOLD", "KENTE", "NIGHT", "CUSTOM"]);
+const LIVE_STUDIO_EFFECTS = new Set(["NONE", "BEAUTY", "VIVID", "WARM", "COOL", "MONO"]);
+const LIVE_STUDIO_LAYOUTS = new Set(["SOLO", "DUO", "TRIO", "GRID", "PANEL", "PIP"]);
+
+async function requireLiveHost(streamId: string, userId: string) {
+  const stream = await (await getDb()).collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1, status: 1 } });
+  if (!stream) return { error: "LIVE stream not found", status: 404 as const };
+  if (String(stream.hostUserId) !== userId) return { error: "Only the LIVE host can change studio settings", status: 403 as const };
+  return { stream };
+}
+
+
+
+
+liveRouter.get("/streams/:streamId/studio", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const streamId = String(req.params.streamId);
+    const host = await requireLiveHost(streamId, req.userId!.toHexString());
+    if ("error" in host) return res.status(host.status).json({ error: host.error });
+    const stream = await (await getDb()).collection("live_streams").findOne({ streamId }, { projection: { studio: 1 } });
+    return res.json({ studio: stream?.studio ?? {
+      background: "NONE", backgroundUrl: null, effect: "NONE", beauty: 0, layout: "SOLO",
+      guestLimit: 15, commentsFilterEnabled: true, autoCaptions: true, giftAlerts: true,
+      lowLatency: true, recordingEnabled: false, screenShareEnabled: false
+    }});
+  } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to load LIVE Studio settings" }); }
+});
+
+liveRouter.patch("/streams/:streamId/studio", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const streamId = String(req.params.streamId);
+    const host = await requireLiveHost(streamId, req.userId!.toHexString());
+    if ("error" in host) return res.status(host.status).json({ error: host.error });
+    const body = req.body ?? {};
+    const update: Record<string, unknown> = { updatedAt: new Date() };
+    if (body.background !== undefined) {
+      const value = String(body.background).toUpperCase();
+      if (!LIVE_STUDIO_BACKGROUNDS.has(value)) return res.status(400).json({ error: "Unsupported LIVE background" });
+      update.background = value;
+    }
+    if (body.backgroundUrl !== undefined) {
+      const value = body.backgroundUrl == null ? null : String(body.backgroundUrl).slice(0, 1000);
+      if (value && !/^https:\/\//i.test(value) && !value.startsWith("live-backgrounds/")) return res.status(400).json({ error: "Invalid LIVE background URL" });
+      update.backgroundUrl = value;
+    }
+    if (body.effect !== undefined) {
+      const value = String(body.effect).toUpperCase();
+      if (!LIVE_STUDIO_EFFECTS.has(value)) return res.status(400).json({ error: "Unsupported LIVE effect" });
+      update.effect = value;
+    }
+    if (body.beauty !== undefined) {
+      const value = Math.min(100, Math.max(0, Number(body.beauty)));
+      if (!Number.isFinite(value)) return res.status(400).json({ error: "Beauty must be 0-100" });
+      update.beauty = Math.round(value);
+    }
+    if (body.layout !== undefined) {
+      const value = String(body.layout).toUpperCase();
+      if (!LIVE_STUDIO_LAYOUTS.has(value)) return res.status(400).json({ error: "Unsupported LIVE layout" });
+      update.layout = value;
+    }
+    if (body.guestLimit !== undefined) {
+      const value = Math.min(15, Math.max(1, Math.floor(Number(body.guestLimit))));
+      if (!Number.isFinite(value)) return res.status(400).json({ error: "Guest limit must be 1-15" });
+      update.guestLimit = value;
+    }
+    for (const key of ["commentsFilterEnabled","autoCaptions","giftAlerts","lowLatency","recordingEnabled","screenShareEnabled"]) {
+      if (body[key] !== undefined) update[key] = body[key] === true;
+    }
+    const db = await getDb();
+    await db.collection("live_streams").updateOne({ streamId }, { $set: { studio: update, updatedAt: new Date() } });
+    const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { studio: 1 } });
+    return res.json({ studio: stream?.studio });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to save LIVE Studio settings" }); }
+});
+
+liveRouter.post("/streams/:streamId/studio/background-upload-url", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const streamId = String(req.params.streamId);
+    const host = await requireLiveHost(streamId, req.userId!.toHexString());
+    if ("error" in host) return res.status(host.status).json({ error: host.error });
+    if (!mediaConfigured()) return res.status(503).json({ error: "Media storage is not configured" });
+    const mimeType = String(req.body?.mimeType ?? "");
+    if (!/^image\/(jpeg|png|webp)$/i.test(mimeType)) return res.status(400).json({ error: "Background must be JPEG, PNG or WebP" });
+    const objectKey = `live-backgrounds/${req.userId!.toHexString()}/${new ObjectId().toHexString()}`;
+    const signed = await createPresignedUpload({ objectKey, mimeType, expiresInSeconds: 900 });
+    return res.status(201).json({ objectKey, uploadUrl: signed.url, expiresInSeconds: signed.expiresInSeconds });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to prepare background upload" }); }
+});
 
 liveRouter.post("/streams", requireUser, liveActionLimit, async (req, res) => {
   try {
