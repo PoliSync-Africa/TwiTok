@@ -99,6 +99,7 @@ export default function LiveHostScreen() {
     {message ? <Text style={styles.message}>{message}</Text> : null}
     {started && <View style={styles.ingest}><Text style={styles.ingestTitle}>Secure ingest ready</Text><Text style={styles.muted}>{ingestUrl || "Connect your configured broadcaster to the ingest endpoint."}</Text><Text style={styles.key}>Stream key: {streamKey ? "••••••••••••" : "secured"}</Text></View>}
     <View style={styles.bottom}>
+      {!started && <Pressable style={styles.studio} disabled={busy} onPress={() => router.push({ pathname: "/live-studio", params: { streamId: String(streamId) } })}><Text style={styles.studioText}>⚙ Advanced LIVE Studio</Text></Pressable>}
       {!started ? <Pressable style={styles.go} disabled={busy} onPress={() => void start()}><Text style={styles.goText}>{busy ? "Starting…" : "Go LIVE"}</Text></Pressable> :
       <Pressable style={styles.stop} disabled={busy} onPress={() => void stop()}><Text style={styles.stopText}>{busy ? "Ending…" : "End LIVE"}</Text></Pressable>}
     </View>
@@ -124,7 +125,9 @@ const styles=StyleSheet.create({
  ingestTitle:{color:"#fff",fontWeight:"900",fontSize:13,textAlign:"center"},
  key:{color:"#fff",fontSize:11,textAlign:"center",marginTop:5},
  bottom:{position:"absolute",left:20,right:20,bottom:32},
- go:{backgroundColor:"#ff2d55",borderRadius:28,paddingVertical:16,alignItems:"center"},
+ studio:{backgroundColor:"rgba(0,0,0,.72)",borderColor:"#444",borderWidth:1,borderRadius:24,paddingVertical:12,alignItems:"center",marginBottom:9},
+  studioText:{color:"#fff",fontSize:12,fontWeight:"900"},
+  go:{backgroundColor:"#ff2d55",borderRadius:28,paddingVertical:16,alignItems:"center"},
  goText:{color:"#fff",fontSize:17,fontWeight:"900"},
  stop:{backgroundColor:"#fff",borderRadius:28,paddingVertical:16,alignItems:"center"},
  stopText:{color:"#000",fontSize:16,fontWeight:"900"},
