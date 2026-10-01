@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { addLiveComment, addLiveModerator, createLiveStream, getLiveReactionSummary, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { sendGift } from "../money/gifts.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
@@ -167,6 +167,23 @@ liveRouter.get("/streams/:streamId/gifts", async (req, res) => {
     ]).toArray();
     return res.json({ gifts, summary: summary[0] ? { gifts: Number(summary[0].gifts), coinsSpent: Number(summary[0].coinsSpent), creatorEarningsUsd: Number(summary[0].creatorEarningsUsd) } : { gifts: 0, coinsSpent: 0, creatorEarningsUsd: 0 } });
   } catch { return res.status(500).json({ error: "Unable to load LIVE gifts" }); }
+});
+
+liveRouter.get("/streams/:streamId/gifts/leaderboard", async (req, res) => {
+  try {
+    const db = await getDb();
+    const streamId = String(req.params.streamId);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 20)));
+    const stream = await db.collection("live_streams").findOne(
+      { streamId, status: { $in: ["LIVE", "ENDED"] } },
+      { projection: { _id: 0, streamId: 1, hostUserId: 1 } }
+    );
+    if (!stream) return res.status(404).json({ error: "LIVE stream not found" });
+    const leaderboard = await getLiveGiftLeaderboard(db, streamId, limit);
+    return res.json({ streamId, leaderboard });
+  } catch {
+    return res.status(500).json({ error: "Unable to load LIVE gift leaderboard" });
+  }
 });
 
 liveRouter.get("/streams/:streamId/reactions", async (req, res) => {
