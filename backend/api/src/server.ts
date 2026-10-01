@@ -30,7 +30,7 @@ import { initializePlaylistIndexes } from "./social/playlists.js";
 import { initializeStoryIndexes } from "./social/stories.js";
 import { rateLimit } from "./security/rate-limit.js";
 import { initializeVerificationIndexes } from "./verification/service.js";
-import { initializeFeedEventQueue, startFeedEventWorker } from "./feed/event-queue.js";
+import { getFeedEventQueueHealth, initializeFeedEventQueue, startFeedEventWorker } from "./feed/event-queue.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -55,6 +55,17 @@ app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
 app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { (req as any).rawBody = Buffer.from(buf); } }));
 
 app.get("/health", (_req, res) => res.json({ service: "twitok-api", status: "ok", platform: "TwiTok", version: "0.6.0" }));
+app.get("/health/feed-events", async (_req, res) => {
+  if (!process.env.MONGODB_URI) return res.status(503).json({ service: "feed-events", status: "unavailable" });
+  try {
+    const db = await getDb();
+    const queue = await getFeedEventQueueHealth(db);
+    const status = queue.failed > 0 || queue.queueLagSeconds > 60 ? "degraded" : "ok";
+    return res.status(status === "ok" ? 200 : 503).json({ service: "feed-events", status, queue });
+  } catch {
+    return res.status(503).json({ service: "feed-events", status: "unavailable" });
+  }
+});
 app.use("/api/v1", apiRouter);
 
 async function start() {
