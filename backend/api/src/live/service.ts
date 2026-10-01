@@ -11,7 +11,11 @@ export async function initializeLiveIndexes(db: Db) {
     db.collection("live_viewers").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("live_comments").createIndex({ streamId: 1, createdAt: -1 }),
     db.collection("live_reactions").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
-    db.collection("live_reactions").createIndex({ streamId: 1, reaction: 1 })
+    db.collection("live_reactions").createIndex({ streamId: 1, reaction: 1 }),
+    db.collection("live_blocks").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
+    db.collection("live_mutes").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
+    db.collection("live_mutes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("live_reports").createIndex({ streamId: 1, createdAt: -1 })
   ]);
 }
 
@@ -54,6 +58,7 @@ export async function addLiveComment(db: Db, streamId: string, userId: string, t
   const clean = text.trim();
   if (!clean || clean.length > LIVE_COMMENT_MAX) throw new Error("Comment must contain 1-300 characters");
   const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { streamId: 1 } });
+  if (stream && await isLiveRestricted(db, streamId, userId)) throw new Error("You are restricted from interacting in this LIVE");
   if (!stream) return null;
   const now = new Date();
   const comment = { commentId: new ObjectId().toHexString(), streamId, userId, text: clean, createdAt: now };
@@ -65,6 +70,7 @@ export async function setLiveReaction(db: Db, streamId: string, userId: string, 
   const type = normalizeLiveReaction(reaction);
   const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { streamId: 1 } });
   if (!stream) return null;
+  if (await isLiveRestricted(db, streamId, userId)) throw new Error("You are restricted from interacting in this LIVE");
   const now = new Date();
   await db.collection("live_reactions").updateOne(
     { streamId, userId },
@@ -79,7 +85,7 @@ export async function removeLiveReaction(db: Db, streamId: string, userId: strin
   return { streamId, removed: true };
 }
 
-export async function refreshLiveViewer(db: Db, streamId: string, userId: string) {
+async function isLiveRestricted(db: Db, streamId: string, userId: string) {\n  const blocked = await db.collection("live_blocks").findOne({ streamId, userId });\n  if (blocked) return true;\n  const mute = await db.collection("live_mutes").findOne({ streamId, userId, expiresAt: { $gt: new Date() } });\n  return Boolean(mute);\n}\n\nexport async function addLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {\n  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId });\n  if (!stream) throw new Error("Only the host can manage LIVE moderators");\n  const now = new Date();\n  await db.collection("live_moderators").updateOne({ streamId, userId }, { $set: { streamId, userId, createdAt: now } }, { upsert: true });\n  return { streamId, userId, moderator: true };\n}\n\nexport async function removeLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {\n  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId });\n  if (!stream) throw new Error("Only the host can manage LIVE moderators");\n  await db.collection("live_moderators").deleteOne({ streamId, userId });\n  return { streamId, userId, moderator: false };\n}\n\nasync function canModerateLive(db: Db, streamId: string, userId: string) {\n  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1 } });\n  if (!stream) return false;\n  if (String(stream.hostUserId) === userId) return true;\n  return Boolean(await db.collection("live_moderators").findOne({ streamId, userId }));\n}\n\nexport async function setLiveMute(db: Db, streamId: string, moderatorId: string, userId: string, durationSeconds = 300) {\n  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can mute viewers");\n  const now = new Date();\n  const expiresAt = new Date(now.getTime() + Math.min(86400, Math.max(10, durationSeconds)) * 1000);\n  await db.collection("live_mutes").updateOne({ streamId, userId }, { $set: { streamId, userId, moderatorId, createdAt: now, expiresAt } }, { upsert: true });\n  return { streamId, userId, expiresAt };\n}\n\nexport async function setLiveBlock(db: Db, streamId: string, moderatorId: string, userId: string) {\n  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can block viewers");\n  await db.collection("live_blocks").updateOne({ streamId, userId }, { $set: { streamId, userId, moderatorId, createdAt: new Date() } }, { upsert: true });\n  await db.collection("live_viewers").deleteOne({ streamId, userId });\n  return { streamId, userId, blocked: true };\n}\n\nexport async function removeLiveBlock(db: Db, streamId: string, moderatorId: string, userId: string) {\n  if (!(await canModerateLive(db, streamId, moderatorId))) throw new Error("Only the host or a moderator can unblock viewers");\n  await db.collection("live_blocks").deleteOne({ streamId, userId });\n  return { streamId, userId, blocked: false };\n}\n\nexport async function reportLiveUser(db: Db, streamId: string, reporterId: string, targetUserId: string, reason: string) {\n  const cleanReason = reason.trim().slice(0, 500);\n  if (!cleanReason) throw new Error("A report reason is required");\n  const stream = await db.collection("live_streams").findOne({ streamId });\n  if (!stream) throw new Error("LIVE stream not found");\n  const report = { reportId: new ObjectId().toHexString(), streamId, reporterId, targetUserId, reason: cleanReason, createdAt: new Date() };\n  await db.collection("live_reports").insertOne(report);\n  return report;\n}\n\nexport async function refreshLiveViewer(db: Db, streamId: string, userId: string) {
   const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { streamId: 1 } });
   if (!stream) return null;
   const now = new Date();
