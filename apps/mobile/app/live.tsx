@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { AudioSession, LiveKitRoom, VideoTrack, useTracks } from "@livekit/react-native";
+import { AudioSession, LiveKitRoom, VideoTrack, useTracks, isTrackReference } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -19,10 +19,14 @@ const GIFTS: Gift[] = [
 ];
 
 function LiveKitVideoSurface() {
-  const tracks = useTracks([Track.Source.Camera]);
-  const camera = tracks.find(t => t.source === Track.Source.Camera);
-  if (!camera) return <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>Connecting to LIVE video…</Text></View>;
-  return <VideoTrack trackRef={camera} style={StyleSheet.absoluteFill} objectFit="cover" />;
+  const tracks = useTracks([Track.Source.Camera]).filter(isTrackReference).slice(0, 16);
+  if (!tracks.length) return <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>Connecting to LIVE video…</Text></View>;
+  return <View style={styles.trackGrid}>
+    {tracks.map((trackRef, index) => <View key={trackRef.publication.trackSid ?? trackRef.participant.identity + "-" + index} style={tracks.length === 1 ? styles.trackSolo : styles.trackTile}>
+      <VideoTrack trackRef={trackRef} style={StyleSheet.absoluteFill} objectFit="cover" />
+      {tracks.length > 1 && <View style={styles.participantBadge}><Text style={styles.participantBadgeText}>{trackRef.participant.name || trackRef.participant.identity.slice(-6)}</Text></View>}
+    </View>)}
+  </View>;
 }
 
 export default function LiveViewerScreen() {
@@ -226,6 +230,11 @@ export default function LiveViewerScreen() {
 const styles=StyleSheet.create({
  root:{flex:1,backgroundColor:"#000"},
  center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:25},
+ trackGrid:{flex:1,flexDirection:"row",flexWrap:"wrap",backgroundColor:"#000"},
+ trackSolo:{flex:1,backgroundColor:"#000",overflow:"hidden"},
+ trackTile:{width:"50%",height:"50%",backgroundColor:"#111",overflow:"hidden",borderWidth:1,borderColor:"#222"},
+ participantBadge:{position:"absolute",left:7,bottom:7,backgroundColor:"rgba(0,0,0,.65)",paddingHorizontal:8,paddingVertical:4,borderRadius:10},
+ participantBadgeText:{color:"#fff",fontSize:9,fontWeight:"900"},
  message:{color:"#aaa",fontSize:13,marginTop:12,textAlign:"center"},
  error:{color:"#fff",fontSize:16,fontWeight:"800"},
  top:{position:"absolute",top:48,left:12,right:12,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},
