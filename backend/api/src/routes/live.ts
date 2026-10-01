@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { addLiveComment, createLiveStream, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { addLiveComment, createLiveStream, getLiveReactionSummary, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 
@@ -95,7 +95,7 @@ liveRouter.post("/streams/:streamId/reaction", requireUser, liveActionLimit, asy
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send LIVE reaction" }); }
 });
 
-liveRouter.delete("/streams/:streamId/reaction", requireUser, liveActionLimit, async (req, res) => {
+liveRouter.get("/streams/:streamId/reactions", async (req, res) => {\n  try {\n    const reactions = await getLiveReactionSummary(await getDb(), String(req.params.streamId));\n    return res.json({ reactions });\n  } catch { return res.status(500).json({ error: "Unable to load LIVE reactions" }); }\n});\n\nliveRouter.delete("/streams/:streamId/reaction", requireUser, liveActionLimit, async (req, res) => {
   try { return res.json(await removeLiveReaction(await getDb(), String(req.params.streamId), req.userId!.toHexString())); }
   catch { return res.status(400).json({ error: "Unable to remove LIVE reaction" }); }
 });
