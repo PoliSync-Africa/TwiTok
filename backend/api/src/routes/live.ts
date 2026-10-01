@@ -31,7 +31,7 @@ liveRouter.get("/streams/:streamId/studio", requireUser, liveActionLimit, async 
   try {
     const streamId = String(req.params.streamId);
     const host = await requireLiveHost(streamId, req.userId!.toHexString());
-    if ("error" in host) return res.status(host.status).json({ error: host.error });
+    if ("error" in host) return res.status(Number(host.status ?? 403)).json({ error: host.error });
     const stream = await (await getDb()).collection("live_streams").findOne({ streamId }, { projection: { studio: 1 } });
     return res.json({ studio: stream?.studio ?? {
       background: "NONE", backgroundUrl: null, effect: "NONE", beauty: 0, layout: "SOLO",
@@ -45,7 +45,7 @@ liveRouter.patch("/streams/:streamId/studio", requireUser, liveActionLimit, asyn
   try {
     const streamId = String(req.params.streamId);
     const host = await requireLiveHost(streamId, req.userId!.toHexString());
-    if ("error" in host) return res.status(host.status).json({ error: host.error });
+    if ("error" in host) return res.status(Number(host.status ?? 403)).json({ error: host.error });
     const body = req.body ?? {};
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (body.background !== undefined) {
@@ -93,7 +93,7 @@ liveRouter.post("/streams/:streamId/studio/background-upload-url", requireUser, 
   try {
     const streamId = String(req.params.streamId);
     const host = await requireLiveHost(streamId, req.userId!.toHexString());
-    if ("error" in host) return res.status(host.status).json({ error: host.error });
+    if ("error" in host) return res.status(Number(host.status ?? 403)).json({ error: host.error });
     if (!mediaConfigured()) return res.status(503).json({ error: "Media storage is not configured" });
     const mimeType = String(req.body?.mimeType ?? "");
     if (!/^image\/(jpeg|png|webp)$/i.test(mimeType)) return res.status(400).json({ error: "Background must be JPEG, PNG or WebP" });
