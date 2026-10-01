@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { createLiveStream, leaveLiveViewer, refreshLiveViewer, setLiveStatus } from "../live/service.js";
+import { addLiveComment, createLiveStream, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 
@@ -65,4 +65,37 @@ liveRouter.delete("/streams/:streamId/viewer", requireUser, liveActionLimit, asy
   try {
     return res.json(await leaveLiveViewer(await getDb(), String(req.params.streamId), req.userId!.toHexString()));
   } catch { return res.status(400).json({ error: "Unable to leave LIVE stream" }); }
+});
+
+
+liveRouter.get("/streams/:streamId/comments", async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const comments = await (await getDb()).collection("live_comments").find(
+      { streamId: String(req.params.streamId) },
+      { projection: { _id: 0, commentId: 1, streamId: 1, userId: 1, text: 1, createdAt: 1 } }
+    ).sort({ createdAt: -1 }).limit(limit).toArray();
+    return res.json({ comments: comments.reverse() });
+  } catch { return res.status(500).json({ error: "Unable to load LIVE comments" }); }
+});
+
+liveRouter.post("/streams/:streamId/comments", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const comment = await addLiveComment(await getDb(), String(req.params.streamId), req.userId!.toHexString(), String(req.body?.text ?? ""));
+    if (!comment) return res.status(404).json({ error: "LIVE stream is not active" });
+    return res.status(201).json({ comment });
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to post LIVE comment" }); }
+});
+
+liveRouter.post("/streams/:streamId/reaction", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const reaction = await setLiveReaction(await getDb(), String(req.params.streamId), req.userId!.toHexString(), String(req.body?.reaction ?? ""));
+    if (!reaction) return res.status(404).json({ error: "LIVE stream is not active" });
+    return res.json(reaction);
+  } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send LIVE reaction" }); }
+});
+
+liveRouter.delete("/streams/:streamId/reaction", requireUser, liveActionLimit, async (req, res) => {
+  try { return res.json(await removeLiveReaction(await getDb(), String(req.params.streamId), req.userId!.toHexString())); }
+  catch { return res.status(400).json({ error: "Unable to remove LIVE reaction" }); }
 });
