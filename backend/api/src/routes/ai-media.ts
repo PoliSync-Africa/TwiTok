@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
 import { Router } from "express";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { requireUser } from "../auth/middleware.js";
 import { getDb } from "../db/mongo.js";
 import { createPresignedPlayback } from "../media/storage.js";
 import { rateLimit } from "../security/rate-limit.js";
 
 export const aiMediaRouter = Router();
+const routeRateLimit = expressRateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+aiMediaRouter.use(routeRateLimit);
 
 function portraitRequested(prompt: string) { return /portrait|skin|face|headshot|outfit|beauty/i.test(prompt); }
 
