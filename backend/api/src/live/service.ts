@@ -1,4 +1,4 @@
-import type { Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 export async function initializeLiveIndexes(db: Db) {
   await Promise.all([
