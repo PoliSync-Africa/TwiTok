@@ -7,6 +7,8 @@ export async function initializeLiveIndexes(db: Db) {
     db.collection("live_streams").createIndex({ status: 1, startedAt: -1 }),
     db.collection("live_events").createIndex({ streamId: 1, createdAt: -1 }),
     db.collection("live_moderators").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
+    db.collection("live_guests").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
+    db.collection("live_guests").createIndex({ streamId: 1, status: 1, updatedAt: -1 }),
     db.collection("live_viewers").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
     db.collection("live_viewers").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("live_comments").createIndex({ streamId: 1, createdAt: -1 }),
@@ -128,6 +130,80 @@ async function isLiveRestricted(db: Db, streamId: string, userId: string) {
   if (blocked) return true;
   const mute = await db.collection("live_mutes").findOne({ streamId, userId, expiresAt: { $gt: new Date() } });
   return Boolean(mute);
+}
+
+
+const LIVE_GUEST_MAX = 3;
+
+async function getLiveGuestState(db: Db, streamId: string, userId: string) {
+  return db.collection("live_guests").findOne({ streamId, userId });
+}
+
+export async function inviteLiveGuest(db: Db, streamId: string, hostUserId: string, userId: string) {
+  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId, status: "LIVE" }, { projection: { streamId: 1 } });
+  if (!stream) throw new Error("Only the host can invite guests to an active LIVE");
+  if (!userId || userId === hostUserId) throw new Error("A valid guest user is required");
+  if (await isLiveRestricted(db, streamId, userId)) throw new Error("This user is restricted from joining the LIVE");
+  const activeCount = await db.collection("live_guests").countDocuments({ streamId, status: "ACTIVE" });
+  const existing = await getLiveGuestState(db, streamId, userId);
+  if (existing?.status === "ACTIVE") return existing;
+  if (activeCount >= LIVE_GUEST_MAX) throw new Error("This LIVE already has the maximum number of guests");
+  const now = new Date();
+  const guest = {
+    streamId,
+    userId,
+    hostUserId,
+    status: "INVITED" as const,
+    invitedAt: now,
+    updatedAt: now
+  };
+  await db.collection("live_guests").updateOne(
+    { streamId, userId },
+    { $set: guest, $unset: { respondedAt: "", joinedAt: "", leftAt: "" } },
+    { upsert: true }
+  );
+  return guest;
+}
+
+export async function respondLiveGuestInvite(db: Db, streamId: string, userId: string, response: "ACCEPT" | "DECLINE") {
+  const invite = await getLiveGuestState(db, streamId, userId);
+  if (!invite || invite.status !== "INVITED") throw new Error("LIVE guest invitation not found");
+  const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { streamId: 1 } });
+  if (!stream) throw new Error("LIVE stream is no longer active");
+  const now = new Date();
+  if (response === "DECLINE") {
+    await db.collection("live_guests").updateOne(
+      { streamId, userId, status: "INVITED" },
+      { $set: { status: "DECLINED", respondedAt: now, updatedAt: now } }
+    );
+    return { streamId, userId, status: "DECLINED" };
+  }
+  if (await isLiveRestricted(db, streamId, userId)) throw new Error("You are restricted from joining this LIVE");
+  const activeCount = await db.collection("live_guests").countDocuments({ streamId, status: "ACTIVE" });
+  if (activeCount >= LIVE_GUEST_MAX) throw new Error("The LIVE guest slots are full");
+  await db.collection("live_guests").updateOne(
+    { streamId, userId, status: "INVITED" },
+    { $set: { status: "ACTIVE", respondedAt: now, joinedAt: now, updatedAt: now } }
+  );
+  return { streamId, userId, status: "ACTIVE" };
+}
+
+export async function removeLiveGuest(db: Db, streamId: string, actorUserId: string, userId: string) {
+  const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1, status: 1 } });
+  if (!stream) throw new Error("LIVE stream not found");
+  if (String(stream.hostUserId) !== actorUserId && actorUserId !== userId) throw new Error("Only the host or guest can leave this LIVE guest session");
+  await db.collection("live_guests").updateOne(
+    { streamId, userId, status: "ACTIVE" },
+    { $set: { status: "REMOVED", leftAt: new Date(), updatedAt: new Date() } }
+  );
+  return { streamId, userId, status: "REMOVED" };
+}
+
+export async function listLiveGuests(db: Db, streamId: string) {
+  return db.collection("live_guests").find(
+    { streamId, status: { $in: ["INVITED", "ACTIVE"] } },
+    { projection: { _id: 0, streamId: 1, userId: 1, hostUserId: 1, status: 1, invitedAt: 1, respondedAt: 1, joinedAt: 1, updatedAt: 1 } }
+  ).sort({ status: 1, updatedAt: -1 }).limit(LIVE_GUEST_MAX + 10).toArray();
 }
 
 export async function addLiveModerator(db: Db, streamId: string, hostUserId: string, userId: string) {
