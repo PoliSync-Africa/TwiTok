@@ -60,7 +60,7 @@ export default function LiveViewerScreen() {
   }, [streamId]);
 
   useEffect(() => {
-    if (!streamId || !manifest || isHost) return;
+    if (!streamId || !manifest) return;
     let alive = true;
     const tokenPromise = getAuthToken();
     const refresh = async () => {
@@ -84,7 +84,7 @@ export default function LiveViewerScreen() {
     void refresh();
     const timer = setInterval(refresh, 4000);
     return () => { alive = false; clearInterval(timer); };
-  }, [streamId, manifest, isHost]);
+  }, [streamId, manifest]);
 
   useEffect(() => {
     if (!streamId || !manifest || isHost) return;
