@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ObjectId } from "mongodb";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, removeLiveGuest as leaveLiveGuest, leaveLiveViewer, respondLiveGuestInvite, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
@@ -6,6 +7,7 @@ import { sendGift } from "../money/gifts.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
+import { createNotification } from "../social/notifications.js";
 
 export const liveRouter = Router();
 const liveActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
@@ -222,6 +224,9 @@ liveRouter.post("/streams/:streamId/guests/invite", requireUser, liveActionLimit
     const db = await getDb();
     const guest = await inviteLiveGuest(db, streamId, req.userId!.toHexString(), userId);
     broadcastToUser(userId, { type: "live.guest.invited", streamId, hostUserId: req.userId!.toHexString() });
+    if (ObjectId.isValid(userId)) {
+      await createNotification(db, { recipientId: new ObjectId(userId), actorId: req.userId!, type: "LIVE_GUEST_INVITE", streamId, metadata: { role: "guest" } });
+    }
     return res.status(201).json({ guest });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to invite LIVE guest" });
@@ -235,7 +240,12 @@ liveRouter.post("/streams/:streamId/guests/respond", requireUser, liveActionLimi
     const db = await getDb();
     const result = await respondLiveGuestInvite(db, String(req.params.streamId), req.userId!.toHexString(), response);
     const invite = await db.collection("live_guests").findOne({ streamId: String(req.params.streamId), userId: req.userId!.toHexString() }, { projection: { hostUserId: 1 } });
-    if (invite?.hostUserId) broadcastToUser(String(invite.hostUserId), { type: "live.guest.response", streamId: String(req.params.streamId), userId: req.userId!.toHexString(), status: result.status });
+    if (invite?.hostUserId) {
+      broadcastToUser(String(invite.hostUserId), { type: "live.guest.response", streamId: String(req.params.streamId), userId: req.userId!.toHexString(), status: result.status });
+      if (ObjectId.isValid(String(invite.hostUserId))) {
+        await createNotification(db, { recipientId: new ObjectId(String(invite.hostUserId)), actorId: req.userId!, type: "LIVE_GUEST_RESPONSE", streamId: String(req.params.streamId), metadata: { status: result.status } });
+      }
+    }
     return res.json(result);
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to respond to LIVE guest invitation" });
