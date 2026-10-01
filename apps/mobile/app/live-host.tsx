@@ -106,7 +106,7 @@ export default function LiveHostScreen() {
 
 const styles=StyleSheet.create({
  root:{flex:1,backgroundColor:"#000"},
- scrim:{...StyleSheet.absoluteFillObject,backgroundColor:"rgba(0,0,0,.18)"},
+ scrim:{...StyleSheet.absoluteFill,backgroundColor:"rgba(0,0,0,.18)"},
  center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:25},
  title:{color:"#fff",fontSize:20,fontWeight:"900",textAlign:"center"},
  error:{color:"#fff",fontSize:16,fontWeight:"800"},
