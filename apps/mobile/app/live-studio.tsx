@@ -170,6 +170,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 const styles = StyleSheet.create({
   root:{flex:1,backgroundColor:"#070707"}, center:{flex:1,backgroundColor:"#070707",alignItems:"center",justifyContent:"center",padding:24},
   header:{paddingTop:54,paddingHorizontal:16,paddingBottom:12,flexDirection:"row",alignItems:"center",gap:12,borderBottomWidth:1,borderBottomColor:"#202020"},
+  title:{color:"#fff",fontSize:20,fontWeight:"900",textAlign:"center"},
   back:{color:"#fff",fontSize:36,lineHeight:36},headerTitle:{color:"#fff",fontSize:20,fontWeight:"900"},headerSub:{color:"#888",fontSize:11,marginTop:2},liveDot:{color:"#ff2d55",fontSize:18,marginLeft:"auto"},
   content:{padding:14,paddingBottom:35},hero:{height:310,borderRadius:22,overflow:"hidden",backgroundColor:"#171717",borderWidth:1,borderColor:"#2b2b2b",marginBottom:16},
   sceneFill:{flex:1,alignItems:"center",justifyContent:"center",backgroundColor:"#1c1c2c"},sceneIcon:{fontSize:48},sceneTitle:{color:"#fff",fontSize:19,fontWeight:"900",marginTop:8},
