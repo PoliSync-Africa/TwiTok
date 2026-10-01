@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 
 export async function initializeLiveIndexes(db: Db) {
@@ -5,6 +6,8 @@ export async function initializeLiveIndexes(db: Db) {
     db.collection("live_streams").createIndex({ streamId: 1 }, { unique: true }),
     db.collection("live_streams").createIndex({ hostUserId: 1, createdAt: -1 }),
     db.collection("live_streams").createIndex({ status: 1, startedAt: -1 }),
+    db.collection("live_ingest_sessions").createIndex({ streamId: 1 }, { unique: true }),
+    db.collection("live_ingest_sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("live_events").createIndex({ streamId: 1, createdAt: -1 }),
     db.collection("live_moderators").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
     db.collection("live_guests").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
@@ -36,6 +39,41 @@ export async function createLiveStream(db: Db, input: { streamId:string; hostUse
   };
   await db.collection("live_streams").insertOne(stream);
   return stream;
+}
+
+
+function hashLiveSecret(secret: string) {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
+export async function createLiveIngestSession(db: Db, streamId: string, hostUserId: string) {
+  const stream = await db.collection("live_streams").findOne({ streamId, hostUserId, status: { $in: ["SCHEDULED", "LIVE"] } });
+  if (!stream) throw new Error("Only the LIVE host can create an ingest session");
+  const ingestSecret = randomBytes(32).toString("base64url");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  await db.collection("live_ingest_sessions").updateOne(
+    { streamId },
+    { $set: { streamId, hostUserId, secretHash: hashLiveSecret(ingestSecret), status: "ACTIVE", createdAt: now, updatedAt: now, expiresAt } },
+    { upsert: true }
+  );
+  const ingestBase = process.env.TWITOK_LIVE_INGEST_URL?.replace(/\/$/, "") || "";
+  const playbackBase = process.env.TWITOK_LIVE_PLAYBACK_URL?.replace(/\/$/, "") || "";
+  return {
+    streamId,
+    ingestUrl: ingestBase ? ingestBase + "/" + streamId : null,
+    streamKey: ingestSecret,
+    playbackUrl: playbackBase ? playbackBase + "/" + streamId + "/index.m3u8" : null,
+    expiresAt
+  };
+}
+
+export async function revokeLiveIngestSession(db: Db, streamId: string, hostUserId: string) {
+  const result = await db.collection("live_ingest_sessions").updateOne(
+    { streamId, hostUserId, status: "ACTIVE" },
+    { $set: { status: "REVOKED", updatedAt: new Date() } }
+  );
+  return { revoked: result.modifiedCount > 0 };
 }
 
 export async function setLiveStatus(db: Db, streamId: string, status: "LIVE"|"ENDED"|"SUSPENDED") {
