@@ -2,6 +2,8 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { addLiveComment, addLiveModerator, createLiveStream, getLiveReactionSummary, leaveLiveViewer, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { sendGift } from "../money/gifts.js";
+import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 
@@ -93,6 +95,77 @@ liveRouter.post("/streams/:streamId/reaction", requireUser, liveActionLimit, asy
     if (!reaction) return res.status(404).json({ error: "LIVE stream is not active" });
     return res.json(reaction);
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send LIVE reaction" }); }
+});
+
+liveRouter.post("/streams/:streamId/gifts", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const db = await getDb();
+    const streamId = String(req.params.streamId);
+    const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { hostUserId: 1 } });
+    if (!stream) return res.status(404).json({ error: "LIVE stream is not active" });
+    const receiverId = String(stream.hostUserId);
+    const giftId = String(req.body?.giftId ?? "").trim();
+    const quantity = Number(req.body?.quantity ?? 1);
+    const idempotencyKey = String(req.header("Idempotency-Key") ?? "").trim();
+    if (!giftId || !idempotencyKey) return res.status(400).json({ error: "giftId and Idempotency-Key are required" });
+
+    const result = await sendGift(db, {
+      senderId: req.userId!.toHexString(),
+      receiverId,
+      giftId,
+      quantity,
+      context: "LIVE"
+    });
+
+    if (!result.duplicate) {
+      const now = new Date();
+      await db.collection("live_streams").updateOne(
+        { streamId, status: "LIVE" },
+        { $inc: { giftsUsd: Number(result.creatorEarningsUsd ?? 0) }, $set: { updatedAt: now } }
+      );
+      await db.collection("live_gift_events").insertOne({
+        transactionId: result.transactionId,
+        streamId,
+        senderId: req.userId!.toHexString(),
+        receiverId,
+        giftId,
+        quantity: result.quantity,
+        coinsSpent: result.coinsSpent,
+        creatorEarningsUsd: result.creatorEarningsUsd,
+        createdAt: now
+      });
+      broadcastToUser(receiverId, {
+        type: "live.gift.received",
+        streamId,
+        transactionId: result.transactionId,
+        giftId,
+        quantity: result.quantity,
+        coinsSpent: result.coinsSpent,
+        animation: result.gift?.animation ?? giftId
+      });
+    }
+
+    return res.status(201).json({ ...result, streamId });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE Gift failed" });
+  }
+});
+
+liveRouter.get("/streams/:streamId/gifts", async (req, res) => {
+  try {
+    const db = await getDb();
+    const streamId = String(req.params.streamId);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const gifts = await db.collection("live_gift_events").find(
+      { streamId },
+      { projection: { _id: 0, transactionId: 1, senderId: 1, receiverId: 1, giftId: 1, quantity: 1, coinsSpent: 1, creatorEarningsUsd: 1, createdAt: 1 } }
+    ).sort({ createdAt: -1 }).limit(limit).toArray();
+    const summary = await db.collection("live_gift_events").aggregate([
+      { $match: { streamId } },
+      { $group: { _id: null, gifts: { $sum: 1 }, coinsSpent: { $sum: "$coinsSpent" }, creatorEarningsUsd: { $sum: "$creatorEarningsUsd" } } }
+    ]).toArray();
+    return res.json({ gifts, summary: summary[0] ? { gifts: Number(summary[0].gifts), coinsSpent: Number(summary[0].coinsSpent), creatorEarningsUsd: Number(summary[0].creatorEarningsUsd) } : { gifts: 0, coinsSpent: 0, creatorEarningsUsd: 0 } });
+  } catch { return res.status(500).json({ error: "Unable to load LIVE gifts" }); }
 });
 
 liveRouter.get("/streams/:streamId/reactions", async (req, res) => {
