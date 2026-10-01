@@ -57,6 +57,7 @@ export default function LiveHostScreen() {
       setStreamKey(String(idata.streamKey));
       setIngestUrl(idata.ingestUrl ? String(idata.ingestUrl) : null);
       setStarted(true);
+      router.replace({ pathname: "/live", params: { streamId: String(streamId), mode: "host" } });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Unable to start LIVE.");
     } finally { setBusy(false); }
