@@ -119,9 +119,12 @@ export default function LiveViewerScreen() {
     void heartbeat(); timer = setInterval(heartbeat, 30000);
     return () => {
       if (timer) clearInterval(timer);
-      void getAuthToken().then(token => token && fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/viewer", {
-        method: "DELETE", headers: { Authorization: "Bearer " + token }
-      })).catch(() => {});
+      void getAuthToken().then(token => {
+        if (!token) return null;
+        return fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/viewer", {
+          method: "DELETE", headers: { Authorization: "Bearer " + token }
+        });
+      }).catch(() => {});
     };
   }, [streamId, manifest, isHost]);
 
