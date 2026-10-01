@@ -41,7 +41,8 @@
           "microphonePermission": "Allow TwiTok to record audio with your videos.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "@livekit/react-native-expo-plugin"
     ]
   }
 }
