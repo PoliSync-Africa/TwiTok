@@ -137,7 +137,9 @@ export default function LiveViewerScreen() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not send reaction");
-      setReactionSummary(data.summary ?? (old => old));
+      const summaryResponse = await fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/reactions");
+      const summaryData = await summaryResponse.json().catch(() => ({}));
+      if (summaryResponse.ok) setReactionSummary(summaryData.reactions ?? {});
     } catch (e) { Alert.alert("LIVE reaction", e instanceof Error ? e.message : "Could not send reaction."); }
   }
 
