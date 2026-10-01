@@ -22,6 +22,12 @@ services:
         sync: false
       - key: TRUST_PROXY
         value: "true"
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
 
   - type: worker
     name: twitok-feed-events
