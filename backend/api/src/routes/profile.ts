@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
@@ -8,6 +9,8 @@ import { createPresignedPlayback, createPresignedUpload, mediaConfigured } from 
 import { rateLimit } from "../security/rate-limit.js";
 
 export const profileRouter = Router();
+const routeRateLimit = expressRateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+profileRouter.use(routeRateLimit);
 
 profileRouter.patch("/me", rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
