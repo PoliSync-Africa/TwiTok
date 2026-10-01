@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { AudioSession, LiveKitRoom, Track, VideoTrack, useTracks } from "@livekit/react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
 
@@ -16,10 +17,13 @@ const GIFTS: Gift[] = [
   { giftId:"royal_crown",name:"Royal Crown",coins:240,emoji:"👑" }
 ];
 
-export default function LiveViewerScreen() {
+function LiveKitVideoSurface() {\n  const tracks = useTracks([Track.Source.Camera]);\n  const camera = tracks.find(t => t.source === Track.Source.Camera);\n  if (!camera) return <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>Connecting to LIVE video…</Text></View>;\n  return <VideoTrack trackRef={camera} style={StyleSheet.absoluteFill} objectFit="cover" />;\n}\n\nexport default function LiveViewerScreen() {
   const { streamId, mode } = useLocalSearchParams<{ streamId?: string; mode?: string }>();
   const isHost = mode === "host";
   const [manifest, setManifest] = useState<string | null>(null);
+  const [liveKitToken, setLiveKitToken] = useState<string | null>(null);
+  const [liveKitUrl, setLiveKitUrl] = useState<string | null>(null);
+  const [canPublish, setCanPublish] = useState(false);
   const [status, setStatus] = useState<"loading"|"live"|"waiting"|"error">("loading");
   const [message, setMessage] = useState("");
   const [viewerCount, setViewerCount] = useState(0);
@@ -49,7 +53,15 @@ export default function LiveViewerScreen() {
         const pd = await playback.json().catch(() => ({}));
         if (!alive) return;
         if (!playback.ok) { setStatus("waiting"); setMessage(pd.error || "Waiting for LIVE playback…"); return; }
-        setManifest(String(pd.manifestUrl)); setStatus("live"); setMessage("");
+        setManifest(String(pd.manifestUrl));
+        const room = await fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/room-token", { headers });
+        const roomData = await room.json().catch(() => ({}));
+        if (room.ok && roomData.participantToken && roomData.serverUrl) {
+          setLiveKitToken(String(roomData.participantToken));
+          setLiveKitUrl(String(roomData.serverUrl));
+          setCanPublish(Boolean(roomData.canPublish));
+        }
+        setStatus("live"); setMessage("");
       } catch (e) {
         if (alive) { setStatus("error"); setMessage(e instanceof Error ? e.message : "Unable to load LIVE"); }
       }
@@ -106,6 +118,12 @@ export default function LiveViewerScreen() {
   }, [streamId, manifest, isHost]);
 
   const player = useVideoPlayer(manifest, p => { p.loop = false; p.play(); });
+
+  useEffect(() => {
+    if (!liveKitToken) return;
+    void AudioSession.startAudioSession();
+    return () => { void AudioSession.stopAudioSession(); };
+  }, [liveKitToken]);
 
   async function postComment() {
     const text = commentText.trim();
@@ -165,7 +183,7 @@ export default function LiveViewerScreen() {
   if (!streamId) return <View style={styles.center}><Text style={styles.error}>LIVE session not found.</Text></View>;
 
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-    {manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
+    {liveKitToken && liveKitUrl && status === "live" ? <LiveKitRoom serverUrl={liveKitUrl} token={liveKitToken} connect={true} audio={canPublish} video={canPublish} options={{ adaptiveStream: true, dynacast: true }}><LiveKitVideoSurface /></LiveKitRoom> : manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
     <View style={styles.top}>
       <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
       <View><Text style={styles.live}>● LIVE</Text><Text style={styles.viewers}>{viewerCount.toLocaleString()} viewers</Text></View>
