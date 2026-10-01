@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { addLiveComment, addLiveModerator, createLiveStream, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, removeLiveGuest as leaveLiveGuest, leaveLiveViewer, respondLiveGuestInvite, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { addLiveComment, addLiveModerator, createLiveStream, createLiveIngestSession, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, removeLiveGuest as leaveLiveGuest, leaveLiveViewer, respondLiveGuestInvite, revokeLiveIngestSession, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { sendGift } from "../money/gifts.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
@@ -20,6 +20,25 @@ liveRouter.post("/streams", requireUser, liveActionLimit, async (req, res) => {
       streamId: randomUUID(), hostUserId: req.userId!.toHexString(), title: title.trim(), category, coverUrl
     }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE creation failed" }); }
+});
+
+liveRouter.post("/streams/:streamId/ingest/session", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const db = await getDb();
+    const result = await createLiveIngestSession(db, String(req.params.streamId), req.userId!.toHexString());
+    return res.status(201).json(result);
+  } catch (error) {
+    return res.status(403).json({ error: error instanceof Error ? error.message : "Unable to create LIVE ingest session" });
+  }
+});
+
+liveRouter.delete("/streams/:streamId/ingest/session", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const result = await revokeLiveIngestSession(await getDb(), String(req.params.streamId), req.userId!.toHexString());
+    return res.json(result);
+  } catch (error) {
+    return res.status(403).json({ error: error instanceof Error ? error.message : "Unable to revoke LIVE ingest session" });
+  }
 });
 
 liveRouter.post("/streams/:streamId/status", requireUser, liveActionLimit, async (req, res) => {
