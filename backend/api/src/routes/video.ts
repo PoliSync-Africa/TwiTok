@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
@@ -10,6 +11,8 @@ import { listStickers } from "../video/stickers.js";
 import { rateLimit } from "../security/rate-limit.js";
 
 export const videoRouter = Router();
+const routeRateLimit = expressRateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+videoRouter.use(routeRateLimit);
 
 videoRouter.post("/photos/uploads", rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
