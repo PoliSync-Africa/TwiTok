@@ -87,6 +87,15 @@ export async function removeLiveReaction(db: Db, streamId: string, userId: strin
   return { streamId, removed: true };
 }
 
+export async function getLiveReactionSummary(db: Db, streamId: string) {
+  const rows = await db.collection("live_reactions").aggregate([
+    { $match: { streamId } },
+    { $group: { _id: "$reaction", count: { $sum: 1 } } },
+    { $sort: { count: -1, _id: 1 } }
+  ]).toArray();
+  return rows.map((row) => ({ reaction: String(row._id), count: Number(row.count) }));
+}
+
 async function isLiveRestricted(db: Db, streamId: string, userId: string) {
   const blocked = await db.collection("live_blocks").findOne({ streamId, userId });
   if (blocked) return true;
