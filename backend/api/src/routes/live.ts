@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../db/mongo.js";
-import { addLiveComment, addLiveModerator, createLiveStream, createLiveIngestSession, getLiveGiftLeaderboard, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, removeLiveGuest as leaveLiveGuest, leaveLiveViewer, respondLiveGuestInvite, revokeLiveIngestSession, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
+import { addLiveComment, addLiveModerator, createLiveStream, createLiveIngestSession, getLiveGiftLeaderboard, getLivePlaybackUrl, getLiveReactionSummary, inviteLiveGuest, listLiveGuests, removeLiveGuest as leaveLiveGuest, leaveLiveViewer, respondLiveGuestInvite, revokeLiveIngestSession, refreshLiveViewer, removeLiveReaction, removeLiveBlock, removeLiveModerator, reportLiveUser, setLiveBlock, setLiveMute, setLiveStatus, setLiveReaction } from "../live/service.js";
 import { sendGift } from "../money/gifts.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
@@ -63,6 +63,23 @@ liveRouter.get("/streams", async (req, res) => {
     ).sort({ viewerCount: -1, startedAt: -1 }).limit(limit).toArray();
     return res.json({ streams });
   } catch { return res.status(500).json({ error: "Unable to load LIVE streams" }); }
+});
+
+liveRouter.get("/streams/:streamId/playback", async (req, res) => {
+  try {
+    const db = await getDb();
+    const streamId = String(req.params.streamId);
+    const stream = await db.collection("live_streams").findOne(
+      { streamId, status: "LIVE" },
+      { projection: { _id: 0, streamId: 1, status: 1, startedAt: 1 } }
+    );
+    if (!stream) return res.status(404).json({ error: "LIVE stream is not active" });
+    const playbackUrl = getLivePlaybackUrl(streamId);
+    if (!playbackUrl) return res.status(503).json({ error: "LIVE playback service is not configured" });
+    return res.json({ streamId, protocol: "HLS", manifestUrl: playbackUrl, lowLatency: false });
+  } catch {
+    return res.status(500).json({ error: "Unable to load LIVE playback" });
+  }
 });
 
 liveRouter.get("/streams/:streamId", async (req, res) => {
