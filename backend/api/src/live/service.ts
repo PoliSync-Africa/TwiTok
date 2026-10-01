@@ -133,7 +133,7 @@ async function isLiveRestricted(db: Db, streamId: string, userId: string) {
 }
 
 
-const LIVE_GUEST_MAX = 3;
+const LIVE_GUEST_MAX = 15;
 
 async function getLiveGuestState(db: Db, streamId: string, userId: string) {
   return db.collection("live_guests").findOne({ streamId, userId });
