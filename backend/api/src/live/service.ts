@@ -15,7 +15,9 @@ export async function initializeLiveIndexes(db: Db) {
     db.collection("live_blocks").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
     db.collection("live_mutes").createIndex({ streamId: 1, userId: 1 }, { unique: true }),
     db.collection("live_mutes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-    db.collection("live_reports").createIndex({ streamId: 1, createdAt: -1 })
+    db.collection("live_reports").createIndex({ streamId: 1, createdAt: -1 }),
+    db.collection("live_gift_events").createIndex({ transactionId: 1 }, { unique: true }),
+    db.collection("live_gift_events").createIndex({ streamId: 1, createdAt: -1 })
   ]);
 }
 
