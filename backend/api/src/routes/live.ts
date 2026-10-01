@@ -55,7 +55,8 @@ liveRouter.patch("/streams/:streamId/studio", requireUser, liveActionLimit, asyn
     }
     if (body.backgroundUrl !== undefined) {
       const value = body.backgroundUrl == null ? null : String(body.backgroundUrl).slice(0, 1000);
-      if (value && !/^https:\/\//i.test(value) && !value.startsWith("live-backgrounds/")) return res.status(400).json({ error: "Invalid LIVE background URL" });
+      const ownPrefix = `live-backgrounds/${req.userId!.toHexString()}/`;
+      if (value && !/^https:\/\//i.test(value) && !value.startsWith(ownPrefix)) return res.status(403).json({ error: "LIVE background is not owned by this account" });
       update.backgroundUrl = value;
     }
     if (body.effect !== undefined) {
