@@ -8,6 +8,7 @@ import { broadcastToUser } from "../realtime/ws.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 import { createNotification } from "../social/notifications.js";
+import { AccessToken } from "livekit-server-sdk";
 
 export const liveRouter = Router();
 const liveActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
@@ -20,6 +21,53 @@ liveRouter.post("/streams", requireUser, liveActionLimit, async (req, res) => {
       streamId: randomUUID(), hostUserId: req.userId!.toHexString(), title: title.trim(), category, coverUrl
     }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE creation failed" }); }
+});
+
+liveRouter.post("/streams/:streamId/room-token", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const livekitUrl = process.env.LIVEKIT_URL?.trim();
+    const apiKey = process.env.LIVEKIT_API_KEY?.trim();
+    const apiSecret = process.env.LIVEKIT_API_SECRET?.trim();
+    if (!livekitUrl || !apiKey || !apiSecret) return res.status(503).json({ error: "LIVE realtime transport is not configured" });
+
+    const db = await getDb();
+    const streamId = String(req.params.streamId);
+    const userId = req.userId!.toHexString();
+    const stream = await db.collection("live_streams").findOne({ streamId, status: "LIVE" }, { projection: { hostUserId: 1, title: 1 } });
+    if (!stream) return res.status(404).json({ error: "LIVE stream is not active" });
+
+    const isHost = String(stream.hostUserId) === userId;
+    const guest = !isHost ? await db.collection("live_guests").findOne(
+      { streamId, userId, status: "ACTIVE" },
+      { projection: { userId: 1 } }
+    ) : null;
+    const canPublish = isHost || Boolean(guest);
+    const roomName = "twitok-live-" + streamId;
+
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity: userId,
+      name: userId,
+      ttl: "1h"
+    });
+    token.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canSubscribe: true,
+      canPublish,
+      canPublishData: true
+    });
+    token.metadata = JSON.stringify({ twitokStreamId: streamId, role: isHost ? "host" : guest ? "guest" : "viewer" });
+
+    return res.json({
+      serverUrl: livekitUrl,
+      participantToken: await token.toJwt(),
+      roomName,
+      role: isHost ? "host" : guest ? "guest" : "viewer",
+      canPublish
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to create LIVE room token" });
+  }
 });
 
 liveRouter.post("/streams/:streamId/ingest/session", requireUser, liveActionLimit, async (req, res) => {
