@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { AudioSession, LiveKitRoom, VideoTrack, useTracks, isTrackReference } from "@livekit/react-native";
 import { Track } from "livekit-client";
@@ -9,7 +9,25 @@ import { getAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type LiveComment = { commentId?: string; userId?: string; text: string; createdAt?: string };
 type Gift = { giftId: string; name: string; coins: number; emoji: string };
-type LiveStudioOverlay = { filter?: string; stickers?: string[] };
+type LiveSticker = { id: string; emoji: string; x: number; y: number; scale: number; rotation: number; animation?: "NONE" | "BOUNCE" | "PULSE" | "FLOAT" };
+type LiveStudioOverlay = { filter?: string; stickers?: LiveSticker[] };
+
+function normalizeLiveStickers(items: unknown): LiveSticker[] {
+  if (!Array.isArray(items)) return [];
+  return items.slice(0, 32).map((item, index) => {
+    if (typeof item === "string") return { id: item + "-" + index, emoji: item, x: 50, y: 30 + (index % 4) * 14, scale: 1, rotation: 0, animation: "NONE" as const };
+    const value = item as Partial<LiveSticker>;
+    return {
+      id: String(value.id ?? value.emoji ?? "sticker-" + index),
+      emoji: String(value.emoji ?? "✨").slice(0, 16),
+      x: Math.min(100, Math.max(0, Number(value.x ?? 50))),
+      y: Math.min(100, Math.max(0, Number(value.y ?? 35))),
+      scale: Math.min(3, Math.max(.5, Number(value.scale ?? 1))),
+      rotation: Math.min(180, Math.max(-180, Number(value.rotation ?? 0))),
+      animation: value.animation === "BOUNCE" || value.animation === "PULSE" || value.animation === "FLOAT" ? value.animation : "NONE"
+    };
+  }).filter(item => item.emoji);
+}
 const GIFTS: Gift[] = [
   { giftId:"rose",name:"Rose",coins:3,emoji:"🌹" },
   { giftId:"heart",name:"Heart",coins:4,emoji:"❤️" },
@@ -47,6 +65,15 @@ export default function LiveViewerScreen() {
   const [giftSummary, setGiftSummary] = useState({ gifts: 0, coinsSpent: 0 });
   const [reactionSummary, setReactionSummary] = useState<Record<string, number>>({});
   const [studioOverlay, setStudioOverlay] = useState<LiveStudioOverlay>({ filter: "NONE", stickers: [] });
+  const stickerMotion = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(stickerMotion, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(stickerMotion, { toValue: 0, duration: 900, useNativeDriver: true })
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [stickerMotion]);
 
   useEffect(() => {
     if (!streamId) { setStatus("error"); setMessage("LIVE session not found."); return; }
@@ -62,7 +89,7 @@ export default function LiveViewerScreen() {
         setViewerCount(Number(data.stream?.viewerCount ?? 0));
         setStudioOverlay({
           filter: String(data.stream?.studio?.filter ?? "NONE"),
-          stickers: Array.isArray(data.stream?.studio?.stickers) ? data.stream.studio.stickers.slice(0, 32).map(String) : []
+          stickers: normalizeLiveStickers(data.stream?.studio?.stickers)
         });
         if (data.stream?.status !== "LIVE") {
           setStatus("waiting"); setMessage("This LIVE hasn't started yet."); return;
@@ -206,7 +233,12 @@ export default function LiveViewerScreen() {
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
     {liveKitToken && liveKitUrl && status === "live" ? <LiveKitRoom serverUrl={liveKitUrl} token={liveKitToken} connect={true} audio={canPublish} video={canPublish} options={{ adaptiveStream: true, dynacast: true }}><LiveKitVideoSurface /></LiveKitRoom> : manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
     {studioOverlay.filter && studioOverlay.filter !== "NONE" && <View pointerEvents="none" style={[styles.filterOverlay, (styles as unknown as Record<string, object>)["filter_" + studioOverlay.filter] ?? styles.filterDefault]} />}
-    {studioOverlay.stickers?.length ? <View pointerEvents="none" style={styles.liveStickers}>{studioOverlay.stickers.map((sticker, index) => <Text key={sticker + index} style={[styles.liveSticker, { transform: [{ rotate: ((index % 5) - 2) * 4 + "deg" }] }]}>{sticker}</Text>)}</View> : null}
+    {studioOverlay.stickers?.length ? <View pointerEvents="none" style={styles.liveStickers}>{studioOverlay.stickers.map((sticker, index) => {
+      const bounce = sticker.animation === "BOUNCE" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) : 0;
+      const pulse = sticker.animation === "PULSE" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [sticker.scale, sticker.scale * 1.18] }) : sticker.scale;
+      const float = sticker.animation === "FLOAT" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) : 0;
+      return <Animated.Text key={sticker.id + index} style={[styles.liveSticker, { left: sticker.x + "%", top: sticker.y + "%", transform: [{ translateX: -16 }, { translateY: bounce }, { translateY: float }, { scale: pulse }, { rotate: sticker.rotation + "deg" }] }]}>{sticker.emoji}</Animated.Text>;
+    })}</View> : null}
     <View style={styles.top}>
       <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
       <View><Text style={styles.live}>● LIVE</Text><Text style={styles.viewers}>{viewerCount.toLocaleString()} viewers</Text></View>
@@ -241,8 +273,8 @@ const styles=StyleSheet.create({
  filterOverlay:{position:"absolute",top:0,right:0,bottom:0,left:0,zIndex:2,pointerEvents:"none"},
  filterDefault:{backgroundColor:"rgba(255,45,85,.06)"},
  filter_CINEMATIC:{backgroundColor:"rgba(255,170,90,.10)"},filter_VINTAGE:{backgroundColor:"rgba(190,145,95,.13)"},filter_DREAM:{backgroundColor:"rgba(210,170,255,.10)"},filter_FADE:{backgroundColor:"rgba(220,220,220,.10)"},filter_SUNNY:{backgroundColor:"rgba(255,220,80,.10)"},filter_DUSK:{backgroundColor:"rgba(80,90,180,.12)"},filter_POP:{backgroundColor:"rgba(255,30,120,.10)"},filter_FILM:{backgroundColor:"rgba(40,40,40,.12)"},filter_NOIR:{backgroundColor:"rgba(0,0,0,.22)"},filter_GLOW:{backgroundColor:"rgba(255,255,210,.12)"},filter_SHARP:{backgroundColor:"rgba(255,255,255,.05)"},filter_SOFT:{backgroundColor:"rgba(230,210,255,.09)"},filter_PORTRAIT:{backgroundColor:"rgba(255,180,160,.08)"},filter_PARTY:{backgroundColor:"rgba(255,80,180,.10)"},filter_FESTIVAL:{backgroundColor:"rgba(255,210,80,.10)"},filter_GOLDEN:{backgroundColor:"rgba(255,190,70,.12)"},filter_TEAL:{backgroundColor:"rgba(0,190,180,.10)"},filter_ROSE:{backgroundColor:"rgba(255,90,130,.10)"},
- liveStickers:{position:"absolute",zIndex:3,top:"25%",left:12,right:12,flexDirection:"row",flexWrap:"wrap",gap:8,pointerEvents:"none"},
- liveSticker:{fontSize:30,textShadowColor:"#000",textShadowOffset:{width:1,height:1},textShadowRadius:4},
+ liveStickers:{position:"absolute",zIndex:3,top:0,left:0,right:0,bottom:0,pointerEvents:"none"},
+ liveSticker:{position:"absolute",fontSize:30,textShadowColor:"#000",textShadowOffset:{width:1,height:1},textShadowRadius:4},
  center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:25},
  trackGrid:{flex:1,flexDirection:"row",flexWrap:"wrap",backgroundColor:"#000"},
  trackSolo:{flex:1,backgroundColor:"#000",overflow:"hidden"},
