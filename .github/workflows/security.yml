@@ -57,4 +57,9 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          if [ "\${{ matrix.directory }}" = "apps/mobile" ]; then
+            node ../../scripts/verify-mobile-audit.mjs
+          else
+            npm audit --omit=dev --audit-level=high
+          fi
