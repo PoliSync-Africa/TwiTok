@@ -6,13 +6,14 @@ import { getAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 export default function VerifyOtpScreen() {
-  const params = useLocalSearchParams<{ channel?: string }>();
+  const params = useLocalSearchParams<{ channel?: string; retryAfterSeconds?: string }>();
   const channel = params.channel === "phone" ? "phone" : "email";
+  const initialRetry = Math.max(0, Number(params.retryAfterSeconds ?? 60) || 60);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
-  const [seconds, setSeconds] = useState(60);
+  const [seconds, setSeconds] = useState(initialRetry);
 
   useEffect(() => {
     if (seconds <= 0) return;
