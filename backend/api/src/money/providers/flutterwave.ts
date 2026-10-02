@@ -92,18 +92,20 @@ export async function verifyFlutterwaveTransaction(transactionId: string) {
   }>("/transactions/" + encodeURIComponent(transactionId) + "/verify");
 }
 
-export function verifyFlutterwaveWebhookSignature(rawBody: string, signature: string | undefined) {
+export function verifyFlutterwaveWebhookSignature(rawBody: string | Buffer, signature: string | undefined) {
   const secretHash = process.env.TWITOK_FLUTTERWAVE_WEBHOOK_SECRET;
   if (!secretHash || !signature) return false;
 
-  // Flutterwave v3 webhooks send the configured secret hash verbatim in
-  // `verif-hash`. Newer Flutterwave webhook signatures use HMAC-SHA256
-  // and the `flutterwave-signature` header. Support both formats.
-  if (signature === secretHash) return true;
+  // Flutterwave v3 webhooks may send the configured secret hash verbatim in
+  // `verif-hash`. Compare it in constant time rather than with `===`.
+  const providedHash = Buffer.from(signature.trim(), "utf8");
+  const expectedHash = Buffer.from(secretHash, "utf8");
+  if (providedHash.length === expectedHash.length && crypto.timingSafeEqual(providedHash, expectedHash)) return true;
 
+  // Newer webhook signatures use HMAC-SHA256 over the exact raw request body.
   const digest = crypto.createHmac("sha256", secretHash).update(rawBody).digest("base64");
-  const provided = Buffer.from(signature);
-  const expected = Buffer.from(digest);
+  const provided = Buffer.from(signature.trim(), "utf8");
+  const expected = Buffer.from(digest, "utf8");
   return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
 }
 
