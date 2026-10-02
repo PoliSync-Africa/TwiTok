@@ -41,6 +41,7 @@ const GIFTS: Gift[] = [
 function LiveHostControls() {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const [busy, setBusy] = useState(false);
+  const [facing, setFacing] = useState<"front" | "back">("front");
 
   const toggleMicrophone = async () => {
     if (busy) return;
@@ -66,12 +67,34 @@ function LiveHostControls() {
     }
   };
 
+  const flipCamera = async () => {
+    if (busy || !isCameraEnabled) return;
+    setBusy(true);
+    try {
+      const nextFacing = facing === "front" ? "back" : "front";
+      const publication = localParticipant.getTrackPublication(Track.Source.Camera);
+      const track = publication?.track;
+      if (!track || typeof track.setCameraFacing !== "function") {
+        throw new Error("Camera flip is not supported by this LiveKit camera track.");
+      }
+      await track.setCameraFacing(nextFacing);
+      setFacing(nextFacing);
+    } catch (e) {
+      Alert.alert("Camera", e instanceof Error ? e.message : "Unable to switch camera.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return <View style={styles.hostControls} pointerEvents="box-none">
     <Pressable disabled={busy} onPress={() => void toggleMicrophone()} style={styles.hostControlButton}>
       <Text style={styles.hostControlText}>{isMicrophoneEnabled ? "🎙️ Mic" : "🔇 Mic"}</Text>
     </Pressable>
     <Pressable disabled={busy} onPress={() => void toggleCamera()} style={styles.hostControlButton}>
       <Text style={styles.hostControlText}>{isCameraEnabled ? "📹 Camera" : "🚫 Camera"}</Text>
+    </Pressable>
+    <Pressable disabled={busy || !isCameraEnabled} onPress={() => void flipCamera()} style={styles.hostControlButton}>
+      <Text style={styles.hostControlText}>↻ {facing === "front" ? "Back" : "Front"}</Text>
     </Pressable>
   </View>;
 }
