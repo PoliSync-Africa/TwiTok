@@ -79,7 +79,15 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
   if (withdrawal.countryCode !== "GH") throw new Error("Only Ghana payouts are currently connected to the Paystack provider");
 
   const destination = withdrawal.destination as Record<string, unknown>;
+  const reference = "TWITOK-" + withdrawalId.replace(/-/g, "").slice(0, 24);
 
+  const claim = await db.collection("withdrawals").updateOne(
+    { withdrawalId, status: "PENDING" },
+    { $set: { provider: "PAYSTACK", providerReference: reference, status: "PROCESSING", updatedAt: new Date() } }
+  );
+  if (claim.matchedCount === 0) return db.collection("withdrawals").findOne({ withdrawalId });
+
+  let transferAttempted = false;
   try {
     const recipient = await createGhanaRecipient({
       name: String(destination.name ?? ""),
@@ -89,26 +97,39 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
     });
 
     await db.collection("withdrawals").updateOne(
-      { withdrawalId, status: "PENDING" },
-      { $set: { provider: "PAYSTACK", providerRecipientCode: recipient.recipient_code, status: "PROCESSING", updatedAt: new Date() } }
+      { withdrawalId, status: "PROCESSING" },
+      { $set: { providerRecipientCode: recipient.recipient_code, updatedAt: new Date() } }
     );
 
+    transferAttempted = true;
     const transfer = await initiateGhanaTransfer({
       amountGhs: Number(withdrawal.payoutAmount),
       recipientCode: recipient.recipient_code,
-      reference: "TWITOK-" + withdrawalId.replace(/-/g, "").slice(0, 24),
+      reference,
       reason: "TwiTok creator payout"
     });
     await db.collection("withdrawals").updateOne(
-      { withdrawalId },
-      { $set: { providerReference: transfer.reference, providerStatus: transfer.status, status: "PROCESSING", updatedAt: new Date() } }
+      { withdrawalId, status: "PROCESSING" },
+      { $set: { providerReference: transfer.reference, providerStatus: transfer.status, updatedAt: new Date() } }
     );
   } catch (error) {
+    // Once the provider transfer request has been sent, an error can be
+    // ambiguous: Paystack may have accepted the transfer while the response
+    // was lost. Never refund the creator in that window; the webhook must
+    // reconcile the final provider state.
+    if (transferAttempted) {
+      await db.collection("withdrawals").updateOne(
+        { withdrawalId, status: "PROCESSING" },
+        { $set: { providerStatus: "UNKNOWN", failureReason: "Provider response was ambiguous; awaiting reconciliation", updatedAt: new Date() } }
+      );
+      throw error;
+    }
+
     const session = db.client?.startSession();
     if (!session) throw error;
     try {
       await session.withTransaction(async () => {
-        const current = await db.collection("withdrawals").findOne({ withdrawalId, status: { $in: ["PENDING", "PROCESSING"] } }, { session });
+        const current = await db.collection("withdrawals").findOne({ withdrawalId, status: "PROCESSING" }, { session });
         if (!current) return;
         await db.collection("wallets").updateOne(
           { userId: String(current.userId) },
@@ -117,7 +138,7 @@ export async function processGhanaWithdrawal(db: Db, withdrawalId: string) {
         );
         await db.collection("withdrawals").updateOne(
           { withdrawalId },
-          { $set: { status: "FAILED", failureReason: error instanceof Error ? error.message : "Provider transfer failed", updatedAt: new Date() } },
+          { $set: { status: "FAILED", failureReason: error instanceof Error ? error.message : "Provider transfer setup failed", updatedAt: new Date() } },
           { session }
         );
       });
@@ -149,12 +170,15 @@ export async function processFlutterwaveWithdrawal(db: Db, withdrawalId: string)
   const reference = "TWITOK-FLW-PAYOUT-" + withdrawalId.replace(/-/g, "").slice(0, 24);
   const callbackUrl = process.env.TWITOK_FLUTTERWAVE_PAYOUT_CALLBACK_URL;
 
-  await db.collection("withdrawals").updateOne(
+  const claim = await db.collection("withdrawals").updateOne(
     { withdrawalId, status: "PENDING" },
     { $set: { provider: "FLUTTERWAVE", providerReference: reference, status: "PROCESSING", updatedAt: new Date() } }
   );
+  if (claim.matchedCount === 0) return db.collection("withdrawals").findOne({ withdrawalId });
 
+  let transferAttempted = false;
   try {
+    transferAttempted = true;
     const transfer = await initiateFlutterwaveTransfer({
       amount: Number(withdrawal.payoutAmount),
       currency: String(withdrawal.payoutCurrency),
@@ -180,6 +204,17 @@ export async function processFlutterwaveWithdrawal(db: Db, withdrawalId: string)
         } }
     );
   } catch (error) {
+    // The transfer call is an external side effect. If it was attempted,
+    // the response may have been lost after provider acceptance. Keep the
+    // debit locked in PROCESSING and let the webhook reconcile it.
+    if (transferAttempted) {
+      await db.collection("withdrawals").updateOne(
+        { withdrawalId, status: "PROCESSING" },
+        { $set: { providerStatus: "UNKNOWN", failureReason: "Provider response was ambiguous; awaiting reconciliation", updatedAt: new Date() } }
+      );
+      throw error;
+    }
+
     const session = db.client?.startSession();
     if (!session) throw error;
     try {
@@ -193,7 +228,7 @@ export async function processFlutterwaveWithdrawal(db: Db, withdrawalId: string)
         );
         await db.collection("withdrawals").updateOne(
           { withdrawalId },
-          { $set: { status: "FAILED", failureReason: error instanceof Error ? error.message : "Flutterwave transfer failed", updatedAt: new Date() } },
+          { $set: { status: "FAILED", failureReason: error instanceof Error ? error.message : "Flutterwave transfer setup failed", updatedAt: new Date() } },
           { session }
         );
       });
