@@ -167,9 +167,25 @@ export async function toggleCommentLike(db: Db, userId: ObjectId, commentIdStrin
 export async function listCommentReplies(db: Db, commentIdString: string, limit = 50) {
   if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
   const commentId = new ObjectId(commentIdString);
+  const parent = await db.collection("video_comments").findOne(
+    { _id: commentId, status: "ACTIVE" },
+    { projection: { videoId: 1 } }
+  );
+  if (!parent) throw new Error("Comment not found");
+  await getPublicVideo(db, parent.videoId);
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 100);
   const rows = await db.collection("video_comments").find({ parentId: commentId, status: "ACTIVE" }).sort({ createdAt: 1 }).limit(safeLimit).toArray();
-  return rows.map(comment => ({ id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt, parentId: commentIdString, attachments: comment.attachments ?? [] }));
+  return Promise.all(rows.map(async comment => ({
+    id: comment._id.toHexString(),
+    userId: comment.userId.toHexString(),
+    text: comment.text,
+    createdAt: comment.createdAt,
+    parentId: commentIdString,
+    attachments: await Promise.all((comment.attachments ?? []).map(async (a: {objectKey:string;mimeType:string}) => ({
+      mimeType: a.mimeType,
+      url: (await createPresignedPlayback(a.objectKey, 900)).url
+    })))
+  })));
 }
 
 
