@@ -4,6 +4,7 @@ import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
+import { sendOtp, verifyOtp, type OtpChannel } from "../verification/otp.js";
 
 const WEB_SESSION_COOKIE = "twitok_user_session";
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
@@ -11,6 +12,8 @@ const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "produc
 export const authRouter = Router();
 const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const userWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const otpSendLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => `otp-send:${req.userId?.toHexString() ?? "anonymous"}:${req.ip ?? "unknown"}` });
+const otpVerifyLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req => `otp-verify:${req.userId?.toHexString() ?? "anonymous"}:${req.ip ?? "unknown"}` });
 
 
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
@@ -36,6 +39,50 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
     res.json({ token, user });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
+});
+
+
+authRouter.post("/verification/send", requireUser, otpSendLimit, async (req, res) => {
+  try {
+    const channel = String(req.body?.channel ?? "").toLowerCase() as OtpChannel;
+    if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "channel must be email or phone" });
+    const result = await sendOtp(await getDb(), req.userId!.toHexString(), channel);
+    res.setHeader("Retry-After", result.retryAfterSeconds);
+    return res.status(202).json({ channel: result.channel, expiresAt: result.expiresAt, retryAfterSeconds: result.retryAfterSeconds });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to send verification code";
+    return res.status(/too many|wait .* seconds|already verified/i.test(message) ? 429 : 400).json({ error: message });
+  }
+});
+
+authRouter.post("/verification/verify", requireUser, otpVerifyLimit, async (req, res) => {
+  try {
+    const channel = String(req.body?.channel ?? "").toLowerCase() as OtpChannel;
+    const code = String(req.body?.code ?? "").trim();
+    if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "channel must be email or phone" });
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
+    const result = await verifyOtp(await getDb(), req.userId!.toHexString(), channel, code);
+    return res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to verify code";
+    return res.status(/too many incorrect|rate/i.test(message) ? 429 : 400).json({ error: message });
+  }
+});
+
+authRouter.get("/verification/status", requireUser, userReadLimit, async (req, res) => {
+  try {
+    const user = await (await getDb()).collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { emailVerified: 1, phoneVerified: 1, email: 1, phone: 1 } }
+    );
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    return res.json({
+      email: user.email ? { address: user.email, verified: user.emailVerified === true } : null,
+      phone: user.phone ? { verified: user.phoneVerified === true } : null
+    });
+  } catch {
+    return res.status(500).json({ error: "Unable to read verification status" });
+  }
 });
 
 authRouter.post("/logout", requireUser, userWriteLimit, async (req, res) => {

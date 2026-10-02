@@ -113,7 +113,14 @@ export default function RegisterScreen() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to create account");
       await saveAuthToken(data.token);
-      router.replace("/profile-setup");
+      const verification = await fetch(API + "/auth/verification/send", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${data.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: method })
+      });
+      const verificationData = await verification.json().catch(() => ({}));
+      if (!verification.ok) throw new Error(verificationData.error ?? "Unable to send verification code");
+      router.replace({ pathname: "/verify-otp", params: { channel: method } });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to create account");
     } finally {
