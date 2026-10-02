@@ -56,6 +56,16 @@ function normalizeProviderJobId(value: unknown): string | null {
   return normalized;
 }
 
+function safeAiMediaError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/not configured/i.test(message)) return { error: "AI media generation is not configured yet", code: "AI_MEDIA_NOT_CONFIGURED" };
+  if (/source media is not owned/i.test(message)) return { error: "Source media is not owned by this account", code: "AI_MEDIA_SOURCE_FORBIDDEN" };
+  if (/provider response|provider returned|provider is too large|invalid response|no valid output|response is too large|empty response/i.test(message)) {
+    return { error: "AI media provider returned an invalid response", code: "AI_MEDIA_PROVIDER_INVALID" };
+  }
+  return { error: "Unable to start AI media generation", code: "AI_MEDIA_REQUEST_FAILED" };
+}
+
 function normalizeProviderStatus(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const normalized = value.trim().toUpperCase();
@@ -179,7 +189,9 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
 
     res.status(202).json({ jobId, status: providerOutputUrl ? "READY_FOR_REVIEW" : "PROCESSING", outputUrl: providerOutputUrl });
   } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to start AI media generation" });
+    const safeError = safeAiMediaError(e);
+    const statusCode = safeError.code === "AI_MEDIA_NOT_CONFIGURED" ? 503 : safeError.code === "AI_MEDIA_SOURCE_FORBIDDEN" ? 403 : 400;
+    res.status(statusCode).json(safeError);
   }
 });
 
