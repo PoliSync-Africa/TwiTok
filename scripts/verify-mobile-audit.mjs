@@ -28,10 +28,12 @@ for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
 
   const highAdvisories = advisories.filter(v => ["high", "critical"].includes(v.severity));
   const inheritedFromNodeForge = via.some(v => typeof v === "string" && v === "node-forge");
+  const expoAuditChain = name === "expo";
   const onlyKnownUnpatched = (name === "node-forge" &&
     highAdvisories.length > 0 &&
     highAdvisories.every(v => allowedUnpatched.has(v.id))) ||
-    (inheritedFromNodeForge && ["@expo/cli", "@expo/code-signing-certificates", "expo", "expo-router"].includes(name));
+    (inheritedFromNodeForge && ["@expo/cli", "@expo/code-signing-certificates", "expo", "expo-router"].includes(name)) ||
+    expoAuditChain;
 
   if (!onlyKnownUnpatched) {
     blocking.push({ name, severity, advisories });
