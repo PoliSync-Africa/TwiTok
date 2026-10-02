@@ -59,6 +59,43 @@ export async function ensureUserIndexes(db: Db) {
   ]);
 }
 
+
+
+function isAsciiAlphaNumeric(code: number) {
+  return (code >= 48 && code <= 57) || (code >= 97 && code <= 122);
+}
+
+function isValidEmailAddress(value: string) {
+  if (value.length === 0 || value.length > 254) return false;
+  const at = value.indexOf("@");
+  if (at <= 0 || at !== value.lastIndexOf("@") || at > 64) return false;
+
+  const localPart = value.slice(0, at);
+  const domainPart = value.slice(at + 1);
+  if (!domainPart || domainPart.length > 253 || !domainPart.includes(".")) return false;
+
+  const localAllowed = "!#$%&'*+-/=?^_\`{|}~.";
+  for (const char of localPart) {
+    const code = char.charCodeAt(0);
+    const allowed = isAsciiAlphaNumeric(code) || localAllowed.includes(char);
+    if (!allowed) return false;
+  }
+  if (localPart.startsWith(".") || localPart.endsWith(".") || localPart.includes("..")) return false;
+
+  const labels = domainPart.split(".");
+  for (const label of labels) {
+    if (!label || label.length > 63) return false;
+    const first = label.charCodeAt(0);
+    const last = label.charCodeAt(label.length - 1);
+    if (!isAsciiAlphaNumeric(first) || !isAsciiAlphaNumeric(last)) return false;
+    for (let index = 1; index < label.length - 1; index += 1) {
+      const code = label.charCodeAt(index);
+      if (!isAsciiAlphaNumeric(code) && code !== 45) return false;
+    }
+  }
+  return true;
+}
+
 export async function createUser(db: Db, input: { username?: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
   const generatedUsername = `user_${new ObjectId().toHexString().slice(-12)}`;
   const username = (input.username?.trim().toLowerCase() || generatedUsername);
@@ -74,21 +111,7 @@ export async function createUser(db: Db, input: { username?: string; password: s
   if (!input.email && !input.phone) throw new Error("Email or phone is required");
   const normalizedEmail = input.email?.trim().toLowerCase();
   if (normalizedEmail) {
-    const emailParts = normalizedEmail.split("@");
-    const localPart = emailParts.length === 2 ? emailParts[0] : "";
-    const domainPart = emailParts.length === 2 ? emailParts[1] : "";
-    const validEmail =
-      normalizedEmail.length <= 254 &&
-      localPart.length > 0 &&
-      localPart.length <= 64 &&
-      domainPart.length > 0 &&
-      domainPart.length <= 253 &&
-      domainPart.includes(".") &&
-      !normalizedEmail.includes(" ") &&
-      !normalizedEmail.includes("\t") &&
-      !normalizedEmail.includes("\n") &&
-      !normalizedEmail.includes("\r");
-    if (!validEmail) throw new Error("Invalid email address");
+    if (!isValidEmailAddress(normalizedEmail)) throw new Error("Invalid email address");
   }
   const normalizedPhone = input.phone?.trim();
   if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
