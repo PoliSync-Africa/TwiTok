@@ -53,7 +53,15 @@ export async function creditPurchasedCoins(db: Db, input: {
 }) {
   if (!Number.isInteger(input.coins) || input.coins <= 0) throw new Error("Invalid coin amount");
   const existing = await db.collection("iap_transactions").findOne({ providerTransactionId: input.providerTransactionId });
-  if (existing) return { duplicate: true, wallet: await ensureWallet(db, input.userId) };
+  if (existing) {
+    const samePurchase =
+      String(existing.userId) === input.userId &&
+      String(existing.provider) === input.provider &&
+      String(existing.sku) === input.sku &&
+      Number(existing.coins) === input.coins;
+    if (!samePurchase) throw new Error("Coin purchase transaction is already bound to a different purchase");
+    return { duplicate: true, wallet: await ensureWallet(db, input.userId) };
+  }
 
   const session = db.client?.startSession();
   if (!session) throw new Error("MongoDB session unavailable");
