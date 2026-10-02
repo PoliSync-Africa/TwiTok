@@ -189,6 +189,19 @@ authRouter.get("/verification/status", requireVerificationUser, userReadLimit, a
   }
 });
 
+authRouter.post("/sessions/revoke-all", requireUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 3, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    await (await getDb()).collection("users").updateOne(
+      { _id: req.userId!, status: "ACTIVE" },
+      { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } }
+    );
+    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    return res.json({ revoked: true, message: "All active sessions have been revoked. Please sign in again." });
+  } catch {
+    return res.status(500).json({ error: "Unable to revoke active sessions" });
+  }
+});
+
 authRouter.post("/logout", requireUser, userWriteLimit, async (req, res) => {
   try {
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
