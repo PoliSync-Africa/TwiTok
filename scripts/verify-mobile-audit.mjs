@@ -14,7 +14,7 @@ try {
   process.exit(result.status || 1);
 }
 
-const allowedUnpatched = new Set(["GHSA-86w9-cpqp-85rv"]);
+const allowedUnpatched = new Set(["ghsa-86w9-cpqp-85rv"]);
 const blocking = [];
 
 for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
@@ -23,7 +23,7 @@ for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
 
   const advisories = (Array.isArray(item.via) ? item.via : [])
     .filter(v => v && typeof v === "object")
-    .map(v => ({ id: String(v.url ?? "").split("/").pop() || String(v.source ?? ""), severity: String(v.severity ?? "").toLowerCase() }));
+    .map(v => ({ id: (String(v.url ?? "").split("/").pop() || String(v.source ?? "")).toLowerCase(), severity: String(v.severity ?? "").toLowerCase() }));
 
   const highAdvisories = advisories.filter(v => ["high", "critical"].includes(v.severity));
   const onlyKnownUnpatched = name === "node-forge" &&
