@@ -278,11 +278,17 @@ export default function LiveStudioScreen() {
                   void save({ stickers: next });
                 };
                 return <>
-                  <Pressable disabled={index >= studio.stickers.length - 1 || busy} style={[styles.layerMoveButton, (index >= studio.stickers.length - 1 || busy) && styles.layerMoveDisabled]} onPress={() => move(studio.stickers.length - 1)}>
-                    <Text style={styles.toolText}>↓ Front</Text>
+                  <Pressable disabled={index >= studio.stickers.length - 1 || busy} style={[styles.layerMoveButton, (index >= studio.stickers.length - 1 || busy) && styles.layerMoveDisabled]} onPress={() => move(index + 1)}>
+                    <Text style={styles.toolText}>↑ Forward</Text>
+                  </Pressable>
+                  <Pressable disabled={index <= 0 || busy} style={[styles.layerMoveButton, (index <= 0 || busy) && styles.layerMoveDisabled]} onPress={() => move(index - 1)}>
+                    <Text style={styles.toolText}>↓ Back</Text>
+                  </Pressable>
+                  <Pressable disabled={index < 0 || index === studio.stickers.length - 1 || busy} style={[styles.layerMoveButton, (index < 0 || index === studio.stickers.length - 1 || busy) && styles.layerMoveDisabled]} onPress={() => move(studio.stickers.length - 1)}>
+                    <Text style={styles.toolText}>⇧ Front</Text>
                   </Pressable>
                   <Pressable disabled={index <= 0 || busy} style={[styles.layerMoveButton, (index <= 0 || busy) && styles.layerMoveDisabled]} onPress={() => move(0)}>
-                    <Text style={styles.toolText}>↑ Back</Text>
+                    <Text style={styles.toolText}>⇩ Back</Text>
                   </Pressable>
                 </>;
               })()}
