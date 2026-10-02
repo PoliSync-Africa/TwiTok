@@ -406,7 +406,9 @@ walletRouter.post("/coins/flutterwave/webhook", async (req, res) => {
     if (verified.status !== "successful" || verified.tx_ref !== reference || verified.currency !== String(purchase.currency)) {
       return res.status(400).json({ error: "Flutterwave payment verification failed" });
     }
-    if (Number(verified.amount) < Number(purchase.amountLocal)) {
+    const verifiedAmount = Number(verified.amount);
+    const expectedAmount = Number(purchase.amountLocal);
+    if (!Number.isFinite(verifiedAmount) || !Number.isFinite(expectedAmount) || verifiedAmount !== expectedAmount) {
       return res.status(400).json({ error: "Flutterwave payment amount mismatch" });
     }
 
@@ -451,9 +453,11 @@ walletRouter.post("/coins/paystack/webhook", async (req, res) => {
     const db = await getDb();
     const purchase = await db.collection("coin_purchases").findOne({ reference, provider: "PAYSTACK" });
     if (!purchase) return res.status(404).json({ error: "Coin purchase not found" });
-    const rate = Number(process.env.TWITOK_USD_GHS_RATE);
     const expectedAmount = Math.round(Number(purchase.amountGhs) * 100);
-    if (!Number.isFinite(rate) || Math.abs(Number(verified.amount) - expectedAmount) > 1) return res.status(400).json({ error: "Payment amount mismatch" });
+    const verifiedAmount = Number(verified.amount);
+    if (!Number.isFinite(expectedAmount) || !Number.isFinite(verifiedAmount) || verifiedAmount !== expectedAmount) {
+      return res.status(400).json({ error: "Payment amount mismatch" });
+    }
     if (purchase.status === "CREDITED") return res.json({ ok: true, duplicate: true });
     const grossUsd = Number(purchase.priceUsd);
     const feeBps = Number(process.env.TWITOK_PAYSTACK_COLLECTION_FEE_BPS);
