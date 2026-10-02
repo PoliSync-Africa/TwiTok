@@ -244,11 +244,22 @@ export async function reconcileFlutterwaveTransfer(db: Db, input: {
   transferId: string;
   reference: string;
   status: string;
+  amount: number;
+  currency: string;
   rawMessage?: string;
 }) {
-  const withdrawal = await db.collection("withdrawals").findOne({
-    $or: [{ providerTransferId: input.transferId }, { providerReference: input.reference }]
-  });
+  const byTransferId = input.transferId
+    ? await db.collection("withdrawals").findOne({ provider: "FLUTTERWAVE", providerTransferId: input.transferId })
+    : null;
+  const byReference = input.reference
+    ? await db.collection("withdrawals").findOne({ provider: "FLUTTERWAVE", providerReference: input.reference })
+    : null;
+
+  if (byTransferId && byReference && String(byTransferId.withdrawalId) !== String(byReference.withdrawalId)) {
+    throw new Error("Flutterwave transfer identity does not match the payout reference");
+  }
+
+  const withdrawal = byTransferId ?? byReference;
 
   if (!withdrawal) {
     await db.collection("payout_webhook_events").updateOne(
@@ -264,6 +275,24 @@ export async function reconcileFlutterwaveTransfer(db: Db, input: {
       { upsert: true }
     );
     return { ignored: true };
+  }
+
+  if (withdrawal.providerReference && String(withdrawal.providerReference) !== input.reference) {
+    throw new Error("Flutterwave transfer reference does not match the withdrawal");
+  }
+  if (withdrawal.providerTransferId && String(withdrawal.providerTransferId) !== input.transferId) {
+    throw new Error("Flutterwave transfer id does not match the withdrawal");
+  }
+
+  const expectedAmount = Math.floor(Number(withdrawal.payoutAmount));
+  const actualAmount = Number(input.amount);
+  const expectedCurrency = String(withdrawal.payoutCurrency ?? "").toUpperCase();
+  const actualCurrency = String(input.currency ?? "").toUpperCase();
+  if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0 || !Number.isSafeInteger(actualAmount) || actualAmount <= 0 || actualAmount !== expectedAmount) {
+    throw new Error("Flutterwave payout amount mismatch");
+  }
+  if (!expectedCurrency || actualCurrency !== expectedCurrency) {
+    throw new Error("Flutterwave payout currency mismatch");
   }
 
   const normalized = input.status.toUpperCase();
@@ -379,6 +408,8 @@ export async function refreshFlutterwaveWithdrawal(db: Db, withdrawalId: string)
     transferId: String(transfer.id),
     reference: String(transfer.reference),
     status: String(transfer.status),
+    amount: Number(transfer.amount),
+    currency: String(transfer.currency),
     rawMessage: transfer.complete_message
   });
 }
@@ -387,6 +418,8 @@ export async function reconcilePaystackTransfer(db: Db, input: {
   eventId: string;
   event: "transfer.success" | "transfer.failed" | "transfer.reversed";
   reference: string;
+  amount: number;
+  currency: string;
   rawStatus?: string;
 }) {
   const withdrawal = await db.collection("withdrawals").findOne({ providerReference: input.reference });
@@ -401,6 +434,16 @@ export async function reconcilePaystackTransfer(db: Db, input: {
       { upsert: true }
     );
     return { ignored: true };
+  }
+
+  const expectedAmount = Math.round(Number(withdrawal.payoutAmount) * 100);
+  const actualAmount = Number(input.amount);
+  if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0 || !Number.isSafeInteger(actualAmount) || actualAmount <= 0 || actualAmount !== expectedAmount) {
+    throw new Error("Paystack payout amount mismatch");
+  }
+  const expectedCurrency = String(withdrawal.payoutCurrency ?? "").toUpperCase();
+  if (String(input.currency ?? "").toUpperCase() !== expectedCurrency || expectedCurrency !== "GHS") {
+    throw new Error("Paystack payout currency mismatch");
   }
 
   if (input.event === "transfer.success") {
