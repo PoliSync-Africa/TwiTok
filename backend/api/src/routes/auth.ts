@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken, issueVerificationToken } from "../auth/user.js";
@@ -55,6 +56,60 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
+
+authRouter.post("/password/forgot", rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => `password-forgot:${req.ip ?? "unknown"}` }), async (req, res) => {
+  const generic = { message: "If the account exists, a password recovery code has been sent to its verified contact." };
+  try {
+    const identifier = String(req.body?.identifier ?? "").trim();
+    if (!identifier) return res.status(200).json(generic);
+    const normalized = identifier.toLowerCase();
+    const db = await getDb();
+    const user = await db.collection("users").findOne(
+      { $or: [{ email: normalized }, { username: normalized }, { phone: identifier }] },
+      { projection: { email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, status: 1 } }
+    );
+    if (!user || user.status !== "ACTIVE") return res.status(200).json(generic);
+    const channel: OtpChannel | null =
+      user.email && user.emailVerified === true ? "email" :
+      user.phone && user.phoneVerified === true ? "phone" : null;
+    if (!channel) return res.status(200).json(generic);
+    try { await sendOtp(db, user._id.toHexString(), channel, undefined, "PASSWORD_RESET"); } catch {}
+    return res.status(200).json(generic);
+  } catch {
+    return res.status(200).json(generic);
+  }
+});
+
+authRouter.post("/password/reset", rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => `password-reset:${req.ip ?? "unknown"}` }), async (req, res) => {
+  try {
+    const identifier = String(req.body?.identifier ?? "").trim();
+    const channel = String(req.body?.channel ?? "").toLowerCase() as OtpChannel;
+    const code = String(req.body?.code ?? "").trim();
+    const newPassword = String(req.body?.newPassword ?? "");
+    if (!identifier || (channel !== "email" && channel !== "phone") || !/^\\d{6}$/.test(code) || newPassword.length < 12) {
+      return res.status(400).json({ error: "Invalid password recovery request" });
+    }
+    const db = await getDb();
+    const normalized = identifier.toLowerCase();
+    const user = await db.collection("users").findOne(
+      { $or: [{ email: normalized }, { username: normalized }, { phone: identifier }] },
+      { projection: { status: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1 } }
+    );
+    if (!user || user.status !== "ACTIVE") return res.status(400).json({ error: "Invalid password recovery request" });
+    const verified = channel === "email" ? user.emailVerified === true : user.phoneVerified === true;
+    const contact = channel === "email" ? user.email : user.phone;
+    if (!verified || !contact) return res.status(400).json({ error: "Invalid password recovery request" });
+    await verifyOtp(db, user._id.toHexString(), channel, code, "PASSWORD_RESET");
+    await db.collection("users").updateOne(
+      { _id: user._id, status: "ACTIVE" },
+      { $set: { passwordHash: await bcrypt.hash(newPassword, 12), updatedAt: new Date() }, $inc: { sessionVersion: 1 } }
+    );
+    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    return res.json({ reset: true, message: "Password reset successfully. Please sign in again." });
+  } catch {
+    return res.status(400).json({ error: "Invalid password recovery request" });
+  }
+});
 
 authRouter.post("/verification/send", requireVerificationUser, otpSendLimit, async (req, res) => {
   try {
