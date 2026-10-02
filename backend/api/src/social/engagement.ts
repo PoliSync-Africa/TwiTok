@@ -104,8 +104,12 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
     parentObjectId = new ObjectId(parentId);
   }
   const createdAt = new Date();
+  const sanitizedAttachments = attachments.map(a => ({
+    objectKey: a.objectKey,
+    mimeType: a.mimeType.toLowerCase()
+  }));
   const result = await db.collection("video_comments").insertOne({
-    videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments, ...(parentObjectId ? { parentId: parentObjectId } : {})
+    videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments: sanitizedAttachments, ...(parentObjectId ? { parentId: parentObjectId } : {})
   });
   if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "COMMENT", videoId, commentId: result.insertedId });
   const mentioned = [...new Set((body.match(/@[a-z0-9._]{3,24}/gi) ?? []).map(x => x.slice(1).toLowerCase()))].slice(0, 20);
