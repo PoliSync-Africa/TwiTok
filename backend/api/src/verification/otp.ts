@@ -48,13 +48,14 @@ function isValidEmail(value: string) {
   );
 }
 
-async function deliverOtp(channel: OtpChannel, destination: string, code: string, purpose: OtpPurpose, expiresInSeconds: number) {
+async function deliverOtp(channel: OtpChannel, destination: string, code: string, purpose: OtpPurpose, expiresInSeconds: number, firstName?: string) {
   if (channel === "email") {
     await sendEmailOtp({
       to: destination,
       code,
       purpose: purpose === "PASSWORD_RESET" ? "PASSWORD_RESET" : "VERIFICATION",
-      expiresInSeconds
+      expiresInSeconds,
+      firstName
     });
     return;
   }
@@ -74,8 +75,8 @@ async function deliverOtp(channel: OtpChannel, destination: string, code: string
       length: 6,
       medium: "sms",
       message: purpose === "PASSWORD_RESET"
-        ? "Your TwiTok password reset code is %otp_code%. It expires soon."
-        : "Your TwiTok verification code is %otp_code%. It expires soon.",
+        ? `Hi ${firstName || "there"}, your TwiTok password reset code is %otp_code%. It expires soon.`
+        : `Hi ${firstName || "there"}, your TwiTok verification code is %otp_code%. It expires soon.`,
       number: destination,
       sender_id: senderId,
       type: "numeric"
@@ -108,7 +109,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user account");
   const user = await db.collection("users").findOne(
     { _id: new ObjectId(userId), status: "ACTIVE" },
-    { projection: { email: 1, phone: 1, emailVerified: 1, phoneVerified: 1 } }
+    { projection: { firstName: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1 } }
   );
   if (!user) throw new Error("Account not found");
 
@@ -141,7 +142,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   const expiresAt = new Date(now.getTime() + OTP_TTL_MS);
   const codeHash = hashCode(userId, channel, destination, code, purpose);
 
-  await deliverOtp(channel, destination, code, purpose, OTP_TTL_MS / 1000);
+  await deliverOtp(channel, destination, code, purpose, OTP_TTL_MS / 1000, user.firstName);
 
   await db.collection("auth_otps").updateMany(
     { userId, channel, purpose, destination, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
