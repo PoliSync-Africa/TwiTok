@@ -206,7 +206,7 @@ export default function LiveViewerScreen() {
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
     {liveKitToken && liveKitUrl && status === "live" ? <LiveKitRoom serverUrl={liveKitUrl} token={liveKitToken} connect={true} audio={canPublish} video={canPublish} options={{ adaptiveStream: true, dynacast: true }}><LiveKitVideoSurface /></LiveKitRoom> : manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
     {studioOverlay.filter && studioOverlay.filter !== "NONE" && <View pointerEvents="none" style={[styles.filterOverlay, styles["filter_" + studioOverlay.filter] ?? styles.filterDefault]} />}
-    {studioOverlay.stickers?.length ? <View pointerEvents="none" style={styles.liveStickers}>{studioOverlay.stickers.map((sticker, index) => <Text key={sticker + index} style={[styles.liveSticker, { transform: [{ rotate: ((index % 5) - 2) * 4 + "deg" as any }] }]}>{sticker}</Text>)}</View> : null}
+    {studioOverlay.stickers?.length ? <View pointerEvents="none" style={styles.liveStickers}>{studioOverlay.stickers.map((sticker, index) => <Text key={sticker + index} style={[styles.liveSticker, { transform: [{ rotate: ((index % 5) - 2) * 4 + "deg" }] }]}>{sticker}</Text>)}</View> : null}
     <View style={styles.top}>
       <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
       <View><Text style={styles.live}>● LIVE</Text><Text style={styles.viewers}>{viewerCount.toLocaleString()} viewers</Text></View>
