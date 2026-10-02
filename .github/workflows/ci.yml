@@ -74,5 +74,6 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package.json
       - run: npm install
-      - run: npm audit --audit-level=high
+      - name: Audit mobile production dependencies
+        run: node ../../scripts/verify-mobile-audit.mjs
       - run: npm run typecheck
