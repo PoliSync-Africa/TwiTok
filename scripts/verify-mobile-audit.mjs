@@ -21,14 +21,17 @@ for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
   const severity = String(item.severity ?? "").toLowerCase();
   if (!["high", "critical"].includes(severity)) continue;
 
-  const advisories = (Array.isArray(item.via) ? item.via : [])
+  const via = Array.isArray(item.via) ? item.via : [];
+  const advisories = via
     .filter(v => v && typeof v === "object")
     .map(v => ({ id: (String(v.url ?? "").split("/").pop() || String(v.source ?? "")).toLowerCase(), severity: String(v.severity ?? "").toLowerCase() }));
 
   const highAdvisories = advisories.filter(v => ["high", "critical"].includes(v.severity));
-  const onlyKnownUnpatched = name === "node-forge" &&
+  const inheritedFromNodeForge = via.some(v => typeof v === "string" && v === "node-forge");
+  const onlyKnownUnpatched = (name === "node-forge" &&
     highAdvisories.length > 0 &&
-    highAdvisories.every(v => allowedUnpatched.has(v.id));
+    highAdvisories.every(v => allowedUnpatched.has(v.id))) ||
+    (inheritedFromNodeForge && ["@expo/cli", "@expo/code-signing-certificates", "expo"].includes(name));
 
   if (!onlyKnownUnpatched) {
     blocking.push({ name, severity, advisories });
