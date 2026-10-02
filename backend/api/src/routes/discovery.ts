@@ -129,7 +129,7 @@ discoveryRouter.get("/suggestions", requireUser, async (req, res) => {
 discoveryRouter.post("/contacts/match", requireUser, async (req, res) => {
   try {
     const raw = Array.isArray(req.body?.hashes) ? req.body.hashes : [];
-    const hashes = [...new Set(raw.filter((x: unknown): x is string => typeof x === "string" && /^[0-9a-f]{64}$/i.test(x)).map(x => x.toLowerCase()))].slice(0, 2000);
+    const hashes = [...new Set(raw.filter((x: unknown): x is string => typeof x === "string" && /^[0-9a-f]{64}$/i.test(x)).map((x: string) => x.toLowerCase()))].slice(0, 2000);
     if (!hashes.length) return res.json({ matches: [] });
 
     const db = await getDb();
