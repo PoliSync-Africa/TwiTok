@@ -144,7 +144,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   await deliverOtp(channel, destination, code);
 
   await db.collection("auth_otps").updateMany(
-    { userId, channel, purpose, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
+    { userId, channel, purpose, destination, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
     { $set: { consumedAt: now, updatedAt: now } }
   );
 
@@ -209,7 +209,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   }
 
   const consumed = await db.collection("auth_otps").findOneAndUpdate(
-    { _id: otp._id, purpose, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
+    { _id: otp._id, userId, channel, purpose, destination, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
     { $set: { consumedAt: now, updatedAt: now } },
     { returnDocument: "after" }
   );
