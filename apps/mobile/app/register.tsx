@@ -22,6 +22,7 @@ function isValidDob(value: string) {
 export default function RegisterScreen() {
   const [step, setStep] = useState(0);
   const [method, setMethod] = useState<SignupMethod | null>(null);
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState<CountryOption | null>(null);
@@ -42,6 +43,14 @@ export default function RegisterScreen() {
   function next() {
     setError("");
     if (step === 0) {
+      if (!firstName.trim()) {
+        setError("Enter your first name.");
+        return;
+      }
+      if (firstName.trim().length > 50) {
+        setError("First name must be 50 characters or less.");
+        return;
+      }
       if (!method) {
         setError("Choose how you want to sign up.");
         return;
@@ -103,6 +112,7 @@ export default function RegisterScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          firstName: firstName.trim(),
           email: method === "email" ? email.trim().toLowerCase() : undefined,
           phone: method === "phone" ? phone.trim() : undefined,
           password,
@@ -130,7 +140,7 @@ export default function RegisterScreen() {
 
   const titles = ["Create your account", method === "phone" ? "Enter your phone" : "Enter your email", "Your birthday", "Create a password"];
   const subtitles = [
-    "Choose a sign-up method, just like the TikTok-style flow.",
+    "Enter your first name, then choose how you want to sign up.",
     "Choose your country first. TwiTok never assumes a default country.",
     "Your date of birth helps us apply age and safety requirements.",
     "Use a password with at least 8 characters."
@@ -157,6 +167,17 @@ export default function RegisterScreen() {
 
         {step === 0 ? (
           <View>
+            <TextInput
+              style={styles.input}
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First name"
+              placeholderTextColor="#777"
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={50}
+              autoFocus
+            />
             <Pressable accessibilityRole="button" accessibilityState={{ selected: method === "phone" }} style={[styles.methodCard, method === "phone" && styles.methodCardActive]} onPress={() => { setMethod("phone"); setError(""); }}>
               <View style={styles.methodIcon}><Text style={styles.methodIconText}>☎</Text></View>
               <View style={styles.methodCopy}><Text style={styles.methodTitle}>Use phone</Text><Text style={styles.methodHint}>Sign up with your mobile number</Text></View>
