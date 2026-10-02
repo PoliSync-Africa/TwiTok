@@ -37,9 +37,18 @@ export async function createUser(db: Db, input: { username?: string; password: s
   if (input.password.length < 12) throw new Error("Password must contain at least 12 characters");
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
+  const countryCode = input.countryCode.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
+  const ageCutoff = new Date();
+  ageCutoff.setUTCFullYear(ageCutoff.getUTCFullYear() - 13);
+  if (dob > ageCutoff) throw new Error("You must be at least 13 years old to create a TwiTok account");
   if (!input.email && !input.phone) throw new Error("Email or phone is required");
+  const normalizedEmail = input.email?.trim().toLowerCase();
+  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error("Invalid email address");
+  const normalizedPhone = input.phone?.trim();
+  if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
   const now = new Date();
-  const user = { sessionVersion: 0, username, nickname: username, email: input.email?.trim().toLowerCase(), phone: input.phone?.trim(), dateOfBirth: dob, countryCode: input.countryCode.trim().toUpperCase(), accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
+  const user = { sessionVersion: 0, username, nickname: username, email: normalizedEmail, phone: normalizedPhone, dateOfBirth: dob, countryCode, accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
   const result = await db.collection("users").insertOne({ ...user, passwordHash: await bcrypt.hash(input.password, 12) });
   return { ...user, _id: result.insertedId.toHexString() };
 }
