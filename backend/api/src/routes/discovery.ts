@@ -120,7 +120,7 @@ discoveryRouter.get("/suggestions", requireUser, async (req, res) => {
       return { user, mutualCount, score, reason };
     }).sort((a, b) => b.score - a.score || Number(b.user.isVerified) - Number(a.user.isVerified)).slice(0, limit);
 
-    res.json({ suggestions: await Promise.all(suggestions.map(x => publicProfile(db, x.user, x.reason, x.mutualCount))) });
+    res.json({ suggestions: await Promise.all(suggestions.map((x: { user: any; reason: string; mutualCount: number }) => publicProfile(db, x.user, x.reason, x.mutualCount))) });
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load suggestions" });
   }
