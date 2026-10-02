@@ -15,6 +15,27 @@ function portraitRequested(prompt: string) { return /portrait|skin|face|headshot
 const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "PORTRAIT_PRO", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
+function validateProviderOutputUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || raw.length > 2048) return null;
+
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return null;
+
+    const allowedHosts = (process.env.TWITOK_AI_MEDIA_ALLOWED_HOSTS ?? "")
+      .split(",")
+      .map(host => host.trim().toLowerCase())
+      .filter(Boolean);
+    if (allowedHosts.length > 0 && !allowedHosts.includes(url.hostname.toLowerCase())) return null;
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 aiMediaRouter.get("/status", rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, (_req, res) => {
   res.json({
     configured: Boolean(process.env.TWITOK_AI_MEDIA_ENDPOINT && process.env.TWITOK_AI_MEDIA_API_KEY),
@@ -87,7 +108,8 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
 
     if (!providerResponse.ok) throw new Error(`AI provider returned HTTP ${providerResponse.status}`);
     const provider = await providerResponse.json() as { outputUrl?: string; jobId?: string; status?: string };
-    if (!provider.outputUrl && !provider.jobId) throw new Error("AI provider returned no output or job id");
+    const providerOutputUrl = validateProviderOutputUrl(provider.outputUrl);
+    if (!providerOutputUrl && !provider.jobId) throw new Error("AI provider returned no valid output URL or job id");
 
     const db = await getDb();
     const jobId = crypto.randomUUID();
@@ -95,12 +117,12 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
       jobId, userId: req.userId, mode, style, prompt: prompt || null,
       sourceObjectKey, providerJobId: provider.jobId ?? null,
       targetResolution, outputSpec, portraitEnhance,
-      outputUrl: provider.outputUrl ?? null,
-      status: provider.outputUrl ? "READY_FOR_REVIEW" : String(provider.status ?? "PROCESSING").toUpperCase(),
+      outputUrl: providerOutputUrl,
+      status: providerOutputUrl ? "READY_FOR_REVIEW" : String(provider.status ?? "PROCESSING").toUpperCase(),
       createdAt: new Date(), updatedAt: new Date()
     });
 
-    res.status(202).json({ jobId, status: provider.outputUrl ? "READY_FOR_REVIEW" : "PROCESSING", outputUrl: provider.outputUrl ?? null });
+    res.status(202).json({ jobId, status: providerOutputUrl ? "READY_FOR_REVIEW" : "PROCESSING", outputUrl: providerOutputUrl });
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to start AI media generation" });
   }
@@ -132,7 +154,7 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
 
       if (providerResponse.ok) {
         const provider = await providerResponse.json() as { outputUrl?: string; url?: string; status?: string; state?: string };
-        outputUrl = provider.outputUrl ?? provider.url ?? null;
+        outputUrl = validateProviderOutputUrl(provider.outputUrl ?? provider.url);
         status = String(provider.status ?? provider.state ?? status).toUpperCase();
         if (outputUrl) status = "READY_FOR_REVIEW";
         await db.collection("ai_media_jobs").updateOne(
