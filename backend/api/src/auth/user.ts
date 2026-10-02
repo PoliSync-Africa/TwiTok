@@ -96,7 +96,9 @@ function isValidEmailAddress(value: string) {
   return true;
 }
 
-export async function createUser(db: Db, input: { username?: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
+export async function createUser(db: Db, input: { firstName: string; username?: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
+  const firstName = input.firstName.trim().replace(/\s+/g, " ");
+  if (!firstName || firstName.length > 50) throw new Error("First name is required and must be 1-50 characters");
   const generatedUsername = `user_${new ObjectId().toHexString().slice(-12)}`;
   const username = (input.username?.trim().toLowerCase() || generatedUsername);
   if (!/^[a-z0-9._]{3,24}$/.test(username)) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
@@ -117,7 +119,7 @@ export async function createUser(db: Db, input: { username?: string; password: s
   if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
   const now = new Date();
   const user = {
-    sessionVersion: 0, username, nickname: username, email: normalizedEmail, phone: normalizedPhone,
+    sessionVersion: 0, firstName, username, nickname: username, email: normalizedEmail, phone: normalizedPhone,
     phoneHash: normalizedPhone ? hashPhone(normalizedPhone) : null,
     phoneSuffixHash: normalizedPhone ? hashPhoneSuffix(normalizedPhone) : null,
     dateOfBirth: dob, countryCode, accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false,
@@ -139,5 +141,5 @@ export async function authenticateUser(db: Db, identifier: string, password: str
       { $set: { phoneHash: hashPhone(user.phone), phoneSuffixHash: hashPhoneSuffix(user.phone), updatedAt: new Date() } }
     );
   }
-  return { _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
+  return { _id: user._id.toHexString(), firstName: user.firstName, username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }
