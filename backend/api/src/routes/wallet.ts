@@ -534,8 +534,11 @@ walletRouter.post("/payout/paystack/webhook", async (req, res) => {
     if (!["transfer.success", "transfer.failed", "transfer.reversed"].includes(event)) return res.json({ ok: true, ignored: true });
     const reference = String(req.body?.data?.reference ?? "");
     const eventId = String(req.body?.data?.id ?? reference + ":" + event);
+    const amount = Number(req.body?.data?.amount);
+    const currency = String(req.body?.data?.currency ?? "");
     if (!reference) return res.status(400).json({ error: "Transfer reference missing" });
-    const result = await reconcilePaystackTransfer(await getDb(), { eventId, event: event as "transfer.success" | "transfer.failed" | "transfer.reversed", reference, rawStatus: String(req.body?.data?.status ?? "") });
+    if (!Number.isFinite(amount) || !currency) return res.status(400).json({ error: "Transfer amount and currency are required" });
+    const result = await reconcilePaystackTransfer(await getDb(), { eventId, event: event as "transfer.success" | "transfer.failed" | "transfer.reversed", reference, amount, currency, rawStatus: String(req.body?.data?.status ?? "") });
     return res.json({ ok: true, ...result });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Payout webhook failed" }); }
 });
@@ -603,8 +606,11 @@ walletRouter.post("/payout/flutterwave/webhook", async (req, res) => {
     const transferId = String(data?.id ?? "");
     const reference = String(data?.reference ?? "");
     const status = String(data?.status ?? "");
+    const amount = Number(data?.amount);
+    const currency = String(data?.currency ?? "");
     if (!transferId || !reference || !status) return res.status(400).json({ error: "Flutterwave transfer identifiers missing" });
-    const result = await reconcileFlutterwaveTransfer(await getDb(), { eventId: transferId + ":" + status, transferId, reference, status, rawMessage: String(data?.complete_message ?? "") });
+    if (!Number.isFinite(amount) || !currency) return res.status(400).json({ error: "Flutterwave transfer amount and currency are required" });
+    const result = await reconcileFlutterwaveTransfer(await getDb(), { eventId: transferId + ":" + status, transferId, reference, status, amount, currency, rawMessage: String(data?.complete_message ?? "") });
     return res.json({ ok: true, ...result });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Flutterwave payout webhook failed" }); }
 });
