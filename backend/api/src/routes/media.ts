@@ -37,7 +37,9 @@ mediaRouter.post("/upload-url", requireUser, uploadSigningLimit, async (req, res
     if (!owned && !photo && !objectKey.startsWith("comment-media/") && !objectKey.startsWith("profile-photos/")) return res.status(404).json({ error: "Upload object not found" });
     const result = await createPresignedUpload({ objectKey, mimeType, sizeBytes });
     res.json(result);
-  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign upload" }); }
+  } catch {
+    res.status(400).json({ error: "Unable to sign upload", code: "MEDIA_UPLOAD_SIGNING_FAILED" });
+  }
 });
 
 mediaRouter.get("/playback/:videoId", requireUser, playbackReadLimit, async (req, res) => {
@@ -60,5 +62,7 @@ mediaRouter.get("/playback/:videoId", requireUser, playbackReadLimit, async (req
     if (video.playback?.hlsUrl) return res.json({ url: video.playback.hlsUrl, type: "HLS" });
     if (video.playback?.objectKey) return res.json(await createPresignedPlayback(video.playback.objectKey));
     return res.status(404).json({ error: "Playback asset is not ready" });
-  } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create playback URL" }); }
+  } catch {
+    res.status(400).json({ error: "Unable to create playback URL", code: "MEDIA_PLAYBACK_FAILED" });
+  }
 });
