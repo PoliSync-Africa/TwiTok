@@ -61,7 +61,7 @@ export async function createUser(db: Db, input: { username?: string; password: s
   if (dob > ageCutoff) throw new Error("You must be at least 13 years old to create a TwiTok account");
   if (!input.email && !input.phone) throw new Error("Email or phone is required");
   const normalizedEmail = input.email?.trim().toLowerCase();
-  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error("Invalid email address");
+  if (normalizedEmail) {\n    const emailParts = normalizedEmail.split("@");\n    const localPart = emailParts.length === 2 ? emailParts[0] : "";\n    const domainPart = emailParts.length === 2 ? emailParts[1] : "";\n    const validEmail = normalizedEmail.length <= 254 && localPart.length > 0 && localPart.length <= 64 && domainPart.length > 0 && domainPart.length <= 253 && domainPart.includes(".") && !normalizedEmail.includes(" ") && !normalizedEmail.includes("\\t") && !normalizedEmail.includes("\\n") && !normalizedEmail.includes("\\r");\n    if (!validEmail) throw new Error("Invalid email address");\n  }
   const normalizedPhone = input.phone?.trim();
   if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
   const now = new Date();
