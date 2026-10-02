@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { AudioSession, LiveKitRoom, VideoTrack, useTracks, isTrackReference } from "@livekit/react-native";
+import { AudioSession, LiveKitRoom, VideoTrack, useLocalParticipant, useTracks, isTrackReference } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -37,6 +37,44 @@ const GIFTS: Gift[] = [
   { giftId:"gold_drum",name:"Golden Drum",coins:80,emoji:"🥁" },
   { giftId:"royal_crown",name:"Royal Crown",coins:240,emoji:"👑" }
 ];
+
+function LiveHostControls() {
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const [busy, setBusy] = useState(false);
+
+  const toggleMicrophone = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+    } catch {
+      Alert.alert("Microphone", "Unable to change microphone state.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await localParticipant.setCameraEnabled(!isCameraEnabled);
+    } catch {
+      Alert.alert("Camera", "Unable to change camera state.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <View style={styles.hostControls} pointerEvents="box-none">
+    <Pressable disabled={busy} onPress={() => void toggleMicrophone()} style={styles.hostControlButton}>
+      <Text style={styles.hostControlText}>{isMicrophoneEnabled ? "🎙️ Mic" : "🔇 Mic"}</Text>
+    </Pressable>
+    <Pressable disabled={busy} onPress={() => void toggleCamera()} style={styles.hostControlButton}>
+      <Text style={styles.hostControlText}>{isCameraEnabled ? "📹 Camera" : "🚫 Camera"}</Text>
+    </Pressable>
+  </View>;
+}
 
 function LiveKitVideoSurface() {
   const tracks = useTracks([Track.Source.Camera]).filter(isTrackReference).slice(0, 16);
@@ -255,7 +293,7 @@ export default function LiveViewerScreen() {
   if (!streamId) return <View style={styles.center}><Text style={styles.error}>LIVE session not found.</Text></View>;
 
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-    {liveKitToken && liveKitUrl && status === "live" ? <LiveKitRoom serverUrl={liveKitUrl} token={liveKitToken} connect={true} audio={canPublish} video={canPublish} options={{ adaptiveStream: true, dynacast: true }}><LiveKitVideoSurface /></LiveKitRoom> : manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
+    {liveKitToken && liveKitUrl && status === "live" ? <LiveKitRoom serverUrl={liveKitUrl} token={liveKitToken} connect={true} audio={canPublish} video={canPublish} options={{ adaptiveStream: true, dynacast: true }}><LiveKitVideoSurface />{isHost && canPublish ? <LiveHostControls /> : null}</LiveKitRoom> : manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
     {studioOverlay.filter && studioOverlay.filter !== "NONE" && <View pointerEvents="none" style={[styles.filterOverlay, (styles as unknown as Record<string, object>)["filter_" + studioOverlay.filter] ?? styles.filterDefault]} />}
     {studioOverlay.stickers?.length ? <View pointerEvents="none" style={styles.liveStickers}>{studioOverlay.stickers.map((sticker, index) => {
       const bounce = sticker.animation === "BOUNCE" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) : 0;
@@ -297,6 +335,9 @@ const styles=StyleSheet.create({
  filterOverlay:{position:"absolute",top:0,right:0,bottom:0,left:0,zIndex:2,pointerEvents:"none"},
  filterDefault:{backgroundColor:"rgba(255,45,85,.06)"},
  filter_CINEMATIC:{backgroundColor:"rgba(255,170,90,.10)"},filter_VINTAGE:{backgroundColor:"rgba(190,145,95,.13)"},filter_DREAM:{backgroundColor:"rgba(210,170,255,.10)"},filter_FADE:{backgroundColor:"rgba(220,220,220,.10)"},filter_SUNNY:{backgroundColor:"rgba(255,220,80,.10)"},filter_DUSK:{backgroundColor:"rgba(80,90,180,.12)"},filter_POP:{backgroundColor:"rgba(255,30,120,.10)"},filter_FILM:{backgroundColor:"rgba(40,40,40,.12)"},filter_NOIR:{backgroundColor:"rgba(0,0,0,.22)"},filter_GLOW:{backgroundColor:"rgba(255,255,210,.12)"},filter_SHARP:{backgroundColor:"rgba(255,255,255,.05)"},filter_SOFT:{backgroundColor:"rgba(230,210,255,.09)"},filter_PORTRAIT:{backgroundColor:"rgba(255,180,160,.08)"},filter_PARTY:{backgroundColor:"rgba(255,80,180,.10)"},filter_FESTIVAL:{backgroundColor:"rgba(255,210,80,.10)"},filter_GOLDEN:{backgroundColor:"rgba(255,190,70,.12)"},filter_TEAL:{backgroundColor:"rgba(0,190,180,.10)"},filter_ROSE:{backgroundColor:"rgba(255,90,130,.10)"},
+ hostControls:{position:"absolute",right:12,bottom:175,zIndex:8,flexDirection:"row",gap:8},
+ hostControlButton:{backgroundColor:"rgba(0,0,0,.68)",borderColor:"#fff",borderWidth:1,borderRadius:18,paddingHorizontal:12,paddingVertical:8},
+ hostControlText:{color:"#fff",fontSize:10,fontWeight:"900"},
  liveStickers:{position:"absolute",zIndex:3,top:0,left:0,right:0,bottom:0,pointerEvents:"none"},
  liveSticker:{position:"absolute",fontSize:30,textShadowColor:"#000",textShadowOffset:{width:1,height:1},textShadowRadius:4},
  center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:25},
