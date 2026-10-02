@@ -27,7 +27,16 @@ export default function LoginScreen() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to sign in");
       await saveAuthToken(data.token);
-      if (data.verificationRequired) { router.replace({ pathname: "/verify-otp", params: { channel: data.channel === "phone" ? "phone" : "email" } }); return; }
+      if (data.verificationRequired) {
+        router.replace({
+          pathname: "/verify-otp",
+          params: {
+            channel: data.channel === "phone" ? "phone" : "email",
+            retryAfterSeconds: String(Number(data.retryAfterSeconds ?? 60) || 60)
+          }
+        });
+        return;
+      }
       router.replace("/feed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in");
