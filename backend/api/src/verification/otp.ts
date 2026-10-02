@@ -170,19 +170,19 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   const now = new Date();
   const otp = await db.collection("auth_otps").findOne(
     { userId, channel, purpose, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
-    { sort: { createdAt: -1 } }
+    { sort: { createdAt: -1 }, ...(session ? { session } : {}) }
   );
 
   if (!otp) throw new Error("The verification code is invalid or expired");
   const attempts = Number(otp.attempts ?? 0);
   if (attempts >= OTP_MAX_ATTEMPTS) {
-    await db.collection("auth_otps").updateOne({ _id: otp._id }, { $set: { consumedAt: now, updatedAt: now } }, ...(session ? { session } : {}));
+    await db.collection("auth_otps").updateOne({ _id: otp._id }, { $set: { consumedAt: now, updatedAt: now } }, session ? { session } : {});
     throw new Error("Too many incorrect attempts. Request a new code");
   }
 
   const user = await db.collection("users").findOne(
     { _id: new ObjectId(userId), status: "ACTIVE" },
-    { projection: { email: 1, phone: 1 } }
+    { projection: { email: 1, phone: 1 }, ...(session ? { session } : {}) }
   );
   if (!user) throw new Error("Account not found");
 
@@ -202,7 +202,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
       { $inc: { attempts: 1 }, $set: { updatedAt: now } }
     );
     if (nextAttempts >= OTP_MAX_ATTEMPTS) {
-      await db.collection("auth_otps").updateOne({ _id: otp._id, consumedAt: { $exists: false } }, { $set: { consumedAt: now, updatedAt: now } }, ...(session ? { session } : {}));
+      await db.collection("auth_otps").updateOne({ _id: otp._id, consumedAt: { $exists: false } }, { $set: { consumedAt: now, updatedAt: now } }, session ? { session } : {});
       throw new Error("Too many incorrect attempts. Request a new code");
     }
     throw new Error("The verification code is incorrect");
@@ -211,7 +211,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   const consumed = await db.collection("auth_otps").findOneAndUpdate(
     { _id: otp._id, userId, channel, purpose, destination, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
     { $set: { consumedAt: now, updatedAt: now } },
-    { returnDocument: "after" }
+    { returnDocument: "after", ...(session ? { session } : {}) }
   );
   if (!consumed) throw new Error("The verification code has already been used");
 
