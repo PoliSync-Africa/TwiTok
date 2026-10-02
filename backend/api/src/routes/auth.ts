@@ -86,7 +86,7 @@ authRouter.post("/password/reset", rateLimit({ windowMs: 15 * 60 * 1000, max: 5,
     const channel = String(req.body?.channel ?? "").toLowerCase() as OtpChannel;
     const code = String(req.body?.code ?? "").trim();
     const newPassword = String(req.body?.newPassword ?? "");
-    if (!identifier || (channel !== "email" && channel !== "phone") || !/^\\d{6}$/.test(code) || newPassword.length < 12) {
+    if (!identifier || (channel !== "email" && channel !== "phone") || !/^\d{6}$/.test(code) || newPassword.length < 12) {
       return res.status(400).json({ error: "Invalid password recovery request" });
     }
     const db = await getDb();
