@@ -266,6 +266,28 @@ export default function LiveStudioScreen() {
                 void save({ stickers: next });
               }}><Text style={styles.toolText}>Delete</Text></Pressable>
             </View>
+            <View style={styles.layerActions}>
+              <Text style={styles.layerActionLabel}>Layer order</Text>
+              {(() => {
+                const index = studio.stickers.findIndex(item => item.id === selected.id);
+                const move = (direction: -1 | 1) => {
+                  const target = index + direction;
+                  if (index < 0 || target < 0 || target >= studio.stickers.length) return;
+                  const next = [...studio.stickers];
+                  const [item] = next.splice(index, 1);
+                  next.splice(target, 0, item);
+                  void save({ stickers: next });
+                };
+                return <>
+                  <Pressable disabled={index <= 0 || busy} style={[styles.layerMoveButton, (index <= 0 || busy) && styles.layerMoveDisabled]} onPress={() => move(-1)}>
+                    <Text style={styles.toolText}>↑ Forward</Text>
+                  </Pressable>
+                  <Pressable disabled={index < 0 || index >= studio.stickers.length - 1 || busy} style={[styles.layerMoveButton, (index >= studio.stickers.length - 1 || busy) && styles.layerMoveDisabled]} onPress={() => move(1)}>
+                    <Text style={styles.toolText}>↓ Back</Text>
+                  </Pressable>
+                </>;
+              })()}
+            </View>
           </View>;
         })()}
       </Section>
@@ -322,5 +344,5 @@ const styles = StyleSheet.create({
   pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},preset:{width:92,height:82,borderRadius:16,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",marginRight:8},presetActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},presetIcon:{fontSize:25},presetText:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:6},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
   wrap:{flexDirection:"row",flexWrap:"wrap"},
   stickerGrid:{flexDirection:"row",flexWrap:"wrap",gap:7},sticker:{width:42,height:42,borderRadius:13,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},stickerActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},stickerText:{fontSize:21},stickerEditor:{marginTop:12,padding:12,borderRadius:14,backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d"},editorTitle:{color:"#fff",fontWeight:"900",marginBottom:8},controlRow:{flexDirection:"row",alignItems:"center",gap:8,marginBottom:8},adjust:{width:34,height:34,borderRadius:10,backgroundColor:"#252525",alignItems:"center",justifyContent:"center"},adjustText:{color:"#fff",fontSize:20,fontWeight:"900"},value:{color:"#fff",fontWeight:"800",minWidth:50,textAlign:"center"},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
-  error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},layerHeader:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginTop:10,marginBottom:7},layerTitle:{color:"#fff",fontSize:11,fontWeight:"900"},clearText:{color:"#ff91a8",fontSize:11,fontWeight:"900"},layerRow:{gap:7},layerChip:{minWidth:55,height:46,borderRadius:12,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",paddingHorizontal:8},layerChipActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},layerEmoji:{fontSize:20},layerIndex:{color:"#777",fontSize:8,marginTop:2},toolButton:{paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#252525",borderWidth:1,borderColor:"#383838",marginRight:7,marginTop:8},toolButtonDanger:{paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#32151c",borderWidth:1,borderColor:"#6b2535",marginRight:7,marginTop:8},toolText:{color:"#fff",fontSize:10,fontWeight:"900"},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
+  error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},layerHeader:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginTop:10,marginBottom:7},layerTitle:{color:"#fff",fontSize:11,fontWeight:"900"},clearText:{color:"#ff91a8",fontSize:11,fontWeight:"900"},layerRow:{gap:7},layerChip:{minWidth:55,height:46,borderRadius:12,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",paddingHorizontal:8},layerChipActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},layerEmoji:{fontSize:20},layerIndex:{color:"#777",fontSize:8,marginTop:2},toolButton:{paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#252525",borderWidth:1,borderColor:"#383838",marginRight:7,marginTop:8},toolButtonDanger:{paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#32151c",borderWidth:1,borderColor:"#6b2535",marginRight:7,marginTop:8},layerActions:{flexDirection:"row",alignItems:"center",flexWrap:"wrap",marginTop:4},layerActionLabel:{color:"#888",fontSize:10,fontWeight:"800",marginRight:7},layerMoveButton:{paddingHorizontal:10,paddingVertical:8,borderRadius:11,backgroundColor:"#252525",borderWidth:1,borderColor:"#383838",marginRight:7,marginTop:4},layerMoveDisabled:{opacity:.4},toolText:{color:"#fff",fontSize:10,fontWeight:"900"},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
 });
