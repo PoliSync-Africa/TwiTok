@@ -1,8 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/mongo.js";
-import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
-import { requireUser } from "../auth/middleware.js";
+import { authenticateUser, createUser, issueUserToken, issueVerificationToken } from "../auth/user.js";
+import { requireUser, requireVerificationUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 import { sendOtp, verifyOtp, type OtpChannel } from "../verification/otp.js";
 
@@ -21,9 +21,8 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     const { username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
     if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
-    const token = issueUserToken(user);
-    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    res.status(201).json({ token, user });
+    const token = issueVerificationToken(user);
+    res.status(201).json({ token, verificationRequired: true, channel: email ? "email" : "phone", user });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
     res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
@@ -34,15 +33,30 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
   try {
     const { identifier, password } = req.body ?? {};
     if (!identifier || !password) return res.status(400).json({ error: "identifier and password are required" });
-    const user = await authenticateUser(await getDb(), identifier, password);
+    const db = await getDb();
+    const user = await authenticateUser(db, identifier, password);
+    const stored = await db.collection("users").findOne(
+      { _id: new (await import("mongodb")).ObjectId(user._id) },
+      { projection: { emailVerified: 1, phoneVerified: 1, email: 1, phone: 1 } }
+    );
+    let verificationChannel: OtpChannel | null = null;
+    const identifierValue = String(identifier).trim().toLowerCase();
+    if (identifierValue.includes("@") && user.email && stored?.emailVerified !== true) verificationChannel = "email";
+    else if (!identifierValue.includes("@") && user.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
+    else if (user.email && stored?.emailVerified !== true) verificationChannel = "email";
+    else if (user.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
+    if (verificationChannel) {
+      const token = issueVerificationToken(user);
+      return res.json({ token, verificationRequired: true, channel: verificationChannel, user });
+    }
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    res.json({ token, user });
+    res.json({ token, verificationRequired: false, user });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
 
-authRouter.post("/verification/send", requireUser, otpSendLimit, async (req, res) => {
+authRouter.post("/verification/send", requireVerificationUser, otpSendLimit, async (req, res) => {
   try {
     const channel = String(req.body?.channel ?? "").toLowerCase() as OtpChannel;
     if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "channel must be email or phone" });
@@ -55,21 +69,33 @@ authRouter.post("/verification/send", requireUser, otpSendLimit, async (req, res
   }
 });
 
-authRouter.post("/verification/verify", requireUser, otpVerifyLimit, async (req, res) => {
+authRouter.post("/verification/verify", requireVerificationUser, otpVerifyLimit, async (req, res) => {
   try {
     const channel = String(req.body?.channel ?? "").toLowerCase() as OtpChannel;
     const code = String(req.body?.code ?? "").trim();
     if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "channel must be email or phone" });
     if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
-    const result = await verifyOtp(await getDb(), req.userId!.toHexString(), channel, code);
-    return res.json(result);
+    const db = await getDb();
+    const result = await verifyOtp(db, req.userId!.toHexString(), channel, code);
+    const user = await db.collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { username: 1, sessionVersion: 1, nickname: 1, email: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1 } }
+    );
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    const token = issueUserToken({
+      _id: user._id.toHexString(),
+      username: user.username,
+      sessionVersion: Number(user.sessionVersion ?? 0)
+    });
+    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
+    return res.json({ ...result, token, user: { ...user, _id: user._id.toHexString() } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to verify code";
     return res.status(/too many incorrect|rate/i.test(message) ? 429 : 400).json({ error: message });
   }
 });
 
-authRouter.get("/verification/status", requireUser, userReadLimit, async (req, res) => {
+authRouter.get("/verification/status", requireVerificationUser, userReadLimit, async (req, res) => {
   try {
     const user = await (await getDb()).collection("users").findOne(
       { _id: req.userId! },
