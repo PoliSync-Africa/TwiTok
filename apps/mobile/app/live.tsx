@@ -14,9 +14,10 @@ type LiveStudioOverlay = { filter?: string; stickers?: LiveSticker[] };
 
 function normalizeLiveStickers(items: unknown): LiveSticker[] {
   if (!Array.isArray(items)) return [];
-  return items.slice(0, 32).map((item, index) => {
-    if (typeof item === "string") return { id: item + "-" + index, emoji: item, x: 50, y: 30 + (index % 4) * 14, scale: 1, rotation: 0, animation: "NONE" as const };
+  return items.slice(0, 32).map((item, index): LiveSticker => {
+    if (typeof item === "string") return { id: item + "-" + index, emoji: item, x: 50, y: 30 + (index % 4) * 14, scale: 1, rotation: 0, animation: "NONE" };
     const value = item as Partial<LiveSticker>;
+    const animation: LiveSticker["animation"] = value.animation === "BOUNCE" || value.animation === "PULSE" || value.animation === "FLOAT" ? value.animation : "NONE";
     return {
       id: String(value.id ?? value.emoji ?? "sticker-" + index),
       emoji: String(value.emoji ?? "✨").slice(0, 16),
@@ -24,7 +25,7 @@ function normalizeLiveStickers(items: unknown): LiveSticker[] {
       y: Math.min(100, Math.max(0, Number(value.y ?? 35))),
       scale: Math.min(3, Math.max(.5, Number(value.scale ?? 1))),
       rotation: Math.min(180, Math.max(-180, Number(value.rotation ?? 0))),
-      animation: value.animation === "BOUNCE" || value.animation === "PULSE" || value.animation === "FLOAT" ? value.animation : "NONE"
+      animation
     };
   }).filter(item => item.emoji);
 }
@@ -237,7 +238,7 @@ export default function LiveViewerScreen() {
       const bounce = sticker.animation === "BOUNCE" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) : 0;
       const pulse = sticker.animation === "PULSE" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [sticker.scale, sticker.scale * 1.18] }) : sticker.scale;
       const float = sticker.animation === "FLOAT" ? stickerMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) : 0;
-      return <Animated.Text key={sticker.id + index} style={[styles.liveSticker, { left: sticker.x + "%", top: sticker.y + "%", transform: [{ translateX: -16 }, { translateY: bounce }, { translateY: float }, { scale: pulse }, { rotate: sticker.rotation + "deg" }] }]}>{sticker.emoji}</Animated.Text>;
+      return <Animated.Text key={sticker.id + index} style={[styles.liveSticker, { left: (`${sticker.x}%` as `${number}%`), top: (`${sticker.y}%` as `${number}%`), transform: [{ translateX: -16 }, { translateY: bounce }, { translateY: float }, { scale: pulse }, { rotate: sticker.rotation + "deg" }] }]}>{sticker.emoji}</Animated.Text>;
     })}</View> : null}
     <View style={styles.top}>
       <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
