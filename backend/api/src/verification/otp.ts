@@ -139,7 +139,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const expiresAt = new Date(now.getTime() + OTP_TTL_MS);
-  const codeHash = hashCode(userId, channel, destination, code);
+  const codeHash = hashCode(userId, channel, destination, code, purpose);
 
   await deliverOtp(channel, destination, code);
 
