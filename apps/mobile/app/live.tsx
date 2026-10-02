@@ -9,6 +9,7 @@ import { getAuthToken } from "../lib/auth";
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type LiveComment = { commentId?: string; userId?: string; text: string; createdAt?: string };
 type Gift = { giftId: string; name: string; coins: number; emoji: string };
+type LiveStudioOverlay = { filter?: string; stickers?: string[] };
 const GIFTS: Gift[] = [
   { giftId:"rose",name:"Rose",coins:3,emoji:"🌹" },
   { giftId:"heart",name:"Heart",coins:4,emoji:"❤️" },
@@ -45,6 +46,7 @@ export default function LiveViewerScreen() {
   const [giftBusy, setGiftBusy] = useState(false);
   const [giftSummary, setGiftSummary] = useState({ gifts: 0, coinsSpent: 0 });
   const [reactionSummary, setReactionSummary] = useState<Record<string, number>>({});
+  const [studioOverlay, setStudioOverlay] = useState<LiveStudioOverlay>({ filter: "NONE", stickers: [] });
 
   useEffect(() => {
     if (!streamId) { setStatus("error"); setMessage("LIVE session not found."); return; }
@@ -58,6 +60,10 @@ export default function LiveViewerScreen() {
         if (!info.ok) throw new Error(data.error || "LIVE stream not found");
         if (!alive) return;
         setViewerCount(Number(data.stream?.viewerCount ?? 0));
+        setStudioOverlay({
+          filter: String(data.stream?.studio?.filter ?? "NONE"),
+          stickers: Array.isArray(data.stream?.studio?.stickers) ? data.stream.studio.stickers.slice(0, 32).map(String) : []
+        });
         if (data.stream?.status !== "LIVE") {
           setStatus("waiting"); setMessage("This LIVE hasn't started yet."); return;
         }
@@ -199,6 +205,8 @@ export default function LiveViewerScreen() {
 
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
     {liveKitToken && liveKitUrl && status === "live" ? <LiveKitRoom serverUrl={liveKitUrl} token={liveKitToken} connect={true} audio={canPublish} video={canPublish} options={{ adaptiveStream: true, dynacast: true }}><LiveKitVideoSurface /></LiveKitRoom> : manifest && status === "live" ? <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover" /> : <View style={styles.center}><ActivityIndicator color="#fff"/><Text style={styles.message}>{message || "Connecting to LIVE…"}</Text></View>}
+    {studioOverlay.filter && studioOverlay.filter !== "NONE" && <View pointerEvents="none" style={[styles.filterOverlay, styles["filter_" + studioOverlay.filter] ?? styles.filterDefault]} />}
+    {studioOverlay.stickers?.length ? <View pointerEvents="none" style={styles.liveStickers}>{studioOverlay.stickers.map((sticker, index) => <Text key={sticker + index} style={[styles.liveSticker, { transform: [{ rotate: ((index % 5) - 2) * 4 + "deg" as any }] }]}>{sticker}</Text>)}</View> : null}
     <View style={styles.top}>
       <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
       <View><Text style={styles.live}>● LIVE</Text><Text style={styles.viewers}>{viewerCount.toLocaleString()} viewers</Text></View>
