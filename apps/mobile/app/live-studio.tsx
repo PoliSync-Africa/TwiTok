@@ -270,20 +270,19 @@ export default function LiveStudioScreen() {
               <Text style={styles.layerActionLabel}>Layer order</Text>
               {(() => {
                 const index = studio.stickers.findIndex(item => item.id === selected.id);
-                const move = (direction: -1 | 1) => {
-                  const target = index + direction;
-                  if (index < 0 || target < 0 || target >= studio.stickers.length) return;
+                const move = (targetIndex: number) => {
+                  if (index < 0 || targetIndex < 0 || targetIndex >= studio.stickers.length || targetIndex === index) return;
                   const next = [...studio.stickers];
                   const [item] = next.splice(index, 1);
-                  next.splice(target, 0, item);
+                  next.splice(targetIndex, 0, item);
                   void save({ stickers: next });
                 };
                 return <>
-                  <Pressable disabled={index <= 0 || busy} style={[styles.layerMoveButton, (index <= 0 || busy) && styles.layerMoveDisabled]} onPress={() => move(-1)}>
-                    <Text style={styles.toolText}>↑ Forward</Text>
+                  <Pressable disabled={index >= studio.stickers.length - 1 || busy} style={[styles.layerMoveButton, (index >= studio.stickers.length - 1 || busy) && styles.layerMoveDisabled]} onPress={() => move(studio.stickers.length - 1)}>
+                    <Text style={styles.toolText}>↓ Front</Text>
                   </Pressable>
-                  <Pressable disabled={index < 0 || index >= studio.stickers.length - 1 || busy} style={[styles.layerMoveButton, (index >= studio.stickers.length - 1 || busy) && styles.layerMoveDisabled]} onPress={() => move(1)}>
-                    <Text style={styles.toolText}>↓ Back</Text>
+                  <Pressable disabled={index <= 0 || busy} style={[styles.layerMoveButton, (index <= 0 || busy) && styles.layerMoveDisabled]} onPress={() => move(0)}>
+                    <Text style={styles.toolText}>↑ Back</Text>
                   </Pressable>
                 </>;
               })()}
