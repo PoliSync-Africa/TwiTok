@@ -44,6 +44,8 @@ export async function createLiveStream(db: Db, input: { streamId:string; hostUse
       background: "NONE",
       backgroundUrl: null,
       effect: "NONE",
+      filter: "NONE",
+      stickers: [],
       beauty: 0,
       layout: "SOLO",
       guestLimit: 15,
