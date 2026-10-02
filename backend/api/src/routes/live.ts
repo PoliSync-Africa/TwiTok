@@ -13,8 +13,17 @@ import { createPresignedUpload, mediaConfigured } from "../media/storage.js";
 
 export const liveRouter = Router();
 const liveActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
-const LIVE_STUDIO_BACKGROUNDS = new Set(["NONE", "BLUR", "STUDIO", "SUNSET", "CITY", "GOLD", "KENTE", "NIGHT", "CUSTOM"]);
-const LIVE_STUDIO_EFFECTS = new Set(["NONE", "BEAUTY", "VIVID", "WARM", "COOL", "MONO"]);
+const LIVE_STUDIO_BACKGROUNDS = new Set([
+  "NONE","BLUR","STUDIO","SUNSET","CITY","GOLD","KENTE","NIGHT","NEON","BEACH","FOREST","MOUNTAINS",
+  "SPACE","GALAXY","AURORA","CLOUDS","CHERRY","SAKURA","TROPICAL","OCEAN","DESERT","LUXURY","CONCERT",
+  "SPORTS","NEWS","OFFICE","CLASSROOM","CAFE","STAGE","FIRE","RAIN","HEARTS","PRIDE","GHANA","AFRICA","CUSTOM"
+]);
+const LIVE_STUDIO_EFFECTS = new Set([
+  "NONE","BEAUTY","VIVID","WARM","COOL","MONO","CINEMATIC","VINTAGE","DREAM","FADE","SUNNY","DUSK",
+  "POP","FILM","NOIR","GLOW","SHARP","SOFT","PORTRAIT","PARTY","FESTIVAL","GOLDEN","TEAL","ROSE"
+]);
+const LIVE_STUDIO_FILTER_MAX = 64;
+const LIVE_STUDIO_STICKER_MAX = 32;
 const LIVE_STUDIO_LAYOUTS = new Set(["SOLO", "DUO", "TRIO", "GRID", "PANEL", "PIP"]);
 
 async function requireLiveHost(streamId: string, userId: string) {
@@ -63,6 +72,17 @@ liveRouter.patch("/streams/:streamId/studio", requireUser, liveActionLimit, asyn
       const value = String(body.effect).toUpperCase();
       if (!LIVE_STUDIO_EFFECTS.has(value)) return res.status(400).json({ error: "Unsupported LIVE effect" });
       update.effect = value;
+    }
+    if (body.filter !== undefined) {
+      const value = String(body.filter).toUpperCase().trim();
+      if (value.length > LIVE_STUDIO_FILTER_MAX || !LIVE_STUDIO_EFFECTS.has(value)) return res.status(400).json({ error: "Unsupported LIVE filter" });
+      update.filter = value;
+    }
+    if (body.stickers !== undefined) {
+      if (!Array.isArray(body.stickers) || body.stickers.length > LIVE_STUDIO_STICKER_MAX) return res.status(400).json({ error: "LIVE stickers must be an array of up to 32 items" });
+      const stickers = body.stickers.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, LIVE_STUDIO_STICKER_MAX);
+      if (stickers.some((item: string) => item.length > 64)) return res.status(400).json({ error: "LIVE sticker names are too long" });
+      update.stickers = [...new Set(stickers)];
     }
     if (body.beauty !== undefined) {
       const value = Math.min(100, Math.max(0, Number(body.beauty)));
