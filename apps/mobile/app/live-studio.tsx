@@ -10,6 +10,8 @@ type Studio = {
   background: string;
   backgroundUrl: string | null;
   effect: string;
+  filter: string;
+  stickers: string[];
   beauty: number;
   layout: string;
   guestLimit: number;
@@ -22,17 +24,24 @@ type Studio = {
 };
 
 const DEFAULTS: Studio = {
-  background: "NONE", backgroundUrl: null, effect: "NONE", beauty: 0, layout: "SOLO",
+  background: "NONE", backgroundUrl: null, effect: "NONE", filter: "NONE", stickers: [], beauty: 0, layout: "SOLO",
   guestLimit: 15, commentsFilterEnabled: true, autoCaptions: true, giftAlerts: true,
   lowLatency: true, recordingEnabled: false, screenShareEnabled: false
 };
 
 const BACKGROUNDS = [
-  ["NONE","No background"], ["BLUR","Soft blur"], ["STUDIO","Creator Studio"],
-  ["SUNSET","Sunset"], ["CITY","City lights"], ["GOLD","Gold"], ["KENTE","Kente"],
-  ["NIGHT","Night"], ["CUSTOM","My photo"]
+  ["NONE","No background","○"],["BLUR","Soft blur","◌"],["STUDIO","Creator Studio","▣"],["SUNSET","Sunset","☀"],
+  ["CITY","City lights","⌂"],["GOLD","Gold","◆"],["KENTE","Kente","▦"],["NIGHT","Night","☾"],
+  ["NEON","Neon room","✦"],["BEACH","Beach","⌁"],["FOREST","Forest","♣"],["MOUNTAINS","Mountains","▲"],
+  ["SPACE","Space","✧"],["GALAXY","Galaxy","✦"],["AURORA","Aurora","≋"],["CLOUDS","Clouds","☁"],
+  ["CHERRY","Cherry","●"],["SAKURA","Sakura","✿"],["TROPICAL","Tropical","🌴"],["OCEAN","Ocean","≈"],
+  ["DESERT","Desert","◇"],["LUXURY","Luxury","♛"],["CONCERT","Concert","♫"],["SPORTS","Sports","★"],
+  ["NEWS","Newsroom","▤"],["OFFICE","Office","▥"],["CLASSROOM","Classroom","▧"],["CAFE","Cafe","☕"],
+  ["STAGE","Stage","◉"],["FIRE","Fire","♨"],["RAIN","Rain","☂"],["HEARTS","Hearts","♥"],
+  ["PRIDE","Pride","🏳️‍🌈"],["GHANA","Ghana","★"],["AFRICA","Africa","◆"],["CUSTOM","My photo","＋"]
 ] as const;
-const EFFECTS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO"];
+const FILTERS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO","CINEMATIC","VINTAGE","DREAM","FADE","SUNNY","DUSK","POP","FILM","NOIR","GLOW","SHARP","SOFT","PORTRAIT","PARTY","FESTIVAL","GOLDEN","TEAL","ROSE"];
+const STICKERS = ["❤️","😂","🔥","👏","😍","🥳","✨","⭐","💯","🎉","🎁","🎵","🎤","👑","💎","🌟","💫","🌈","☀️","🌙","☁️","⚡","🌸","🌺","🌴","🦋","🐝","🍀","🍕","🍔","🍹","⚽","🏆","🎮","📸","🎬","🇬🇭","🇳🇬","🇰🇪","🇿🇦","🇺🇸","🇬🇧"];
 const LAYOUTS = ["SOLO","DUO","TRIO","GRID","PANEL","PIP"];
 
 export default function LiveStudioScreen() {
@@ -119,7 +128,7 @@ export default function LiveStudioScreen() {
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
         {customPreview && studio.background === "CUSTOM" ? <Image source={{ uri: customPreview }} style={StyleSheet.absoluteFill} /> : <View style={styles.sceneFill}><Text style={styles.sceneIcon}>🎬</Text><Text style={styles.sceneTitle}>{backgroundLabel}</Text></View>}
-        <View style={styles.sceneOverlay}><Text style={styles.sceneBadge}>9:16 LIVE SCENE</Text><Text style={styles.sceneCaption}>{studio.layout} • {studio.effect} • Beauty {studio.beauty}%</Text></View>
+        <View style={styles.sceneOverlay}><Text style={styles.sceneBadge}>9:16 LIVE SCENE</Text><Text style={styles.sceneCaption}>{studio.layout} • {studio.filter} • Beauty {studio.beauty}%</Text>{studio.stickers.length ? <Text style={styles.stickerPreview}>{studio.stickers.join(" ")}</Text> : null}</View>
       </View>
 
       <Section title="Background">
@@ -127,6 +136,26 @@ export default function LiveStudioScreen() {
           {BACKGROUNDS.map(([id,label]) => <Pressable key={id} style={[styles.choice, studio.background === id && styles.choiceActive]} onPress={() => id === "CUSTOM" ? void uploadBackground() : void save({ background: id })}><Text style={styles.choiceIcon}>{id === "CUSTOM" ? "＋" : id === "BLUR" ? "◌" : "✦"}</Text><Text style={styles.choiceText}>{label}</Text></Pressable>)}
         </ScrollView>
         <Text style={styles.note}>Choose a preset or upload your own photo. The selected scene is saved to this LIVE.</Text>
+      </Section>
+
+      <Section title="Filters">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+          {FILTERS.map(filter => <Pressable key={filter} style={[styles.pill, studio.filter === filter && styles.pillActive]} onPress={() => void save({ filter })}><Text style={styles.pillText}>{filter}</Text></Pressable>)}
+        </ScrollView>
+        <Text style={styles.note}>Live filters are selectable independently from beauty controls.</Text>
+      </Section>
+
+      <Section title="Stickers">
+        <View style={styles.stickerGrid}>
+          {STICKERS.map(sticker => {
+            const selected = studio.stickers.includes(sticker);
+            return <Pressable key={sticker} style={[styles.sticker, selected && styles.stickerActive]} onPress={() => {
+              const next = selected ? studio.stickers.filter(item => item !== sticker) : [...studio.stickers, sticker].slice(0, 32);
+              void save({ stickers: next });
+            }}><Text style={styles.stickerText}>{sticker}</Text></Pressable>;
+          })}
+        </View>
+        <Text style={styles.note}>{studio.stickers.length}/32 stickers selected. Tap again to remove.</Text>
       </Section>
 
       <Section title="Effects & beauty">
@@ -174,10 +203,12 @@ const styles = StyleSheet.create({
   back:{color:"#fff",fontSize:36,lineHeight:36},headerTitle:{color:"#fff",fontSize:20,fontWeight:"900"},headerSub:{color:"#888",fontSize:11,marginTop:2},liveDot:{color:"#ff2d55",fontSize:18,marginLeft:"auto"},
   content:{padding:14,paddingBottom:35},hero:{height:310,borderRadius:22,overflow:"hidden",backgroundColor:"#171717",borderWidth:1,borderColor:"#2b2b2b",marginBottom:16},
   sceneFill:{flex:1,alignItems:"center",justifyContent:"center",backgroundColor:"#1c1c2c"},sceneIcon:{fontSize:48},sceneTitle:{color:"#fff",fontSize:19,fontWeight:"900",marginTop:8},
-  sceneOverlay:{position:"absolute",left:12,right:12,bottom:12,backgroundColor:"rgba(0,0,0,.62)",borderRadius:14,padding:10},sceneBadge:{color:"#ff6b87",fontSize:10,fontWeight:"900"},sceneCaption:{color:"#fff",fontSize:11,marginTop:4},
+  sceneOverlay:{position:"absolute",left:12,right:12,bottom:12,backgroundColor:"rgba(0,0,0,.62)",borderRadius:14,padding:10},
+  stickerPreview:{color:"#fff",fontSize:22,marginTop:5},sceneBadge:{color:"#ff6b87",fontSize:10,fontWeight:"900"},sceneCaption:{color:"#fff",fontSize:11,marginTop:4},
   section:{backgroundColor:"#111",borderRadius:18,padding:14,marginBottom:12,borderWidth:1,borderColor:"#242424"},sectionTitle:{color:"#fff",fontSize:15,fontWeight:"900",marginBottom:11},
   row:{gap:8},choice:{width:100,height:82,borderRadius:14,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},choiceActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},choiceIcon:{color:"#fff",fontSize:22},choiceText:{color:"#ddd",fontSize:10,fontWeight:"800",marginTop:6,textAlign:"center"},note:{color:"#777",fontSize:10,lineHeight:15,marginTop:10},
   pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
-  wrap:{flexDirection:"row",flexWrap:"wrap"},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
+  wrap:{flexDirection:"row",flexWrap:"wrap"},
+  stickerGrid:{flexDirection:"row",flexWrap:"wrap",gap:7},sticker:{width:42,height:42,borderRadius:13,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},stickerActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},stickerText:{fontSize:21},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
   error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
 });
