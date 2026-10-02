@@ -41,6 +41,7 @@ const BACKGROUNDS = [
   ["PRIDE","Pride","🏳️‍🌈"],["GHANA","Ghana","★"],["AFRICA","Africa","◆"],["CUSTOM","My photo","＋"]
 ] as const;
 const FILTERS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO","CINEMATIC","VINTAGE","DREAM","FADE","SUNNY","DUSK","POP","FILM","NOIR","GLOW","SHARP","SOFT","PORTRAIT","PARTY","FESTIVAL","GOLDEN","TEAL","ROSE"];
+const EFFECTS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO"];
 const STICKERS = ["❤️","😂","🔥","👏","😍","🥳","✨","⭐","💯","🎉","🎁","🎵","🎤","👑","💎","🌟","💫","🌈","☀️","🌙","☁️","⚡","🌸","🌺","🌴","🦋","🐝","🍀","🍕","🍔","🍹","⚽","🏆","🎮","📸","🎬","🇬🇭","🇳🇬","🇰🇪","🇿🇦","🇺🇸","🇬🇧"];
 const LAYOUTS = ["SOLO","DUO","TRIO","GRID","PANEL","PIP"];
 
