@@ -11,6 +11,13 @@ const WEB_SESSION_COOKIE = "twitok_user_session";
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
 
 export const authRouter = Router();
+
+authRouter.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
+
 const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const userWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const otpSendLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => `otp-send:${req.userId?.toHexString() ?? "anonymous"}:${req.ip ?? "unknown"}` });
