@@ -42,9 +42,9 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     let verificationChannel: OtpChannel | null = null;
     const identifierValue = String(identifier).trim().toLowerCase();
     if (identifierValue.includes("@") && user.email && stored?.emailVerified !== true) verificationChannel = "email";
-    else if (!identifierValue.includes("@") && user.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
+    else if (!identifierValue.includes("@") && stored?.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
     else if (user.email && stored?.emailVerified !== true) verificationChannel = "email";
-    else if (user.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
+    else if (stored?.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
     if (verificationChannel) {
       const token = issueVerificationToken(user);
       return res.json({ token, verificationRequired: true, channel: verificationChannel, user });
