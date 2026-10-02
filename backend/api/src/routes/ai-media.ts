@@ -15,6 +15,59 @@ function portraitRequested(prompt: string) { return /portrait|skin|face|headshot
 const ALLOWED_MODES = new Set(["IMAGE", "VIDEO"]);
 const ALLOWED_STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT", "PORTRAIT_PRO", "ANIME", "ILLUSTRATION", "REALISTIC"]);
 
+async function readProviderJson(response: Response, maxBytes = 64 * 1024): Promise<Record<string, unknown>> {
+  const declaredLength = Number(response.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) throw new Error("AI provider response is too large");
+  if (!response.body) throw new Error("AI provider returned an empty response");
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new Error("AI provider response is too large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = Buffer.concat(chunks.map(chunk => Buffer.from(chunk))).toString("utf8");
+  const parsed: unknown = JSON.parse(body);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("AI provider returned an invalid response");
+  return parsed as Record<string, unknown>;
+}
+
+function normalizeProviderJobId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 200) return null;
+  for (const char of normalized) {
+    const code = char.charCodeAt(0);
+    const safe = (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || char === "." || char === "_" || char === ":" || char === "-";
+    if (!safe) return null;
+  }
+  return normalized;
+}
+
+function normalizeProviderStatus(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim().toUpperCase();
+  if (!normalized || normalized.length > 40) return fallback;
+  for (const char of normalized) {
+    const code = char.charCodeAt(0);
+    const safe = (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || char === "_" || char === "-";
+    if (!safe) return fallback;
+  }
+  return normalized;
+}
+
 function validateProviderOutputUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const raw = value.trim();
@@ -107,18 +160,20 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
     }
 
     if (!providerResponse.ok) throw new Error(`AI provider returned HTTP ${providerResponse.status}`);
-    const provider = await providerResponse.json() as { outputUrl?: string; jobId?: string; status?: string };
+    const provider = await readProviderJson(providerResponse);
     const providerOutputUrl = validateProviderOutputUrl(provider.outputUrl);
-    if (!providerOutputUrl && !provider.jobId) throw new Error("AI provider returned no valid output URL or job id");
+    const providerJobId = normalizeProviderJobId(provider.jobId);
+    if (!providerOutputUrl && !providerJobId) throw new Error("AI provider returned no valid output URL or job id");
+    const providerStatus = normalizeProviderStatus(provider.status, "PROCESSING");
 
     const db = await getDb();
     const jobId = crypto.randomUUID();
     await db.collection("ai_media_jobs").insertOne({
       jobId, userId: req.userId, mode, style, prompt: prompt || null,
-      sourceObjectKey, providerJobId: provider.jobId ?? null,
+      sourceObjectKey, providerJobId,
       targetResolution, outputSpec, portraitEnhance,
       outputUrl: providerOutputUrl,
-      status: providerOutputUrl ? "READY_FOR_REVIEW" : String(provider.status ?? "PROCESSING").toUpperCase(),
+      status: providerOutputUrl ? "READY_FOR_REVIEW" : providerStatus,
       createdAt: new Date(), updatedAt: new Date()
     });
 
@@ -139,7 +194,9 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   const statusEndpoint = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
   if (!outputUrl && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
     try {
-      const url = statusEndpoint.replace("{jobId}", encodeURIComponent(String(job.providerJobId)));
+      const providerJobId = normalizeProviderJobId(job.providerJobId);
+      if (!providerJobId) return res.status(409).json({ error: "AI media job has an invalid provider job id" });
+      const url = statusEndpoint.replace("{jobId}", encodeURIComponent(providerJobId));
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
       let providerResponse: Response;
@@ -153,9 +210,9 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
       }
 
       if (providerResponse.ok) {
-        const provider = await providerResponse.json() as { outputUrl?: string; url?: string; status?: string; state?: string };
+        const provider = await readProviderJson(providerResponse);
         outputUrl = validateProviderOutputUrl(provider.outputUrl ?? provider.url);
-        status = String(provider.status ?? provider.state ?? status).toUpperCase();
+        status = normalizeProviderStatus(provider.status ?? provider.state, status);
         if (outputUrl) status = "READY_FOR_REVIEW";
         await db.collection("ai_media_jobs").updateOne(
           { _id: job._id },
