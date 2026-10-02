@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Image, PanResponder, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -61,6 +61,8 @@ export default function LiveStudioScreen() {
   const [message, setMessage] = useState("");
   const [customPreview, setCustomPreview] = useState<string | null>(null);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
+  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
 
   const headers = async (json = false) => {
     const token = await getAuthToken();
@@ -140,6 +142,26 @@ export default function LiveStudioScreen() {
     finally { setBusy(false); }
   };
 
+  const selectedPreviewSticker = studio.stickers.find(item => item.id === selectedStickerId) ?? null;
+  const previewPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => Boolean(selectedPreviewSticker && previewSize.width > 0 && previewSize.height > 0),
+    onMoveShouldSetPanResponder: (_, gesture) => Boolean(selectedPreviewSticker && (Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3)),
+    onPanResponderGrant: () => {
+      if (selectedPreviewSticker) dragStart.current = { x: selectedPreviewSticker.x, y: selectedPreviewSticker.y };
+    },
+    onPanResponderMove: (_, gesture) => {
+      if (!selectedPreviewSticker || !dragStart.current || !previewSize.width || !previewSize.height) return;
+      const nextX = Math.min(100, Math.max(0, dragStart.current.x + (gesture.dx / previewSize.width) * 100));
+      const nextY = Math.min(100, Math.max(0, dragStart.current.y + (gesture.dy / previewSize.height) * 100));
+      setStudio(current => ({ ...current, stickers: current.stickers.map(item => item.id === selectedPreviewSticker.id ? { ...item, x: nextX, y: nextY } : item) }));
+    },
+    onPanResponderRelease: () => {
+      dragStart.current = null;
+      const current = studio.stickers.find(item => item.id === selectedStickerId);
+      if (current) void save({ stickers: studio.stickers.map(item => item.id === current.id ? { ...item } : item) });
+    },
+    onPanResponderTerminate: () => { dragStart.current = null; }
+  }), [selectedPreviewSticker, previewSize.width, previewSize.height, selectedStickerId, studio.stickers]);
   const backgroundLabel = useMemo(() => BACKGROUNDS.find(x => x[0] === studio.background)?.[1] ?? studio.background, [studio.background]);
   const SCENE_PRESETS = [
     { id: "CREATOR", label: "Creator", icon: "🎬", background: "CREATOR_LOFT", filter: "STUDIO_CLEAN", effect: "BEAUTY", beauty: 25, layout: "SOLO" },
@@ -160,9 +182,10 @@ export default function LiveStudioScreen() {
     </View>
 
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.hero}>
+      <View style={styles.hero} onLayout={event => setPreviewSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })} {...previewPanResponder.panHandlers}>
         {customPreview && studio.background === "CUSTOM" ? <Image source={{ uri: customPreview }} style={StyleSheet.absoluteFill} /> : <View style={styles.sceneFill}><Text style={styles.sceneIcon}>🎬</Text><Text style={styles.sceneTitle}>{backgroundLabel}</Text></View>}
-        <View style={styles.sceneOverlay}><Text style={styles.sceneBadge}>9:16 LIVE SCENE</Text><Text style={styles.sceneCaption}>{studio.layout} • {studio.filter} • Beauty {studio.beauty}%</Text>{studio.stickers.length ? <Text style={styles.stickerPreview}>{studio.stickers.map(sticker => sticker.emoji).join(" ")}</Text> : null}</View>
+        {studio.stickers.map(sticker => <Pressable key={sticker.id} onPress={() => setSelectedStickerId(sticker.id)} style={[styles.previewSticker, { left: `${sticker.x}%`, top: `${sticker.y}%`, transform: [{ translateX: -18 }, { translateY: -18 }, { scale: sticker.scale }, { rotate: `${sticker.rotation}deg` }] }, selectedStickerId === sticker.id && styles.previewStickerSelected]}><Text style={styles.previewStickerText}>{sticker.emoji}</Text></Pressable>)}
+        <View style={styles.sceneOverlay}><Text style={styles.sceneBadge}>9:16 LIVE SCENE</Text><Text style={styles.sceneCaption}>{studio.layout} • {studio.filter} • Beauty {studio.beauty}%</Text>{selectedPreviewSticker ? <Text style={styles.dragHint}>Drag {selectedPreviewSticker.emoji} to reposition</Text> : <Text style={styles.dragHint}>Tap a sticker to select it</Text>}</View>
       </View>
 
       <Section title="Background">
@@ -267,7 +290,7 @@ const styles = StyleSheet.create({
   content:{padding:14,paddingBottom:35},hero:{height:310,borderRadius:22,overflow:"hidden",backgroundColor:"#171717",borderWidth:1,borderColor:"#2b2b2b",marginBottom:16},
   sceneFill:{flex:1,alignItems:"center",justifyContent:"center",backgroundColor:"#1c1c2c"},sceneIcon:{fontSize:48},sceneTitle:{color:"#fff",fontSize:19,fontWeight:"900",marginTop:8},
   sceneOverlay:{position:"absolute",left:12,right:12,bottom:12,backgroundColor:"rgba(0,0,0,.62)",borderRadius:14,padding:10},
-  stickerPreview:{color:"#fff",fontSize:22,marginTop:5},sceneBadge:{color:"#ff6b87",fontSize:10,fontWeight:"900"},sceneCaption:{color:"#fff",fontSize:11,marginTop:4},
+  stickerPreview:{color:"#fff",fontSize:22,marginTop:5},previewSticker:{position:"absolute",zIndex:10,width:36,height:36,alignItems:"center",justifyContent:"center"},previewStickerSelected:{borderWidth:1,borderColor:"#fff",borderRadius:10,backgroundColor:"rgba(255,45,85,.18)"},previewStickerText:{fontSize:28},dragHint:{color:"#aaa",fontSize:9,marginTop:4},sceneBadge:{color:"#ff6b87",fontSize:10,fontWeight:"900"},sceneCaption:{color:"#fff",fontSize:11,marginTop:4},
   section:{backgroundColor:"#111",borderRadius:18,padding:14,marginBottom:12,borderWidth:1,borderColor:"#242424"},sectionTitle:{color:"#fff",fontSize:15,fontWeight:"900",marginBottom:11},
   row:{gap:8},choice:{width:100,height:82,borderRadius:14,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},choiceActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},choiceIcon:{color:"#fff",fontSize:22},choiceText:{color:"#ddd",fontSize:10,fontWeight:"800",marginTop:6,textAlign:"center"},note:{color:"#777",fontSize:10,lineHeight:15,marginTop:10},
   pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},preset:{width:92,height:82,borderRadius:16,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",marginRight:8},presetActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},presetIcon:{fontSize:25},presetText:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:6},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
