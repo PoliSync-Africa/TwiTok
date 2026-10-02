@@ -63,6 +63,8 @@ export default function LiveStudioScreen() {
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
   const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
   const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const studioRef = useRef(studio);
+  studioRef.current = studio;
 
   const headers = async (json = false) => {
     const token = await getAuthToken();
@@ -157,11 +159,11 @@ export default function LiveStudioScreen() {
     },
     onPanResponderRelease: () => {
       dragStart.current = null;
-      const current = studio.stickers.find(item => item.id === selectedStickerId);
-      if (current) void save({ stickers: studio.stickers.map(item => item.id === current.id ? { ...item } : item) });
+      const current = studioRef.current.stickers.find(item => item.id === selectedStickerId);
+      if (current) void save({ stickers: studioRef.current.stickers });
     },
     onPanResponderTerminate: () => { dragStart.current = null; }
-  }), [selectedPreviewSticker, previewSize.width, previewSize.height, selectedStickerId, studio.stickers]);
+  }), [selectedPreviewSticker, previewSize.width, previewSize.height, selectedStickerId]);
   const backgroundLabel = useMemo(() => BACKGROUNDS.find(x => x[0] === studio.background)?.[1] ?? studio.background, [studio.background]);
   const SCENE_PRESETS = [
     { id: "CREATOR", label: "Creator", icon: "🎬", background: "CREATOR_LOFT", filter: "STUDIO_CLEAN", effect: "BEAUTY", beauty: 25, layout: "SOLO" },
