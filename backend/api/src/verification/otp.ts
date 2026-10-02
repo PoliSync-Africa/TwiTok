@@ -3,6 +3,7 @@ import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { ObjectId } from "mongodb";
 
 export type OtpChannel = "email" | "phone";
+export type OtpPurpose = "VERIFICATION" | "PASSWORD_RESET";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -15,9 +16,9 @@ function getPepper() {
   return pepper;
 }
 
-function hashCode(userId: string, channel: OtpChannel, destination: string, code: string) {
+function hashCode(userId: string, channel: OtpChannel, destination: string, code: string, purpose: OtpPurpose = "VERIFICATION") {
   return createHmac("sha256", getPepper())
-    .update(`${userId}:${channel}:${destination}:${code}`)
+    .update(`${userId}:${purpose}:${channel}:${destination}:${code}`)
     .digest("hex");
 }
 
@@ -103,7 +104,7 @@ export async function initializeOtpIndexes(db: Db) {
   ]);
 }
 
-export async function sendOtp(db: Db, userId: string, channel: OtpChannel, requestedDestination?: string) {
+export async function sendOtp(db: Db, userId: string, channel: OtpChannel, requestedDestination?: string, purpose: OtpPurpose = "VERIFICATION") {
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user account");
   const user = await db.collection("users").findOne(
     { _id: new ObjectId(userId), status: "ACTIVE" },
@@ -117,12 +118,12 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   if (channel === "email" && destination !== normalizeDestination(channel, user.email ?? "")) throw new Error("Email address does not match the account");
 
   const verifiedField = channel === "email" ? "emailVerified" : "phoneVerified";
-  if (user[verifiedField] === true) throw new Error(`${channel === "email" ? "Email" : "Phone"} is already verified`);
+  if (purpose === "VERIFICATION" && user[verifiedField] === true) throw new Error(`${channel === "email" ? "Email" : "Phone"} is already verified`);
 
   const now = new Date();
   const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
   const recent = await db.collection("auth_otps").find(
-    { userId, channel, createdAt: { $gte: lastHour } },
+    { userId, channel, purpose, createdAt: { $gte: lastHour } },
     { projection: { createdAt: 1, expiresAt: 1, attempts: 1 }, sort: { createdAt: -1 }, limit: OTP_MAX_SENDS_PER_HOUR }
   ).toArray();
 
@@ -143,13 +144,14 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   await deliverOtp(channel, destination, code);
 
   await db.collection("auth_otps").updateMany(
-    { userId, channel, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
+    { userId, channel, purpose, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
     { $set: { consumedAt: now, updatedAt: now } }
   );
 
   await db.collection("auth_otps").insertOne({
     userId,
     channel,
+    purpose,
     destination,
     codeHash,
     attempts: 0,
@@ -161,13 +163,13 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   return { channel, expiresAt, retryAfterSeconds: Math.ceil(OTP_RESEND_COOLDOWN_MS / 1000) };
 }
 
-export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, code: string) {
+export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, code: string, purpose: OtpPurpose = "VERIFICATION") {
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user account");
   if (!/^\d{6}$/.test(String(code))) throw new Error("Enter the 6-digit verification code");
 
   const now = new Date();
   const otp = await db.collection("auth_otps").findOne(
-    { userId, channel, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
+    { userId, channel, purpose, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
     { sort: { createdAt: -1 } }
   );
 
@@ -187,7 +189,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   const destination = channel === "email"
     ? normalizeDestination(channel, user.email ?? "")
     : normalizeDestination(channel, user.phone ?? "");
-  const expectedHash = hashCode(userId, channel, destination, String(code));
+  const expectedHash = hashCode(userId, channel, destination, String(code), purpose);
 
   const expectedBuffer = Buffer.from(expectedHash, "hex");
   const storedBuffer = Buffer.from(String(otp.codeHash), "hex");
@@ -196,7 +198,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   if (!matches) {
     const nextAttempts = attempts + 1;
     await db.collection("auth_otps").updateOne(
-      { _id: otp._id, consumedAt: { $exists: false } },
+      { _id: otp._id, purpose, consumedAt: { $exists: false } },
       { $inc: { attempts: 1 }, $set: { updatedAt: now } }
     );
     if (nextAttempts >= OTP_MAX_ATTEMPTS) {
@@ -207,7 +209,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   }
 
   const consumed = await db.collection("auth_otps").findOneAndUpdate(
-    { _id: otp._id, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
+    { _id: otp._id, purpose, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
     { $set: { consumedAt: now, updatedAt: now } },
     { returnDocument: "after" }
   );
