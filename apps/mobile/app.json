@@ -5,14 +5,18 @@
     "version": "0.1.0",
     "scheme": "twitok",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "africa.twitok.app"
     },
     "android": {
-      "package": "africa.twitok.app"
+      "package": "africa.twitok.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/twitok-logo.jpg",
+        "backgroundColor": "#000000"
+      }
     },
     "web": {
       "bundler": "metro"
