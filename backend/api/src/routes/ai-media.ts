@@ -78,6 +78,24 @@ function normalizeProviderStatus(value: unknown, fallback: string): string {
   return normalized;
 }
 
+function validateProviderEndpoint(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || raw.length > 2048) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password || url.hash) return null;
+    const allowedHosts = (process.env.TWITOK_AI_MEDIA_ALLOWED_HOSTS ?? "")
+      .split(",")
+      .map(host => host.trim().toLowerCase())
+      .filter(Boolean);
+    if (allowedHosts.length > 0 && !allowedHosts.includes(url.hostname.toLowerCase())) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function validateProviderOutputUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const raw = value.trim();
@@ -137,7 +155,7 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
       sourceUrl = (await createPresignedPlayback(sourceObjectKey, 600)).url;
     }
 
-    const endpoint = process.env.TWITOK_AI_MEDIA_ENDPOINT;
+    const endpoint = validateProviderEndpoint(process.env.TWITOK_AI_MEDIA_ENDPOINT);
     const apiKey = process.env.TWITOK_AI_MEDIA_API_KEY;
     if (!endpoint || !apiKey) {
       return res.status(503).json({ error: "AI media generation is not configured yet", code: "AI_MEDIA_NOT_CONFIGURED" });
@@ -203,7 +221,7 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   let outputUrl = job.outputUrl ?? null;
   let status = String(job.status ?? "PROCESSING").toUpperCase();
 
-  const statusEndpoint = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
+  const statusEndpoint = validateProviderEndpoint(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT);
   if (!outputUrl && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
     try {
       const providerJobId = normalizeProviderJobId(job.providerJobId);
