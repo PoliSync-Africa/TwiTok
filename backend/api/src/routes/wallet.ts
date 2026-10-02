@@ -190,9 +190,32 @@ walletRouter.post("/coins/paystack/initialize", requireAdultUser, async (req, re
     const amountGhs = Number((pkg.priceUsd * rate).toFixed(2));
     const reference = "TWITOK-" + randomUUID().replaceAll("-", "").slice(0, 24);
     const callbackUrl = process.env.TWITOK_PAYSTACK_CALLBACK_URL;
-    const result = await initializeCoinPurchase({ email: user.email, amountGhs, reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, callbackUrl });
-    await db.collection("coin_purchases").insertOne({ reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, priceUsd: pkg.priceUsd, amountGhs, status: "INITIALIZED", provider: "PAYSTACK", createdAt: new Date() });
-    return res.status(201).json({ reference, authorizationUrl: result.authorization_url, accessCode: result.access_code, amountGhs, currency: "GHS", coins: pkg.coins });
+    const purchase = {
+      reference,
+      userId: req.userId!.toHexString(),
+      sku: pkg.sku,
+      coins: pkg.coins,
+      priceUsd: pkg.priceUsd,
+      amountGhs,
+      status: "INITIALIZING",
+      provider: "PAYSTACK",
+      createdAt: new Date()
+    };
+    await db.collection("coin_purchases").insertOne(purchase);
+    try {
+      const result = await initializeCoinPurchase({ email: user.email, amountGhs, reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, callbackUrl });
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "PAYSTACK" },
+        { $set: { status: "INITIALIZED", initializedAt: new Date() } }
+      );
+      return res.status(201).json({ reference, authorizationUrl: result.authorization_url, accessCode: result.access_code, amountGhs, currency: "GHS", coins: pkg.coins });
+    } catch (error) {
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "PAYSTACK", status: "INITIALIZING" },
+        { $set: { status: "FAILED", failedAt: new Date() } }
+      );
+      throw error;
+    }
   } catch (error) { return res.status(502).json({ error: error instanceof Error ? error.message : "Coin purchase initialization failed" }); }
 });
 
@@ -376,20 +399,6 @@ walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req,
 
     const amountLocal = Number((pkg.priceUsd * rate).toFixed(2));
     const reference = "TWITOK-FLW-" + randomUUID().replaceAll("-", "").slice(0, 24);
-    const result = await initializeFlutterwaveCheckout({
-      email: user.email,
-      phoneNumber: user.phoneNumber ? String(user.phoneNumber) : undefined,
-      name: user.name ? String(user.name) : undefined,
-      amount: amountLocal,
-      currency,
-      reference,
-      redirectUrl: process.env.TWITOK_FLUTTERWAVE_CALLBACK_URL,
-      paymentOptions: process.env.TWITOK_FLUTTERWAVE_PAYMENT_OPTIONS,
-      userId: req.userId!.toHexString(),
-      sku: pkg.sku,
-      coins: pkg.coins
-    });
-
     await db.collection("coin_purchases").insertOne({
       reference,
       userId: req.userId!.toHexString(),
@@ -398,12 +407,37 @@ walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req,
       priceUsd: pkg.priceUsd,
       amountLocal,
       currency,
-      status: "INITIALIZED",
+      status: "INITIALIZING",
       provider: "FLUTTERWAVE",
       createdAt: new Date()
     });
 
-    return res.status(201).json({ reference, authorizationUrl: result.link, amount: amountLocal, currency, coins: pkg.coins, provider: "FLUTTERWAVE" });
+    try {
+      const result = await initializeFlutterwaveCheckout({
+        email: user.email,
+        phoneNumber: user.phoneNumber ? String(user.phoneNumber) : undefined,
+        name: user.name ? String(user.name) : undefined,
+        amount: amountLocal,
+        currency,
+        reference,
+        redirectUrl: process.env.TWITOK_FLUTTERWAVE_CALLBACK_URL,
+        paymentOptions: process.env.TWITOK_FLUTTERWAVE_PAYMENT_OPTIONS,
+        userId: req.userId!.toHexString(),
+        sku: pkg.sku,
+        coins: pkg.coins
+      });
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "FLUTTERWAVE" },
+        { $set: { status: "INITIALIZED", initializedAt: new Date() } }
+      );
+      return res.status(201).json({ reference, authorizationUrl: result.link, amount: amountLocal, currency, coins: pkg.coins, provider: "FLUTTERWAVE" });
+    } catch (error) {
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "FLUTTERWAVE", status: "INITIALIZING" },
+        { $set: { status: "FAILED", failedAt: new Date() } }
+      );
+      throw error;
+    }
   } catch (error) {
     return res.status(502).json({ error: error instanceof Error ? error.message : "Flutterwave Coin purchase initialization failed" });
   }
