@@ -1,5 +1,5 @@
 import type { Db } from "mongodb";
-import { createHmac, randomInt } from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { ObjectId } from "mongodb";
 
 export type OtpChannel = "email" | "phone";
@@ -24,7 +24,7 @@ function hashCode(userId: string, channel: OtpChannel, destination: string, code
 function normalizeDestination(channel: OtpChannel, value: string) {
   const normalized = String(value ?? "").trim();
   if (channel === "email") return normalized.toLowerCase();
-  const digits = normalized.replace(/\\D/g, "");
+  const digits = normalized.replace(/\D/g, "");
   if (digits.length < 7 || digits.length > 20) throw new Error("Invalid phone number");
   return digits;
 }
@@ -40,9 +40,9 @@ function isValidEmail(value: string) {
     domain.length <= 253 &&
     domain.includes(".") &&
     !value.includes(" ") &&
-    !value.includes("\\t") &&
-    !value.includes("\\n") &&
-    !value.includes("\\r")
+    !value.includes("\t") &&
+    !value.includes("\n") &&
+    !value.includes("\r")
   );
 }
 
@@ -163,7 +163,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
 
 export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, code: string) {
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user account");
-  if (!/^\\d{6}$/.test(String(code))) throw new Error("Enter the 6-digit verification code");
+  if (!/^\d{6}$/.test(String(code))) throw new Error("Enter the 6-digit verification code");
 
   const now = new Date();
   const otp = await db.collection("auth_otps").findOne(
@@ -189,7 +189,11 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
     : normalizeDestination(channel, user.phone ?? "");
   const expectedHash = hashCode(userId, channel, destination, String(code));
 
-  if (expectedHash !== otp.codeHash) {
+  const expectedBuffer = Buffer.from(expectedHash, "hex");
+  const storedBuffer = Buffer.from(String(otp.codeHash), "hex");
+  const matches = expectedBuffer.length === storedBuffer.length && timingSafeEqual(expectedBuffer, storedBuffer);
+
+  if (!matches) {
     const nextAttempts = attempts + 1;
     await db.collection("auth_otps").updateOne(
       { _id: otp._id, consumedAt: { $exists: false } },
