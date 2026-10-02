@@ -40,6 +40,8 @@ export async function getDb(): Promise<Db> {
   await db.collection("videos").createIndex({ status: 1, visibility: 1, publishedAt: -1, _id: -1 });
   await db.collection("videos").createIndex({ ownerId: 1, status: 1, visibility: 1, publishedAt: -1 });
   await db.collection("videos").createIndex({ countryCode: 1, status: 1, visibility: 1, publishedAt: -1 });
+  // AI media job polling and per-user concurrency checks.
+  await db.collection("ai_media_jobs").createIndex({ userId: 1, status: 1, createdAt: -1 });
   await db.collection("shop_returns").createIndex({ orderId: 1, createdAt: -1 });
   await db.collection("shop_returns").createIndex({ buyerId: 1, createdAt: -1 });
   await db.collection("shop_refunds").createIndex({ orderId: 1, returnId: 1 }, { unique: true });
