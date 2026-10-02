@@ -6,12 +6,14 @@ import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
+type LiveSticker = { id: string; emoji: string; x: number; y: number; scale: number; rotation: number; animation: "NONE" | "BOUNCE" | "PULSE" | "FLOAT" };
+
 type Studio = {
   background: string;
   backgroundUrl: string | null;
   effect: string;
   filter: string;
-  stickers: string[];
+  stickers: LiveSticker[];
   beauty: number;
   layout: string;
   guestLimit: number;
@@ -58,17 +60,30 @@ export default function LiveStudioScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [customPreview, setCustomPreview] = useState<string | null>(null);
+  const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
 
   const headers = async (json = false) => {
     const token = await getAuthToken();
     return { ...(json ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: "Bearer " + token } : {}) };
   };
 
+  const normalizeStickers = (items: unknown): LiveSticker[] => Array.isArray(items) ? items.slice(0, 32).map((item, index) => {
+    if (typeof item === "string") return { id: item + "-" + index, emoji: item, x: 50, y: 28 + (index % 4) * 14, scale: 1, rotation: 0, animation: "NONE" as const };
+    const value = item as Partial<LiveSticker>;
+    const animation = value.animation === "BOUNCE" || value.animation === "PULSE" || value.animation === "FLOAT" ? value.animation : "NONE";
+    return { id: String(value.id ?? value.emoji ?? "sticker-" + index), emoji: String(value.emoji ?? "✨").slice(0, 16), x: Math.min(100, Math.max(0, Number(value.x ?? 50))), y: Math.min(100, Math.max(0, Number(value.y ?? 35))), scale: Math.min(3, Math.max(.5, Number(value.scale ?? 1))), rotation: Math.min(180, Math.max(-180, Number(value.rotation ?? 0))), animation };
+  }).filter(item => item.emoji);
+
   const load = async () => {
     if (!streamId) return;
     const res = await fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/studio", { headers: await headers() });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) setStudio({ ...DEFAULTS, ...(data.studio ?? {}) });
+    if (res.ok) {
+      const next = { ...DEFAULTS, ...(data.studio ?? {}) };
+      next.stickers = normalizeStickers(data.studio?.stickers);
+      setStudio(next);
+      if (!selectedStickerId && next.stickers[0]) setSelectedStickerId(next.stickers[0].id);
+    }
     else setMessage(data.error || "Unable to load LIVE Studio.");
   };
 
@@ -153,17 +168,37 @@ export default function LiveStudioScreen() {
         <Text style={styles.note}>Live filters are selectable independently from beauty controls.</Text>
       </Section>
 
-      <Section title="Stickers">
+      <Section title="Stickers & AR placement">
         <View style={styles.stickerGrid}>
-          {STICKERS.map(sticker => {
-            const selected = studio.stickers.includes(sticker);
-            return <Pressable key={sticker} style={[styles.sticker, selected && styles.stickerActive]} onPress={() => {
-              const next = selected ? studio.stickers.filter(item => item !== sticker) : [...studio.stickers, sticker].slice(0, 32);
-              void save({ stickers: next });
+          {STICKERS.map((sticker, index) => {
+            const existing = studio.stickers.find(item => item.emoji === sticker);
+            return <Pressable key={sticker + index} style={[styles.sticker, existing && styles.stickerActive]} onPress={() => {
+              if (existing) {
+                const next = studio.stickers.filter(item => item.id !== existing.id);
+                void save({ stickers: next });
+                if (selectedStickerId === existing.id) setSelectedStickerId(next[0]?.id ?? null);
+              } else if (studio.stickers.length < 32) {
+                const created: LiveSticker = { id: sticker + "-" + Date.now(), emoji: sticker, x: 50, y: 32 + (studio.stickers.length % 4) * 14, scale: 1, rotation: 0, animation: "FLOAT" };
+                setSelectedStickerId(created.id);
+                void save({ stickers: [...studio.stickers, created] });
+              }
             }}><Text style={styles.stickerText}>{sticker}</Text></Pressable>;
           })}
         </View>
-        <Text style={styles.note}>{studio.stickers.length}/32 stickers selected. Tap again to remove.</Text>
+        <Text style={styles.note}>{studio.stickers.length}/32 stickers. Select a sticker, then adjust its position, size, rotation and animation.</Text>
+        {(() => {
+          const selected = studio.stickers.find(item => item.id === selectedStickerId);
+          if (!selected) return null;
+          const patchSelected = (patch: Partial<LiveSticker>) => void save({ stickers: studio.stickers.map(item => item.id === selected.id ? { ...item, ...patch } : item) });
+          return <View style={styles.stickerEditor}>
+            <Text style={styles.editorTitle}>Editing {selected.emoji}</Text>
+            <View style={styles.controlRow}><Text style={styles.label}>Horizontal</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ x: Math.max(0, selected.x - 5) })}><Text style={styles.adjustText}>−</Text></Pressable><Text style={styles.value}>{Math.round(selected.x)}%</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ x: Math.min(100, selected.x + 5) })}><Text style={styles.adjustText}>+</Text></Pressable></View>
+            <View style={styles.controlRow}><Text style={styles.label}>Vertical</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ y: Math.max(0, selected.y - 5) })}><Text style={styles.adjustText}>−</Text></Pressable><Text style={styles.value}>{Math.round(selected.y)}%</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ y: Math.min(100, selected.y + 5) })}><Text style={styles.adjustText}>+</Text></Pressable></View>
+            <View style={styles.controlRow}><Text style={styles.label}>Size</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ scale: Math.max(.5, Number((selected.scale - .25).toFixed(2))) })}><Text style={styles.adjustText}>−</Text></Pressable><Text style={styles.value}>{selected.scale.toFixed(2)}×</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ scale: Math.min(3, Number((selected.scale + .25).toFixed(2))) })}><Text style={styles.adjustText}>+</Text></Pressable></View>
+            <View style={styles.controlRow}><Text style={styles.label}>Rotation</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ rotation: Math.max(-180, selected.rotation - 15) })}><Text style={styles.adjustText}>−</Text></Pressable><Text style={styles.value}>{Math.round(selected.rotation)}°</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ rotation: Math.min(180, selected.rotation + 15) })}><Text style={styles.adjustText}>+</Text></Pressable></View>
+            <View style={styles.wrap}>{(["NONE","BOUNCE","PULSE","FLOAT"] as const).map(animation => <Pressable key={animation} style={[styles.pill, selected.animation === animation && styles.pillActive]} onPress={() => patchSelected({ animation })}><Text style={styles.pillText}>{animation}</Text></Pressable>)}</View>
+          </View>;
+        })()}
       </Section>
 
       <Section title="Effects & beauty">
@@ -217,6 +252,6 @@ const styles = StyleSheet.create({
   row:{gap:8},choice:{width:100,height:82,borderRadius:14,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},choiceActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},choiceIcon:{color:"#fff",fontSize:22},choiceText:{color:"#ddd",fontSize:10,fontWeight:"800",marginTop:6,textAlign:"center"},note:{color:"#777",fontSize:10,lineHeight:15,marginTop:10},
   pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
   wrap:{flexDirection:"row",flexWrap:"wrap"},
-  stickerGrid:{flexDirection:"row",flexWrap:"wrap",gap:7},sticker:{width:42,height:42,borderRadius:13,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},stickerActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},stickerText:{fontSize:21},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
+  stickerGrid:{flexDirection:"row",flexWrap:"wrap",gap:7},sticker:{width:42,height:42,borderRadius:13,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},stickerActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},stickerText:{fontSize:21},stickerEditor:{marginTop:12,padding:12,borderRadius:14,backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d"},editorTitle:{color:"#fff",fontWeight:"900",marginBottom:8},controlRow:{flexDirection:"row",alignItems:"center",gap:8,marginBottom:8},adjust:{width:34,height:34,borderRadius:10,backgroundColor:"#252525",alignItems:"center",justifyContent:"center"},adjustText:{color:"#fff",fontSize:20,fontWeight:"900"},value:{color:"#fff",fontWeight:"800",minWidth:50,textAlign:"center"},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
   error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
 });
