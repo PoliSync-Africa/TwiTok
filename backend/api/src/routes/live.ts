@@ -95,7 +95,7 @@ liveRouter.patch("/streams/:streamId/studio", requireUser, liveActionLimit, asyn
         const animation = String(raw.animation ?? "NONE").toUpperCase();
         if (![x, y, scale, rotation].every(Number.isFinite) || x < 0 || x > 100 || y < 0 || y > 100 || scale < 0.5 || scale > 3 || rotation < -180 || rotation > 180 || !LIVE_STICKER_ANIMATIONS.has(animation)) return null;
         return { id, emoji, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, scale: Math.round(scale * 100) / 100, rotation: Math.round(rotation), animation };
-      }).filter(Boolean);
+      }).filter((sticker): sticker is { id: string; emoji: string; x: number; y: number; scale: number; rotation: number; animation: string } => sticker !== null);
       const unique = new Map<string, unknown>();
       for (const sticker of stickers) unique.set(String((sticker as { id: string }).id), sticker);
       update.stickers = Array.from(unique.values()).slice(0, LIVE_STUDIO_STICKER_MAX);
