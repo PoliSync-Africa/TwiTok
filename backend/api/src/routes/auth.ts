@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
-import { getDb } from "../db/mongo.js";
+import { getDb, withMongoTransaction } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken, issueVerificationToken } from "../auth/user.js";
 import { requireUser, requireVerificationUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
@@ -122,11 +122,16 @@ authRouter.post("/password/reset", rateLimit({ windowMs: 15 * 60 * 1000, max: 5,
     const verified = channel === "email" ? user.emailVerified === true : user.phoneVerified === true;
     const contact = channel === "email" ? user.email : user.phone;
     if (!verified || !contact) return res.status(400).json({ error: "Invalid password recovery request" });
-    await verifyOtp(db, user._id.toHexString(), channel, code, "PASSWORD_RESET");
-    await db.collection("users").updateOne(
-      { _id: user._id, status: "ACTIVE" },
-      { $set: { passwordHash: await bcrypt.hash(newPassword, 12), updatedAt: new Date() }, $inc: { sessionVersion: 1 } }
-    );
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await withMongoTransaction(async session => {
+      await verifyOtp(db, user._id.toHexString(), channel, code, "PASSWORD_RESET", session);
+      const updated = await db.collection("users").updateOne(
+        { _id: user._id, status: "ACTIVE" },
+        { $set: { passwordHash, updatedAt: new Date() }, $inc: { sessionVersion: 1 } },
+        { session }
+      );
+      if (updated.matchedCount !== 1) throw new Error("Account state changed during password reset");
+    });
     res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     return res.json({ reset: true, message: "Password reset successfully. Please sign in again." });
   } catch {
