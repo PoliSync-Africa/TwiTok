@@ -26,9 +26,9 @@ const otpVerifyLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req =
 
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
   try {
-    const { username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
-    if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
-    const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
+    const { firstName, username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
+    if (!firstName || !password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "firstName, password, dateOfBirth and countryCode are required" });
+    const db = await getDb(), user = await createUser(db, { firstName, username, password, email, phone, dateOfBirth, countryCode });
     const token = issueVerificationToken(user);
     res.status(201).json({ token, verificationRequired: true, channel: email ? "email" : "phone", user });
   } catch (error) {
@@ -45,7 +45,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const user = await authenticateUser(db, identifier, password);
     const stored = await db.collection("users").findOne(
       { _id: new (await import("mongodb")).ObjectId(user._id) },
-      { projection: { emailVerified: 1, phoneVerified: 1, email: 1, phone: 1 } }
+      { projection: { firstName: 1, emailVerified: 1, phoneVerified: 1, email: 1, phone: 1 } }
     );
     let verificationChannel: OtpChannel | null = null;
     const identifierValue = String(identifier).trim().toLowerCase();
@@ -237,7 +237,7 @@ authRouter.get("/me", requireUser, userReadLimit, async (req, res) => {
   try {
     const user = await (await getDb()).collection("users").findOne(
       { _id: req.userId! },
-      { projection: { _id: 1, username: 1, nickname: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1, bio: 1, avatarUrl: 1, createdAt: 1, updatedAt: 1 } }
+      { projection: { _id: 1, firstName: 1, username: 1, nickname: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1, bio: 1, avatarUrl: 1, createdAt: 1, updatedAt: 1 } }
     );
     if (!user) return res.status(404).json({ error: "Account not found" });
     res.json({ user });
