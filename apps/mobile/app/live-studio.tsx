@@ -67,12 +67,15 @@ export default function LiveStudioScreen() {
     return { ...(json ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: "Bearer " + token } : {}) };
   };
 
-  const normalizeStickers = (items: unknown): LiveSticker[] => Array.isArray(items) ? items.slice(0, 32).map((item, index) => {
-    if (typeof item === "string") return { id: item + "-" + index, emoji: item, x: 50, y: 28 + (index % 4) * 14, scale: 1, rotation: 0, animation: "NONE" as const };
-    const value = item as Partial<LiveSticker>;
-    const animation = value.animation === "BOUNCE" || value.animation === "PULSE" || value.animation === "FLOAT" ? value.animation : "NONE";
-    return { id: String(value.id ?? value.emoji ?? "sticker-" + index), emoji: String(value.emoji ?? "✨").slice(0, 16), x: Math.min(100, Math.max(0, Number(value.x ?? 50))), y: Math.min(100, Math.max(0, Number(value.y ?? 35))), scale: Math.min(3, Math.max(.5, Number(value.scale ?? 1))), rotation: Math.min(180, Math.max(-180, Number(value.rotation ?? 0))), animation };
-  }).filter(item => item.emoji) as LiveSticker[];
+  const normalizeStickers = (items: unknown): LiveSticker[] => {
+    if (!Array.isArray(items)) return [];
+    return items.slice(0, 32).map((item, index) => {
+      if (typeof item === "string") return { id: item + "-" + index, emoji: item, x: 50, y: 28 + (index % 4) * 14, scale: 1, rotation: 0, animation: "NONE" as const };
+      const value = item as Partial<LiveSticker>;
+      const animation = value.animation === "BOUNCE" || value.animation === "PULSE" || value.animation === "FLOAT" ? value.animation : "NONE";
+      return { id: String(value.id ?? value.emoji ?? "sticker-" + index), emoji: String(value.emoji ?? "✨").slice(0, 16), x: Math.min(100, Math.max(0, Number(value.x ?? 50))), y: Math.min(100, Math.max(0, Number(value.y ?? 35))), scale: Math.min(3, Math.max(.5, Number(value.scale ?? 1))), rotation: Math.min(180, Math.max(-180, Number(value.rotation ?? 0))), animation };
+    }).filter(item => item.emoji) as LiveSticker[];
+  };
 
   const load = async () => {
     if (!streamId) return;
