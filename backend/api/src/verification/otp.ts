@@ -1,4 +1,4 @@
-import type { Db } from "mongodb";
+import type { ClientSession, Db } from "mongodb";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { ObjectId } from "mongodb";
 
@@ -163,7 +163,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   return { channel, expiresAt, retryAfterSeconds: Math.ceil(OTP_RESEND_COOLDOWN_MS / 1000) };
 }
 
-export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, code: string, purpose: OtpPurpose = "VERIFICATION") {
+export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, code: string, purpose: OtpPurpose = "VERIFICATION", session?: ClientSession) {
   if (!ObjectId.isValid(userId)) throw new Error("Invalid user account");
   if (!/^\d{6}$/.test(String(code))) throw new Error("Enter the 6-digit verification code");
 
@@ -176,7 +176,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   if (!otp) throw new Error("The verification code is invalid or expired");
   const attempts = Number(otp.attempts ?? 0);
   if (attempts >= OTP_MAX_ATTEMPTS) {
-    await db.collection("auth_otps").updateOne({ _id: otp._id }, { $set: { consumedAt: now, updatedAt: now } });
+    await db.collection("auth_otps").updateOne({ _id: otp._id }, { $set: { consumedAt: now, updatedAt: now } }, ...(session ? { session } : {}));
     throw new Error("Too many incorrect attempts. Request a new code");
   }
 
@@ -202,7 +202,7 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
       { $inc: { attempts: 1 }, $set: { updatedAt: now } }
     );
     if (nextAttempts >= OTP_MAX_ATTEMPTS) {
-      await db.collection("auth_otps").updateOne({ _id: otp._id, consumedAt: { $exists: false } }, { $set: { consumedAt: now, updatedAt: now } });
+      await db.collection("auth_otps").updateOne({ _id: otp._id, consumedAt: { $exists: false } }, { $set: { consumedAt: now, updatedAt: now } }, ...(session ? { session } : {}));
       throw new Error("Too many incorrect attempts. Request a new code");
     }
     throw new Error("The verification code is incorrect");
