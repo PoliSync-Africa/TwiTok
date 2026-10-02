@@ -152,6 +152,16 @@ export async function sendGift(db: Db, input: {
   if (!idempotencyKey || idempotencyKey.length > 128) throw new Error("A valid Idempotency-Key is required");
   const existing = await db.collection("gift_transactions").findOne({ senderId: input.senderId, idempotencyKey });
   if (existing) {
+    const requestedQuantity = Math.max(1, Math.min(100, Math.floor(input.quantity ?? 1)));
+    if (
+      String(existing.receiverId) !== String(input.receiverId) ||
+      String(existing.giftId) !== String(gift.giftId) ||
+      Number(existing.quantity) !== requestedQuantity ||
+      String(existing.context) !== String(input.context) ||
+      String(existing.videoId ?? "") !== String(input.videoId ?? "")
+    ) {
+      throw new Error("Idempotency-Key conflicts with an existing Gift transaction");
+    }
     const allocations = await db.collection("gift_coin_allocations").find({ giftTransactionId: existing.transactionId }).sort({ createdAt: 1 }).toArray();
     return {
       transactionId: existing.transactionId,
