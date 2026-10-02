@@ -238,6 +238,11 @@ export default function LiveViewerScreen() {
 
 const styles=StyleSheet.create({
  root:{flex:1,backgroundColor:"#000"},
+ filterOverlay:{...StyleSheet.absoluteFillObject,zIndex:2,pointerEvents:"none"},
+ filterDefault:{backgroundColor:"rgba(255,45,85,.06)"},
+ filter_CINEMATIC:{backgroundColor:"rgba(255,170,90,.10)"},filter_VINTAGE:{backgroundColor:"rgba(190,145,95,.13)"},filter_DREAM:{backgroundColor:"rgba(210,170,255,.10)"},filter_FADE:{backgroundColor:"rgba(220,220,220,.10)"},filter_SUNNY:{backgroundColor:"rgba(255,220,80,.10)"},filter_DUSK:{backgroundColor:"rgba(80,90,180,.12)"},filter_POP:{backgroundColor:"rgba(255,30,120,.10)"},filter_FILM:{backgroundColor:"rgba(40,40,40,.12)"},filter_NOIR:{backgroundColor:"rgba(0,0,0,.22)"},filter_GLOW:{backgroundColor:"rgba(255,255,210,.12)"},filter_SHARP:{backgroundColor:"rgba(255,255,255,.05)"},filter_SOFT:{backgroundColor:"rgba(230,210,255,.09)"},filter_PORTRAIT:{backgroundColor:"rgba(255,180,160,.08)"},filter_PARTY:{backgroundColor:"rgba(255,80,180,.10)"},filter_FESTIVAL:{backgroundColor:"rgba(255,210,80,.10)"},filter_GOLDEN:{backgroundColor:"rgba(255,190,70,.12)"},filter_TEAL:{backgroundColor:"rgba(0,190,180,.10)"},filter_ROSE:{backgroundColor:"rgba(255,90,130,.10)"},
+ liveStickers:{position:"absolute",zIndex:3,top:"25%",left:12,right:12,flexDirection:"row",flexWrap:"wrap",gap:8,pointerEvents:"none"},
+ liveSticker:{fontSize:30,textShadowColor:"#000",textShadowOffset:{width:1,height:1},textShadowRadius:4},
  center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:25},
  trackGrid:{flex:1,flexDirection:"row",flexWrap:"wrap",backgroundColor:"#000"},
  trackSolo:{flex:1,backgroundColor:"#000",overflow:"hidden"},
