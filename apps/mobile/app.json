@@ -43,6 +43,11 @@
         }
       ],
       "@livekit/react-native-expo-plugin"
-    ]
+    ],
+    "splash": {
+      "image": "./assets/twitok-logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    }
   }
 }
