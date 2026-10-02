@@ -16,16 +16,26 @@ mediaRouter.get("/status", (_req, res) => {
 mediaRouter.post("/upload-url", requireUser, uploadSigningLimit, async (req, res) => {
   try {
     const objectKey = String(req.body?.objectKey ?? "");
-    const mimeType = String(req.body?.mimeType ?? "");
-    const userPrefix = `videos/${req.userId!.toHexString()}/`;
-    const allowedPrefixes = [userPrefix, `photos/${req.userId!.toHexString()}/`, `remixes/${req.userId!.toHexString()}/`, `profile-photos/${req.userId!.toHexString()}/`, `comment-media/${req.userId!.toHexString()}/`];
-    if (!objectKey || !allowedPrefixes.some(prefix => objectKey.startsWith(prefix))) return res.status(403).json({ error: "Media object is not owned by this account" });
-    if (!mimeType) return res.status(400).json({ error: "mimeType is required" });
+    const mimeType = String(req.body?.mimeType ?? "").toLowerCase().split(";")[0].trim();
+    const sizeBytes = Number(req.body?.sizeBytes);
+    const userId = req.userId!.toHexString();
+    const prefixes = [
+      { prefix: `videos/${userId}/`, types: new Set(["video/mp4", "video/quicktime", "video/webm"]), maxBytes: 500 * 1024 * 1024 },
+      { prefix: `photos/${userId}/`, types: new Set(["image/jpeg", "image/png", "image/webp"]), maxBytes: 20 * 1024 * 1024 },
+      { prefix: `remixes/${userId}/`, types: new Set(["video/mp4", "video/quicktime", "video/webm"]), maxBytes: 500 * 1024 * 1024 },
+      { prefix: `profile-photos/${userId}/`, types: new Set(["image/jpeg", "image/png", "image/webp"]), maxBytes: 10 * 1024 * 1024 },
+      { prefix: `comment-media/${userId}/`, types: new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "video/webm", "audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/webm"]), maxBytes: 50 * 1024 * 1024 }
+    ];
+    if (!objectKey) return res.status(400).json({ error: "objectKey is required" });
+    const mediaRule = prefixes.find(item => objectKey.startsWith(item.prefix));
+    if (!mediaRule) return res.status(403).json({ error: "Media object is not owned by this account" });
+    if (!mediaRule.types.has(mimeType)) return res.status(400).json({ error: "Unsupported media type for this upload" });
+    if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > mediaRule.maxBytes) return res.status(400).json({ error: "Invalid media size" });
     const db = await getDb();
-    const owned = await db.collection("video_uploads").findOne({ userId: req.userId, objectKey });
-    const photo = await db.collection("photo_uploads").findOne({ userId: req.userId, objectKey });
+    const owned = await db.collection("video_uploads").findOne({ userId: req.userId, objectKey, mimeType, sizeBytes });
+    const photo = await db.collection("photo_uploads").findOne({ userId: req.userId, objectKey, mimeType, sizeBytes });
     if (!owned && !photo && !objectKey.startsWith("comment-media/") && !objectKey.startsWith("profile-photos/")) return res.status(404).json({ error: "Upload object not found" });
-    const result = await createPresignedUpload({ objectKey, mimeType });
+    const result = await createPresignedUpload({ objectKey, mimeType, sizeBytes });
     res.json(result);
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to sign upload" }); }
 });
