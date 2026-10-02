@@ -67,12 +67,15 @@ export async function initiateGhanaTransfer(input: {
   });
 }
 
-export function verifyPaystackWebhookSignature(rawBody: string, signature: string | undefined) {
+export function verifyPaystackWebhookSignature(rawBody: string | Buffer, signature: string | undefined) {
   if (!signature) return false;
-  const digest = crypto.createHmac("sha512", key()).update(rawBody).digest("hex");
-  const expected = Buffer.from(digest, "hex");
-  const provided = Buffer.from(signature.trim(), "hex");
-  if (provided.length !== expected.length) return false;
+  const normalized = signature.trim();
+  // Paystack signs the exact raw request body with HMAC-SHA512 and sends the
+  // digest as 128 hexadecimal characters. Reject malformed encodings before
+  // converting them to bytes so malformed input can never reach timingSafeEqual.
+  if (!/^[0-9a-fA-F]{128}$/.test(normalized)) return false;
+  const expected = crypto.createHmac("sha512", key()).update(rawBody).digest();
+  const provided = Buffer.from(normalized, "hex");
   return crypto.timingSafeEqual(expected, provided);
 }
 
