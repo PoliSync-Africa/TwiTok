@@ -34,11 +34,10 @@ import { shopFinanceRouter } from "./shop-finance.js";
 import { shopAffiliateRouter } from "./shop-affiliate.js";
 import { shopContentRouter } from "./shop-content.js";
 import { shopLiveRouter } from "./shop-live.js";
+import { discoveryRouter } from "./discovery.js";
 
 export const apiRouter = Router();
 
-// CodeQL-recognized global API guard. Individual sensitive routes may also
-// apply stricter per-user limits for expensive or abuse-prone operations.
 apiRouter.use(expressRateLimit({
   windowMs: 60 * 1000,
   limit: 120,
@@ -70,6 +69,7 @@ apiRouter.use("/payments", paymentRoutingRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/verification", verificationRouter);
 apiRouter.use("/ai-media", aiMediaRouter);
+apiRouter.use("/discover", discoveryRouter);
 apiRouter.use("/shop", shopRouter);
 apiRouter.use("/shop/commerce", shopCommerceRouter);
 apiRouter.use("/shop", shopOrdersRouter);

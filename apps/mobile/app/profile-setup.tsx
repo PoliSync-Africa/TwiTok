@@ -45,11 +45,11 @@ export default function ProfileSetupScreen() {
     setBusy(true);setError("");
     try{
       const token=await getAuthToken();
-      const r=await fetch(API+"/auth/profile-setup",{method:"PATCH",headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({username:normalized,nickname:displayName,bio:bio.trim(),isPrivate})});
+      const r=await fetch(API+"/auth/profile-setup",{method:"PATCH",headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}: {})},body:JSON.stringify({username:normalized,nickname:displayName,bio:bio.trim(),isPrivate})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Unable to complete profile");
       if(photoUri) await uploadPhoto(token!);
-      router.replace("/feed");
+      router.replace("/find-friends");
     }catch(e){setError(e instanceof Error?e.message:"Unable to complete profile");}finally{setBusy(false);}
   }
 
@@ -64,7 +64,7 @@ export default function ProfileSetupScreen() {
     <TextInput style={[styles.input,styles.bio]} value={bio} onChangeText={setBio} placeholder="Bio" placeholderTextColor="#777" maxLength={80} multiline/>
     <View style={styles.privacy}><Text style={styles.privacyText}>Private account</Text><Switch value={isPrivate} onValueChange={setIsPrivate}/></View>
     {error?<Text style={styles.error}>{error}</Text>:null}
-    <Pressable style={styles.button} onPress={complete} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.buttonText}>Continue to TwiTok</Text>}</Pressable>
+    <Pressable style={styles.button} onPress={complete} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.buttonText}>Find friends</Text>}</Pressable>
   </ScrollView>;
 }
 const styles=StyleSheet.create({

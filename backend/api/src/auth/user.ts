@@ -1,5 +1,6 @@
 import type { Db } from "mongodb";
 import { ObjectId } from "mongodb";
+import { createHash } from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -21,10 +22,26 @@ export function verifyUserToken(token: string): UserToken {
   return decoded;
 }
 
+export function normalizePhoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+export function hashPhone(value: string) {
+  const digits = normalizePhoneDigits(value);
+  return digits ? createHash("sha256").update(digits).digest("hex") : null;
+}
+
+export function hashPhoneSuffix(value: string) {
+  const digits = normalizePhoneDigits(value);
+  return digits.length >= 8 ? createHash("sha256").update(digits.slice(-10)).digest("hex") : null;
+}
+
 export async function ensureUserIndexes(db: Db) {
   await Promise.all([
     db.collection("users").createIndex({ email: 1 }, { unique: true, sparse: true }),
     db.collection("users").createIndex({ phone: 1 }, { unique: true, sparse: true }),
+    db.collection("users").createIndex({ phoneHash: 1 }, { sparse: true }),
+    db.collection("users").createIndex({ phoneSuffixHash: 1 }, { sparse: true }),
     db.collection("users").createIndex({ username: 1 }, { unique: true }),
     db.collection("users").createIndex({ createdAt: -1 })
   ]);
@@ -48,7 +65,14 @@ export async function createUser(db: Db, input: { username?: string; password: s
   const normalizedPhone = input.phone?.trim();
   if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
   const now = new Date();
-  const user = { sessionVersion: 0, username, nickname: username, email: normalizedEmail, phone: normalizedPhone, dateOfBirth: dob, countryCode, accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false, profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false, createdAt: now, updatedAt: now };
+  const user = {
+    sessionVersion: 0, username, nickname: username, email: normalizedEmail, phone: normalizedPhone,
+    phoneHash: normalizedPhone ? hashPhone(normalizedPhone) : null,
+    phoneSuffixHash: normalizedPhone ? hashPhoneSuffix(normalizedPhone) : null,
+    dateOfBirth: dob, countryCode, accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false,
+    profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false,
+    contactSyncEnabled: false, createdAt: now, updatedAt: now
+  };
   const result = await db.collection("users").insertOne({ ...user, passwordHash: await bcrypt.hash(input.password, 12) });
   return { ...user, _id: result.insertedId.toHexString() };
 }
@@ -58,5 +82,11 @@ export async function authenticateUser(db: Db, identifier: string, password: str
   const user = await db.collection("users").findOne({ $or: [{ email: normalized }, { username: normalized }, { phone: identifier.trim() }] });
   if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
   if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid login credentials");
+  if (user.phone && (!user.phoneHash || !user.phoneSuffixHash)) {
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { $set: { phoneHash: hashPhone(user.phone), phoneSuffixHash: hashPhoneSuffix(user.phone), updatedAt: new Date() } }
+    );
+  }
   return { _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }

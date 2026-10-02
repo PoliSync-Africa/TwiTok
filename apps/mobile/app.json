@@ -42,6 +42,12 @@
           "recordAudioAndroid": true
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow TwiTok to use your contacts to help you find people you know."
+        }
+      ],
       "@livekit/react-native-expo-plugin"
     ],
     "splash": {
