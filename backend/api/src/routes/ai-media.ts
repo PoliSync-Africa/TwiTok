@@ -246,11 +246,23 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
   const job = await db.collection("ai_media_jobs").findOne({ jobId: String(req.params.jobId), userId: req.userId });
   if (!job) return res.status(404).json({ error: "AI media job not found" });
 
-  let outputUrl = job.outputUrl ?? null;
-  let status = String(job.status ?? "PROCESSING").toUpperCase();
+  let outputUrl = validateProviderOutputUrl(job.outputUrl);
+  let status = normalizeProviderStatus(job.status, "PROCESSING");
+
+  const jobCreatedAt = job.createdAt instanceof Date ? job.createdAt : null;
+  const maxJobAgeMs = 24 * 60 * 60 * 1000;
+  if (jobCreatedAt && Date.now() - jobCreatedAt.getTime() > maxJobAgeMs && status !== "READY_FOR_REVIEW") {
+    if (status === "PROCESSING" || status === "QUEUED") {
+      status = "EXPIRED";
+      await db.collection("ai_media_jobs").updateOne(
+        { _id: job._id },
+        { $set: { status, outputUrl: null, updatedAt: new Date() } }
+      );
+    }
+  }
 
   const statusEndpoint = validateProviderEndpoint(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT);
-  if (!outputUrl && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
+  if (!outputUrl && (status === "PROCESSING" || status === "QUEUED") && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
     try {
       const providerJobId = normalizeProviderJobId(job.providerJobId);
       if (!providerJobId) return res.status(409).json({ error: "AI media job has an invalid provider job id" });
