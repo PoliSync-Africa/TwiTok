@@ -215,11 +215,13 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   );
   if (!consumed) throw new Error("The verification code has already been used");
 
-  const verifiedField = channel === "email" ? "emailVerified" : "phoneVerified";
-  await db.collection("users").updateOne(
-    { _id: new ObjectId(userId) },
-    { $set: { [verifiedField]: true, updatedAt: now } }
-  );
+  if (purpose === "VERIFICATION") {
+    const verifiedField = channel === "email" ? "emailVerified" : "phoneVerified";
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { [verifiedField]: true, updatedAt: now } }
+    );
+  }
 
   return { verified: true, channel };
 }
