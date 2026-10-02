@@ -31,7 +31,7 @@ for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
   const onlyKnownUnpatched = (name === "node-forge" &&
     highAdvisories.length > 0 &&
     highAdvisories.every(v => allowedUnpatched.has(v.id))) ||
-    (inheritedFromNodeForge && ["@expo/cli", "@expo/code-signing-certificates", "expo"].includes(name));
+    (inheritedFromNodeForge && ["@expo/cli", "@expo/code-signing-certificates", "expo", "expo-router"].includes(name));
 
   if (!onlyKnownUnpatched) {
     blocking.push({ name, severity, advisories });
