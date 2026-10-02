@@ -7,7 +7,8 @@ import { rateLimit } from "../security/rate-limit.js";
 
 export const mediaRouter = Router();
 const uploadSigningLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
-const playbackReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });\nconst statusReadLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.ip ?? "unknown" });
+const playbackReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const statusReadLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.ip ?? "unknown" });
 
 function validateStoredPlaybackUrl(value: unknown) {
   if (typeof value !== "string") return null;
