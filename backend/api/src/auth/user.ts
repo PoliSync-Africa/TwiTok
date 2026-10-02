@@ -34,7 +34,7 @@ export async function createUser(db: Db, input: { username?: string; password: s
   const generatedUsername = `user_${new ObjectId().toHexString().slice(-12)}`;
   const username = (input.username?.trim().toLowerCase() || generatedUsername);
   if (!/^[a-z0-9._]{3,24}$/.test(username)) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
-  if (input.password.length < 12) throw new Error("Password must contain at least 12 characters");
+  if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
   const countryCode = input.countryCode.trim().toUpperCase();
