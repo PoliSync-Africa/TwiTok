@@ -194,7 +194,10 @@ authRouter.post("/change-password", requireUser, rateLimit({ windowMs: 15 * 60 *
 
 authRouter.get("/me", requireUser, userReadLimit, async (req, res) => {
   try {
-    const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
+    const user = await (await getDb()).collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { _id: 1, username: 1, nickname: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1, bio: 1, avatarUrl: 1, createdAt: 1, updatedAt: 1 } }
+    );
     if (!user) return res.status(404).json({ error: "Account not found" });
     res.json({ user });
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
