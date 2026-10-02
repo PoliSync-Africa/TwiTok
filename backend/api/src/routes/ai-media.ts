@@ -78,6 +78,23 @@ function normalizeProviderStatus(value: unknown, fallback: string): string {
   return normalized;
 }
 
+function sanitizeAiMediaJob(job: Record<string, unknown>) {
+  const safeOutputUrl = validateProviderOutputUrl(job.outputUrl);
+  const status = normalizeProviderStatus(job.status, "PROCESSING");
+  return {
+    jobId: typeof job.jobId === "string" ? job.jobId : "",
+    mode: typeof job.mode === "string" ? job.mode : "IMAGE",
+    style: typeof job.style === "string" ? job.style : "CLEAN",
+    status: safeOutputUrl ? "READY_FOR_REVIEW" : status,
+    outputUrl: safeOutputUrl,
+    targetResolution: typeof job.targetResolution === "string" ? job.targetResolution : "SOURCE_MAX",
+    outputSpec: job.outputSpec && typeof job.outputSpec === "object" ? job.outputSpec : null,
+    portraitEnhance: Boolean(job.portraitEnhance),
+    createdAt: job.createdAt instanceof Date ? job.createdAt : null,
+    updatedAt: job.updatedAt instanceof Date ? job.updatedAt : null
+  };
+}
+
 function validateProviderEndpoint(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const raw = value.trim();
@@ -254,16 +271,6 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
     }
   }
 
-  res.json({
-    jobId: job.jobId,
-    mode: job.mode,
-    style: job.style,
-    status,
-    outputUrl,
-    targetResolution: job.targetResolution ?? "SOURCE_MAX",
-    outputSpec: job.outputSpec ?? null,
-    portraitEnhance: Boolean(job.portraitEnhance),
-    createdAt: job.createdAt,
-    updatedAt: new Date()
-  });
+  const responseJob = sanitizeAiMediaJob({ ...job, status, outputUrl, updatedAt: new Date() });
+  res.json(responseJob);
 });
