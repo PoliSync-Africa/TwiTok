@@ -47,8 +47,21 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     else if (user.email && stored?.emailVerified !== true) verificationChannel = "email";
     else if (stored?.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
     if (verificationChannel) {
+      let retryAfterSeconds = 0;
+      try {
+        const sent = await sendOtp(db, user._id, verificationChannel);
+        retryAfterSeconds = sent.retryAfterSeconds;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to send verification code";
+        const waitMatch = message.match(/^Please wait (\\d+) seconds before requesting another code$/);
+        if (waitMatch) {
+          retryAfterSeconds = Number(waitMatch[1]);
+        } else {
+          return res.status(503).json({ error: "Verification delivery is temporarily unavailable. Please try again shortly." });
+        }
+      }
       const token = issueVerificationToken(user);
-      return res.json({ token, verificationRequired: true, channel: verificationChannel, user });
+      return res.json({ token, verificationRequired: true, channel: verificationChannel, retryAfterSeconds, user });
     }
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
