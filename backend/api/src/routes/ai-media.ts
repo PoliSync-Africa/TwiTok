@@ -212,6 +212,17 @@ aiMediaRouter.post("/restyle", rateLimit({ windowMs: 60 * 60 * 1000, max: 10, ke
     const providerStatus = normalizeProviderStatus(provider.status, "PROCESSING");
 
     const db = await getDb();
+    const activeJobs = await db.collection("ai_media_jobs").countDocuments({
+      userId: req.userId,
+      status: { $in: ["QUEUED", "PROCESSING"] }
+    });
+    if (activeJobs >= 3) {
+      return res.status(429).json({
+        error: "Too many AI media jobs are already processing",
+        code: "AI_MEDIA_CONCURRENCY_LIMIT"
+      });
+    }
+
     const jobId = crypto.randomUUID();
     await db.collection("ai_media_jobs").insertOne({
       jobId, userId: req.userId, mode, style, prompt: prompt || null,
