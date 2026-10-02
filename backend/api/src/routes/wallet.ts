@@ -231,12 +231,14 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
 
     const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
     const refundEvents = new Set(["CANCELLATION"]);
+    const isCustomerSupportRefund = refundEvents.has(eventType) && String(event?.cancel_reason ?? "").toUpperCase() === "CUSTOMER_SUPPORT";
     const db = await getDb();
 
-    // A transaction ID must never be rebound to a different TwiTok account,
-    // store, or product. The webhook is authenticated, but these fields still
-    // need server-side consistency checks before any wallet mutation.
-    const providerTransactionId = "REVENUECAT:" + store + ":" + transactionId;
+    // Bind both purchases and refunds to the original RevenueCat transaction.
+    // Cancellation events may carry a transaction ID different from the original
+    // purchase, so refunds must resolve original_transaction_id first.
+    const refundTransactionId = String(event?.original_transaction_id ?? transactionId).trim();
+    const providerTransactionId = "REVENUECAT:" + store + ":" + (isCustomerSupportRefund ? refundTransactionId : transactionId);
     const existingIap = await db.collection("iap_transactions").findOne(
       { providerTransactionId },
       { projection: { userId: 1, provider: 1, sku: 1, coins: 1 } }
@@ -248,7 +250,10 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
         String(existingIap.sku) === pkg.sku &&
         Number(existingIap.coins) === pkg.coins;
       if (!samePurchase) return res.status(409).json({ error: "RevenueCat transaction is already bound to a different purchase" });
+    } else if (isCustomerSupportRefund) {
+      return res.status(404).json({ error: "Original RevenueCat Coin purchase not found" });
     }
+
     const account = ObjectId.isValid(userId) ? await db.collection("users").findOne({ _id: new ObjectId(userId) }, { projection: { _id: 1 } }) : null;
     if (!account) return res.status(404).json({ error: "RevenueCat App User is not a TwiTok account" });
 
@@ -288,8 +293,8 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
       return res.status(200).json({ ok: true, duplicate: result.duplicate });
     }
 
-    if (refundEvents.has(eventType) && String(event?.cancel_reason ?? "").toUpperCase() === "CUSTOMER_SUPPORT") {
-      const originalTransactionId = "REVENUECAT:" + store + ":" + transactionId;
+    if (isCustomerSupportRefund) {
+      const originalTransactionId = providerTransactionId;
       const refundGrossUsdRaw = Number(event?.price);
       const taxPct = Number(event?.tax_percentage ?? 0);
       const commissionPct = Number(event?.commission_percentage ?? 0);
