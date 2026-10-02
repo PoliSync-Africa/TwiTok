@@ -70,7 +70,10 @@ export async function initiateGhanaTransfer(input: {
 export function verifyPaystackWebhookSignature(rawBody: string, signature: string | undefined) {
   if (!signature) return false;
   const digest = crypto.createHmac("sha512", key()).update(rawBody).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
+  const expected = Buffer.from(digest, "hex");
+  const provided = Buffer.from(signature.trim(), "hex");
+  if (provided.length !== expected.length) return false;
+  return crypto.timingSafeEqual(expected, provided);
 }
 
 
