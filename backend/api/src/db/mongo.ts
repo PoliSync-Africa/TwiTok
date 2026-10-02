@@ -72,4 +72,14 @@ export async function getDb(): Promise<Db> {
 
   return db;
 }
-\nexport async function withMongoTransaction<T>(work: (session: import("mongodb").ClientSession) => Promise<T>): Promise<T> {\n  if (!client) await getDb();\n  if (!client) throw new Error("MongoDB client is not initialized");\n  const session = client.startSession();\n  try {\n    return await session.withTransaction(() => work(session));\n  } finally {\n    await session.endSession();\n  }\n}\n
+
+export async function withMongoTransaction<T>(work: (session: import("mongodb").ClientSession) => Promise<T>): Promise<T> {
+  if (!client) await getDb();
+  if (!client) throw new Error("MongoDB client is not initialized");
+  const session = client.startSession();
+  try {
+    return await session.withTransaction(() => work(session));
+  } finally {
+    await session.endSession();
+  }
+}
