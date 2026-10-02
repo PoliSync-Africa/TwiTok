@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "TwiTok",
+    "slug": "twitok",
+    "version": "0.1.0",
+    "scheme": "twitok",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "africa.twitok.app"
+    },
+    "android": {
+      "package": "africa.twitok.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TwiTok to access your photos and videos.",
+          "cameraPermission": "Allow TwiTok to use your camera.",
+          "microphonePermission": "Allow TwiTok to record audio and video."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow TwiTok to record voice comments.",
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow TwiTok to use your camera to create videos.",
+          "microphonePermission": "Allow TwiTok to record audio with your videos.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "@livekit/react-native-expo-plugin"
+    ],
+    "splash": {
+      "image": "./assets/twitok-logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    }
+  }
+}

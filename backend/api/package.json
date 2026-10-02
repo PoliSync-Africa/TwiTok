@@ -1,0 +1,39 @@
+{
+  "name": "@twitok/api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "worker:video": "tsx src/workers/video-worker.ts",
+    "worker:photo": "tsx src/workers/photo-worker.ts",
+    "test:types": "tsc --noEmit",
+    "worker:stt": "tsx src/workers/transcription-worker.ts",
+    "worker:translate": "tsx src/workers/translation-worker.ts",
+    "worker:feed-events": "tsx src/workers/feed-event-worker.ts"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.1.0",
+    "mongodb": "^6.18.0",
+    "bcryptjs": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "@aws-sdk/client-s3": "^3.888.0",
+    "@aws-sdk/s3-request-presigner": "^3.888.0",
+    "ws": "^8.18.3",
+    "express-rate-limit": "^8.7.0",
+    "ioredis": "^5.7.0",
+    "livekit-server-sdk": "^2.19.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "@types/ws": "^8.18.1"
+  }
+}

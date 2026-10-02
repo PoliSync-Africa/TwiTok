@@ -1,0 +1,189 @@
+import crypto from "node:crypto";
+
+type FlutterwaveResponse<T> = { status: string; message: string; data: T };
+
+const baseUrl = "https://api.flutterwave.com/v3";
+const MOBILE_DIALING_CODES: Record<string, string> = {
+  GH: "233", NG: "234", KE: "254", UG: "256", ZA: "27", RW: "250",
+  TZ: "255", MW: "265", ZM: "260", CM: "237", CI: "225", SN: "221",
+  EG: "20", SL: "232", BF: "226", GN: "224", GW: "245", ML: "223",
+  TN: "216", BJ: "229", TG: "228"
+};
+
+function normalizeMobileMoneyNumber(countryCode: string, value: string) {
+  const code = String(countryCode ?? "").toUpperCase();
+  const dialingCode = MOBILE_DIALING_CODES[code];
+  let digits = String(value ?? "").trim().replace(/[^0-9+]/g, "");
+  if (digits.startsWith("+")) digits = digits.slice(1);
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (!digits) throw new Error("Mobile Money number is required");
+  if (dialingCode) {
+    if (digits.startsWith("0")) digits = dialingCode + digits.slice(1);
+    else if (!digits.startsWith(dialingCode)) digits = dialingCode + digits;
+  }
+  if (!/^\\d{8,15}$/.test(digits)) throw new Error("Invalid Mobile Money number");
+  return digits;
+}
+
+
+function key() {
+  const value = process.env.TWITOK_FLUTTERWAVE_SECRET_KEY;
+  if (!value) throw new Error("FLUTTERWAVE_SECRET_KEY is not configured");
+  return value;
+}
+
+async function flutterwave<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(baseUrl + path, {
+    ...init,
+    headers: {
+      Authorization: "Bearer " + key(),
+      "Content-Type": "application/json",
+      accept: "application/json",
+      ...(init.headers ?? {})
+    }
+  });
+  const body = await response.json() as FlutterwaveResponse<T>;
+  if (!response.ok || body.status !== "success") throw new Error(body.message || "Flutterwave request failed");
+  return body.data;
+}
+
+export async function initializeFlutterwaveCheckout(input: {
+  email: string;
+  phoneNumber?: string;
+  name?: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  redirectUrl?: string;
+  paymentOptions?: string;
+  userId: string;
+  sku: string;
+  coins: number;
+}) {
+  return flutterwave<{ link: string }>("/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      amount: Math.round(input.amount * 100) / 100,
+      currency: input.currency,
+      tx_ref: input.reference,
+      redirect_url: input.redirectUrl,
+      customer: {
+        email: input.email,
+        phone_number: input.phoneNumber,
+        name: input.name
+      },
+      payment_options: input.paymentOptions,
+      customizations: { title: "TwiTok Coins", description: "Purchase TwiTok Coins" },
+      meta: { userId: input.userId, sku: input.sku, coins: input.coins, purpose: "TWITOK_COIN_PURCHASE" }
+    })
+  });
+}
+
+export async function verifyFlutterwaveTransaction(transactionId: string) {
+  return flutterwave<{
+    id: number;
+    tx_ref: string;
+    status: string;
+    amount: number;
+    charged_amount?: number;
+    amount_settled?: number;
+    currency: string;
+    customer?: { email?: string };
+  }>("/transactions/" + encodeURIComponent(transactionId) + "/verify");
+}
+
+export function verifyFlutterwaveWebhookSignature(rawBody: string, signature: string | undefined) {
+  const secretHash = process.env.TWITOK_FLUTTERWAVE_WEBHOOK_SECRET;
+  if (!secretHash || !signature) return false;
+
+  // Flutterwave v3 webhooks send the configured secret hash verbatim in
+  // `verif-hash`. Newer Flutterwave webhook signatures use HMAC-SHA256
+  // and the `flutterwave-signature` header. Support both formats.
+  if (signature === secretHash) return true;
+
+  const digest = crypto.createHmac("sha256", secretHash).update(rawBody).digest("base64");
+  const provided = Buffer.from(signature);
+  const expected = Buffer.from(digest);
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+}
+
+
+export async function initiateFlutterwaveTransfer(input: {
+  amount: number;
+  currency: string;
+  countryCode: string;
+  type: "BANK" | "MOBILE_MONEY";
+  accountNumber: string;
+  bankCode: string;
+  branchCode?: string;
+  beneficiaryName: string;
+  reference: string;
+  callbackUrl?: string;
+}) {
+  const amount = Math.floor(input.amount);
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Flutterwave transfer amount must be a positive integer");
+  if (!input.accountNumber || !input.bankCode || !input.beneficiaryName) throw new Error("Flutterwave payout destination is incomplete");
+  const accountNumber = input.type === "MOBILE_MONEY"
+    ? normalizeMobileMoneyNumber(input.countryCode, input.accountNumber)
+    : input.accountNumber.trim();
+  if (input.type === "BANK" && input.countryCode === "GH" && !input.branchCode) {
+    throw new Error("Ghana Flutterwave bank payouts require a destination branch code");
+  }
+
+  const meta = input.type === "MOBILE_MONEY"
+    ? {
+        sender: process.env.TWITOK_FLUTTERWAVE_SENDER_NAME ?? "TwiTok",
+        sender_country: process.env.TWITOK_FLUTTERWAVE_SENDER_COUNTRY ?? "GH",
+        mobile_number: process.env.TWITOK_FLUTTERWAVE_SENDER_MOBILE ?? ""
+      }
+    : undefined;
+
+  return flutterwave<{
+    id: number;
+    account_number: string;
+    bank_code: string;
+    full_name: string;
+    currency: string;
+    amount: number;
+    fee?: number;
+    status: string;
+    reference: string;
+    complete_message?: string;
+    bank_name?: string;
+  }>("/transfers", {
+    method: "POST",
+    body: JSON.stringify({
+      account_bank: input.bankCode,
+      account_number: accountNumber,
+      ...(input.type === "BANK" && input.countryCode === "GH" && input.branchCode ? { destination_branch_code: input.branchCode } : {}),
+      amount,
+      currency: input.currency,
+      beneficiary_name: input.beneficiaryName,
+      reference: input.reference,
+      callback_url: input.callbackUrl,
+      narration: "TwiTok creator payout",
+      meta
+    })
+  });
+}
+
+export async function getFlutterwaveTransfer(transferId: string | number) {
+  return flutterwave<{
+    id: number;
+    account_number: string;
+    bank_code: string;
+    full_name: string;
+    currency: string;
+    amount: number;
+    fee?: number;
+    status: string;
+    reference: string;
+    complete_message?: string;
+  }>("/transfers/" + encodeURIComponent(String(transferId)));
+}
+
+export async function listFlutterwaveBanks(countryCode: string) {
+  return flutterwave<Array<{ id: number; code: string; name: string; provider_type?: string }>>(
+    "/banks/" + encodeURIComponent(countryCode.toUpperCase()) + "?include_provider_type=1"
+  );
+}
