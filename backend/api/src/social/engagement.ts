@@ -152,8 +152,9 @@ export async function toggleRepost(db: Db, userId: ObjectId, videoIdString: stri
 export async function toggleCommentLike(db: Db, userId: ObjectId, commentIdString: string) {
   if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
   const commentId = new ObjectId(commentIdString);
-  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { _id: 1 } });
+  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { _id: 1, videoId: 1 } });
   if (!comment) throw new Error("Comment not found");
+  await getPublicVideo(db, comment.videoId);
   const existing = await db.collection("comment_likes").findOne({ commentId, userId }, { projection: { _id: 1 } });
   if (existing) {
     await db.collection("comment_likes").deleteOne({ _id: existing._id });
