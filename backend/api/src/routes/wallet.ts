@@ -226,6 +226,13 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
     if (!userId || !transactionId) return res.status(400).json({ error: "RevenueCat user and transaction identifiers are required" });
     if (!pkg) return res.status(400).json({ error: "Unknown RevenueCat Coin product" });
 
+    const allowedStores = new Set(["APP_STORE", "PLAY_STORE"]);
+    if (!allowedStores.has(store)) return res.status(400).json({ error: "Unsupported RevenueCat store" });
+
+    const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
+    const refundEvents = new Set(["CANCELLATION"]);
+    const db = await getDb();
+
     // A transaction ID must never be rebound to a different TwiTok account,
     // store, or product. The webhook is authenticated, but these fields still
     // need server-side consistency checks before any wallet mutation.
@@ -242,13 +249,6 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
         Number(existingIap.coins) === pkg.coins;
       if (!samePurchase) return res.status(409).json({ error: "RevenueCat transaction is already bound to a different purchase" });
     }
-
-    const allowedStores = new Set(["APP_STORE", "PLAY_STORE"]);
-    if (!allowedStores.has(store)) return res.status(400).json({ error: "Unsupported RevenueCat store" });
-
-    const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
-    const refundEvents = new Set(["CANCELLATION"]);
-    const db = await getDb();
     const account = ObjectId.isValid(userId) ? await db.collection("users").findOne({ _id: new ObjectId(userId) }, { projection: { _id: 1 } }) : null;
     if (!account) return res.status(404).json({ error: "RevenueCat App User is not a TwiTok account" });
 
