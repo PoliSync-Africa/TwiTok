@@ -12,11 +12,7 @@
       "bundleIdentifier": "africa.twitok.app"
     },
     "android": {
-      "package": "africa.twitok.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/twitok-logo.jpg",
-        "backgroundColor": "#000000"
-      }
+      "package": "africa.twitok.app"
     },
     "web": {
       "bundler": "metro"
