@@ -22,7 +22,7 @@ type Person = {
   pending?: boolean;
 };
 
-async function authHeaders() {
+async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
