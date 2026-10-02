@@ -65,6 +65,9 @@ export default function LiveStudioScreen() {
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const studioRef = useRef(studio);
   studioRef.current = studio;
+  const pendingStudioPatch = useRef<Partial<Studio>>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlight = useRef(false);
 
   const headers = async (json = false) => {
     const token = await getAuthToken();
@@ -96,20 +99,44 @@ export default function LiveStudioScreen() {
 
   useEffect(() => { void load(); }, [streamId]);
 
-  const save = async (patch: Partial<Studio>) => {
-    if (!streamId || busy) return;
-    setBusy(true); setMessage("");
+  const flushStudioSaves = async () => {
+    if (!streamId || saveInFlight.current) return;
+    saveInFlight.current = true;
+    setBusy(true);
+    setMessage("");
     try {
-      const next = { ...studio, ...patch };
-      const res = await fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/studio", {
-        method: "PATCH", headers: await headers(true), body: JSON.stringify(patch)
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Could not save LIVE Studio settings");
-      setStudio({ ...next, ...(data.studio ?? {}) });
-    } catch (e) { setMessage(e instanceof Error ? e.message : "Could not save LIVE Studio settings"); }
-    finally { setBusy(false); }
+      while (Object.keys(pendingStudioPatch.current).length > 0) {
+        const patch = pendingStudioPatch.current;
+        pendingStudioPatch.current = {};
+        const res = await fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/studio", {
+          method: "PATCH", headers: await headers(true), body: JSON.stringify(patch)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          pendingStudioPatch.current = { ...patch, ...pendingStudioPatch.current };
+          throw new Error(data.error || "Could not save LIVE Studio settings");
+        }
+        setStudio(current => ({ ...current, ...(data.studio ?? {}) }));
+      }
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Could not save LIVE Studio settings");
+    } finally {
+      saveInFlight.current = false;
+      setBusy(false);
+    }
   };
+
+  const save = (patch: Partial<Studio>) => {
+    if (!streamId) return;
+    setStudio(current => ({ ...current, ...patch }));
+    pendingStudioPatch.current = { ...pendingStudioPatch.current, ...patch };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { saveTimer.current = null; void flushStudioSaves(); }, 180);
+  };
+
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
 
   const uploadBackground = async () => {
     if (!streamId || busy) return;
