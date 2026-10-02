@@ -23,7 +23,7 @@
     "expo-camera": "57.0.5",
     "expo-contacts": "~57.0.5",
     "expo-crypto": "~57.0.3",
-    "expo-linking": "~7.0.0",
+    "expo-linking": "~7.0.11",
     "react-native-purchases": "^10.10.2",
     "expo-location": "~19.0.7",
     "@livekit/react-native": "^3.0.0",

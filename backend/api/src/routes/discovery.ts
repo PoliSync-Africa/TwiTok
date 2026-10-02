@@ -1,10 +1,9 @@
 import { Router } from "express";
 import { rateLimit as expressRateLimit } from "express-rate-limit";
-import { ObjectId } from "mongodb";
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { followUser, isBlockedEitherWay } from "../social/follows.js";
+import { followUser } from "../social/follows.js";
 
 export const discoveryRouter = Router();
 
@@ -21,13 +20,13 @@ export async function ensureDiscoveryIndexes(db: Awaited<ReturnType<typeof getDb
   ]);
 }
 
-function publicProfile(user: any, reason?: string, mutualCount = 0) {
+async function publicProfile(db: Awaited<ReturnType<typeof getDb>>, user: any, reason?: string, mutualCount = 0) {
   return {
     id: user._id.toHexString(),
     username: user.username,
     nickname: user.nickname ?? user.username,
     countryCode: user.countryCode ?? null,
-    profilePhotoKey: user.profilePhotoKey ?? null,
+    profilePhotoUrl: user.profilePhotoKey ? (await (await import("../media/storage.js")).createPresignedPlayback(user.profilePhotoKey, 900)).url : null,
     isVerified: user.isVerified === true,
     isPrivate: user.isPrivate === true,
     reason: reason ?? null,
@@ -121,7 +120,7 @@ discoveryRouter.get("/suggestions", requireUser, async (req, res) => {
       return { user, mutualCount, score, reason };
     }).sort((a, b) => b.score - a.score || Number(b.user.isVerified) - Number(a.user.isVerified)).slice(0, limit);
 
-    res.json({ suggestions: suggestions.map(x => publicProfile(x.user, x.reason, x.mutualCount)) });
+    res.json({ suggestions: await Promise.all(suggestions.map(x => publicProfile(db, x.user, x.reason, x.mutualCount))) });
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load suggestions" });
   }
@@ -151,7 +150,7 @@ discoveryRouter.post("/contacts/match", requireUser, async (req, res) => {
       projection: { username: 1, nickname: 1, countryCode: 1, profilePhotoKey: 1, isVerified: 1, isPrivate: 1 }
     }).limit(200).toArray();
 
-    res.json({ matches: users.map(user => publicProfile(user, "In your contacts")) });
+    res.json({ matches: await Promise.all(users.map(user => publicProfile(db, user, "In your contacts"))) });
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to match contacts" });
   }
@@ -240,7 +239,7 @@ discoveryRouter.get("/facebook/matches", requireUser, async (req, res) => {
       { _id: { $in: ids }, status: "ACTIVE", profileSetupComplete: true },
       { projection: { username: 1, nickname: 1, countryCode: 1, profilePhotoKey: 1, isVerified: 1, isPrivate: 1 } }
     ).toArray();
-    res.json({ matches: users.map(user => publicProfile(user, "From Facebook")) });
+    res.json({ matches: await Promise.all(users.map(user => publicProfile(db, user, "From Facebook"))) });
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load Facebook matches" });
   }

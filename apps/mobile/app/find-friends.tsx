@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, Linking as NativeLinking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking as NativeLinking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Contacts from "expo-contacts/legacy";
 import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
@@ -13,7 +13,7 @@ type Person = {
   username: string;
   nickname: string;
   countryCode?: string | null;
-  profilePhotoKey?: string | null;
+  profilePhotoUrl?: string | null;
   isVerified?: boolean;
   isPrivate?: boolean;
   reason?: string | null;
@@ -175,7 +175,7 @@ export default function FindFriendsScreen() {
     {groups.map(group => group.people.length ? <View key={group.title} style={styles.section}>
       <Text style={styles.sectionTitle}>{group.title}</Text>
       {group.people.map(person => <View key={person.id} style={styles.person}>
-        <View style={styles.avatar}>{person.profilePhotoKey ? <Image source={{ uri: person.profilePhotoKey }} style={styles.avatarImage} /> : <Text style={styles.avatarText}>{(person.nickname || person.username).slice(0,1).toUpperCase()}</Text>}</View>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{(person.nickname || person.username).slice(0,1).toUpperCase()}</Text></View>
         <View style={styles.personCopy}><Text style={styles.nickname}>{person.nickname}</Text><Text style={styles.username}>@{person.username}</Text>{person.reason ? <Text style={styles.reason}>{person.reason}</Text> : null}</View>
         <Pressable style={styles.follow} onPress={() => follow(person)} disabled={following[person.id] || pending[person.id]}><Text style={styles.followText}>{following[person.id] ? "Following" : pending[person.id] ? "Requested" : "Follow"}</Text></Pressable>
       </View>)}
@@ -207,7 +207,6 @@ const styles=StyleSheet.create({
   sectionTitle:{color:"#fff",fontSize:18,fontWeight:"900",marginBottom:10},
   person:{flexDirection:"row",alignItems:"center",paddingVertical:11},
   avatar:{width:48,height:48,borderRadius:24,backgroundColor:"#222",alignItems:"center",justifyContent:"center",marginRight:11},
-  avatarImage:{width:48,height:48,borderRadius:24},
   avatarText:{color:"#d4af37",fontSize:18,fontWeight:"900"},
   personCopy:{flex:1},
   nickname:{color:"#fff",fontSize:14,fontWeight:"800"},
