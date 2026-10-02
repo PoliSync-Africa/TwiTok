@@ -1,6 +1,7 @@
 import type { ClientSession, Db } from "mongodb";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { ObjectId } from "mongodb";
+import { sendEmailOtp } from "./email.js";
 
 export type OtpChannel = "email" | "phone";
 export type OtpPurpose = "VERIFICATION" | "PASSWORD_RESET";
@@ -47,7 +48,17 @@ function isValidEmail(value: string) {
   );
 }
 
-async function deliverOtp(channel: OtpChannel, destination: string, code: string) {
+async function deliverOtp(channel: OtpChannel, destination: string, code: string, purpose: OtpPurpose, expiresInSeconds: number) {
+  if (channel === "email") {
+    await sendEmailOtp({
+      to: destination,
+      code,
+      purpose: purpose === "PASSWORD_RESET" ? "PASSWORD_RESET" : "VERIFICATION",
+      expiresInSeconds
+    });
+    return;
+  }
+
   const webhook = process.env.TWITOK_OTP_DELIVERY_WEBHOOK_URL?.trim();
   const allowConsole = process.env.NODE_ENV !== "production" && process.env.TWITOK_OTP_ALLOW_CONSOLE === "true";
 
@@ -81,7 +92,7 @@ async function deliverOtp(channel: OtpChannel, destination: string, code: string
         channel,
         destination,
         code,
-        expiresInSeconds: OTP_TTL_MS / 1000,
+        expiresInSeconds,
         template: "TWITOK_VERIFICATION"
       }),
       signal: controller.signal
@@ -141,7 +152,7 @@ export async function sendOtp(db: Db, userId: string, channel: OtpChannel, reque
   const expiresAt = new Date(now.getTime() + OTP_TTL_MS);
   const codeHash = hashCode(userId, channel, destination, code, purpose);
 
-  await deliverOtp(channel, destination, code);
+  await deliverOtp(channel, destination, code, purpose, OTP_TTL_MS / 1000);
 
   await db.collection("auth_otps").updateMany(
     { userId, channel, purpose, destination, consumedAt: { $exists: false }, expiresAt: { $gt: now } },
