@@ -12,7 +12,7 @@ import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider, res
 import { requireUser, requireAdultUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { rateLimit as expressRateLimit } from "express-rate-limit";
+import { rateLimit as expressRateLimit, ipKeyGenerator } from "express-rate-limit";
 
 export const walletRouter = Router();
 
@@ -90,7 +90,7 @@ walletRouter.get("/me/ledger", requireUser, async (req, res) => {
 });
 
 
-walletRouter.get("/me/earnings", requireUser, expressRateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false, keyGenerator: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+walletRouter.get("/me/earnings", requireUser, expressRateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false, keyGenerator: req => req.userId?.toHexString() ?? ipKeyGenerator(req.ip ?? "unknown") }), async (req, res) => {
   try {
     const db = await getDb();
     const now = new Date();
