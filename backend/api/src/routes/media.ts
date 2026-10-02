@@ -7,9 +7,22 @@ import { rateLimit } from "../security/rate-limit.js";
 
 export const mediaRouter = Router();
 const uploadSigningLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
-const playbackReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const playbackReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });\nconst statusReadLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.ip ?? "unknown" });
 
-mediaRouter.get("/status", (_req, res) => {
+function validateStoredPlaybackUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || raw.length > 2048) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+mediaRouter.get("/status", statusReadLimit, (_req, res) => {
   res.json({ configured: mediaConfigured() });
 });
 
@@ -59,7 +72,9 @@ mediaRouter.get("/playback/:videoId", requireUser, playbackReadLimit, async (req
         if (!following) return res.status(403).json({ error: "Follow the creator to view this video" });
       }
     }
-    if (video.playback?.hlsUrl) return res.json({ url: video.playback.hlsUrl, type: "HLS" });
+    const hlsUrl = validateStoredPlaybackUrl(video.playback?.hlsUrl);
+    if (hlsUrl) return res.json({ url: hlsUrl, type: "HLS" });
+    if (video.playback?.hlsUrl) return res.status(404).json({ error: "Playback asset is not ready" });
     if (video.playback?.objectKey) return res.json(await createPresignedPlayback(video.playback.objectKey));
     return res.status(404).json({ error: "Playback asset is not ready" });
   } catch {
