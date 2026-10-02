@@ -231,6 +231,16 @@ export default function LiveStudioScreen() {
           })}
         </View>
         <Text style={styles.note}>{studio.stickers.length}/32 stickers. Select a sticker, then adjust its position, size, rotation and animation.</Text>
+        <View style={styles.layerHeader}>
+          <Text style={styles.layerTitle}>Sticker layers</Text>
+          <Pressable disabled={!studio.stickers.length || busy} onPress={() => { setSelectedStickerId(null); void save({ stickers: [] }); }}><Text style={styles.clearText}>Clear all</Text></Pressable>
+        </View>
+        {studio.stickers.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.layerRow}>
+          {studio.stickers.map((item, index) => <Pressable key={item.id} style={[styles.layerChip, selectedStickerId === item.id && styles.layerChipActive]} onPress={() => setSelectedStickerId(item.id)}>
+            <Text style={styles.layerEmoji}>{item.emoji}</Text><Text style={styles.layerIndex}>#{index + 1}</Text>
+          </Pressable>)}
+        </ScrollView> : null}
+
         {(() => {
           const selected = studio.stickers.find(item => item.id === selectedStickerId);
           if (!selected) return null;
@@ -242,6 +252,20 @@ export default function LiveStudioScreen() {
             <View style={styles.controlRow}><Text style={styles.label}>Size</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ scale: Math.max(.5, Number((selected.scale - .25).toFixed(2))) })}><Text style={styles.adjustText}>−</Text></Pressable><Text style={styles.value}>{selected.scale.toFixed(2)}×</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ scale: Math.min(3, Number((selected.scale + .25).toFixed(2))) })}><Text style={styles.adjustText}>+</Text></Pressable></View>
             <View style={styles.controlRow}><Text style={styles.label}>Rotation</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ rotation: Math.max(-180, selected.rotation - 15) })}><Text style={styles.adjustText}>−</Text></Pressable><Text style={styles.value}>{Math.round(selected.rotation)}°</Text><Pressable style={styles.adjust} onPress={() => patchSelected({ rotation: Math.min(180, selected.rotation + 15) })}><Text style={styles.adjustText}>+</Text></Pressable></View>
             <View style={styles.wrap}>{(["NONE","BOUNCE","PULSE","FLOAT"] as const).map(animation => <Pressable key={animation} style={[styles.pill, selected.animation === animation && styles.pillActive]} onPress={() => patchSelected({ animation })}><Text style={styles.pillText}>{animation}</Text></Pressable>)}</View>
+            <View style={styles.wrap}>
+              <Pressable style={styles.toolButton} onPress={() => patchSelected({ x: 50, y: 50, scale: 1, rotation: 0 })}><Text style={styles.toolText}>↺ Reset</Text></Pressable>
+              <Pressable style={styles.toolButton} onPress={() => {
+                if (studio.stickers.length >= 32) return;
+                const copy: LiveSticker = { ...selected, id: selected.id + "-copy-" + Date.now(), x: Math.min(100, selected.x + 6), y: Math.min(100, selected.y + 6) };
+                setSelectedStickerId(copy.id);
+                void save({ stickers: [...studio.stickers, copy] });
+              }}><Text style={styles.toolText}>＋ Duplicate</Text></Pressable>
+              <Pressable style={styles.toolButtonDanger} onPress={() => {
+                const next = studio.stickers.filter(item => item.id !== selected.id);
+                setSelectedStickerId(next[0]?.id ?? null);
+                void save({ stickers: next });
+              }}><Text style={styles.toolText}>Delete</Text></Pressable>
+            </View>
           </View>;
         })()}
       </Section>
@@ -298,5 +322,5 @@ const styles = StyleSheet.create({
   pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},preset:{width:92,height:82,borderRadius:16,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",marginRight:8},presetActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},presetIcon:{fontSize:25},presetText:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:6},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
   wrap:{flexDirection:"row",flexWrap:"wrap"},
   stickerGrid:{flexDirection:"row",flexWrap:"wrap",gap:7},sticker:{width:42,height:42,borderRadius:13,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},stickerActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},stickerText:{fontSize:21},stickerEditor:{marginTop:12,padding:12,borderRadius:14,backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d"},editorTitle:{color:"#fff",fontWeight:"900",marginBottom:8},controlRow:{flexDirection:"row",alignItems:"center",gap:8,marginBottom:8},adjust:{width:34,height:34,borderRadius:10,backgroundColor:"#252525",alignItems:"center",justifyContent:"center"},adjustText:{color:"#fff",fontSize:20,fontWeight:"900"},value:{color:"#fff",fontWeight:"800",minWidth:50,textAlign:"center"},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
-  error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
+  error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},layerHeader:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginTop:10,marginBottom:7},layerTitle:{color:"#fff",fontSize:11,fontWeight:"900"},clearText:{color:"#ff91a8",fontSize:11,fontWeight:"900"},layerRow:{gap:7},layerChip:{minWidth:55,height:46,borderRadius:12,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",paddingHorizontal:8},layerChipActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},layerEmoji:{fontSize:20},layerIndex:{color:"#777",fontSize:8,marginTop:2},toolButton:{paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#252525",borderWidth:1,borderColor:"#383838",marginRight:7,marginTop:8},toolButtonDanger:{paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#32151c",borderWidth:1,borderColor:"#6b2535",marginRight:7,marginTop:8},toolText:{color:"#fff",fontSize:10,fontWeight:"900"},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
 });
