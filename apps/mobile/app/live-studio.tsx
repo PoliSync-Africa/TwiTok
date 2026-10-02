@@ -141,6 +141,14 @@ export default function LiveStudioScreen() {
   };
 
   const backgroundLabel = useMemo(() => BACKGROUNDS.find(x => x[0] === studio.background)?.[1] ?? studio.background, [studio.background]);
+  const SCENE_PRESETS = [
+    { id: "CREATOR", label: "Creator", icon: "🎬", background: "CREATOR_LOFT", filter: "STUDIO_CLEAN", effect: "BEAUTY", beauty: 25, layout: "SOLO" },
+    { id: "PODCAST", label: "Podcast", icon: "🎙️", background: "PODCAST", filter: "CINEMATIC", effect: "NONE", beauty: 10, layout: "DUO" },
+    { id: "GAMING", label: "Gaming", icon: "🎮", background: "GAMING", filter: "CYBERPUNK", effect: "VIVID", beauty: 0, layout: "GRID" },
+    { id: "NEWS", label: "News", icon: "📰", background: "NEWS", filter: "STUDIO_CLEAN", effect: "NONE", beauty: 0, layout: "PANEL" },
+    { id: "BEAUTY", label: "Beauty", icon: "💄", background: "BEAUTY_ROOM", filter: "SOFT", effect: "BEAUTY", beauty: 55, layout: "SOLO" },
+    { id: "AFRICA", label: "Africa", icon: "🌍", background: "AFRICA", filter: "AFRICAN_SUN", effect: "WARM", beauty: 15, layout: "SOLO" }
+  ] as const;
 
   if (!streamId) return <View style={styles.center}><Text style={styles.title}>LIVE Studio session not found.</Text></View>;
 
@@ -154,7 +162,7 @@ export default function LiveStudioScreen() {
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
         {customPreview && studio.background === "CUSTOM" ? <Image source={{ uri: customPreview }} style={StyleSheet.absoluteFill} /> : <View style={styles.sceneFill}><Text style={styles.sceneIcon}>🎬</Text><Text style={styles.sceneTitle}>{backgroundLabel}</Text></View>}
-        <View style={styles.sceneOverlay}><Text style={styles.sceneBadge}>9:16 LIVE SCENE</Text><Text style={styles.sceneCaption}>{studio.layout} • {studio.filter} • Beauty {studio.beauty}%</Text>{studio.stickers.length ? <Text style={styles.stickerPreview}>{studio.stickers.join(" ")}</Text> : null}</View>
+        <View style={styles.sceneOverlay}><Text style={styles.sceneBadge}>9:16 LIVE SCENE</Text><Text style={styles.sceneCaption}>{studio.layout} • {studio.filter} • Beauty {studio.beauty}%</Text>{studio.stickers.length ? <Text style={styles.stickerPreview}>{studio.stickers.map(sticker => sticker.emoji).join(" ")}</Text> : null}</View>
       </View>
 
       <Section title="Background">
@@ -162,6 +170,15 @@ export default function LiveStudioScreen() {
           {BACKGROUNDS.map(([id,label]) => <Pressable key={id} style={[styles.choice, studio.background === id && styles.choiceActive]} onPress={() => id === "CUSTOM" ? void uploadBackground() : void save({ background: id })}><Text style={styles.choiceIcon}>{id === "CUSTOM" ? "＋" : id === "BLUR" ? "◌" : "✦"}</Text><Text style={styles.choiceText}>{label}</Text></Pressable>)}
         </ScrollView>
         <Text style={styles.note}>Choose a preset or upload your own photo. The selected scene is saved to this LIVE.</Text>
+      </Section>
+
+      <Section title="Quick scene presets">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+          {SCENE_PRESETS.map(preset => <Pressable key={preset.id} style={[styles.preset, studio.background === preset.background && studio.filter === preset.filter && styles.presetActive]} disabled={busy} onPress={() => void save({ background: preset.background, filter: preset.filter, effect: preset.effect, beauty: preset.beauty, layout: preset.layout })}>
+            <Text style={styles.presetIcon}>{preset.icon}</Text><Text style={styles.presetText}>{preset.label}</Text>
+          </Pressable>)}
+        </ScrollView>
+        <Text style={styles.note}>One tap applies a complete scene setup. You can fine-tune every setting afterward.</Text>
       </Section>
 
       <Section title="Filters">
@@ -253,7 +270,7 @@ const styles = StyleSheet.create({
   stickerPreview:{color:"#fff",fontSize:22,marginTop:5},sceneBadge:{color:"#ff6b87",fontSize:10,fontWeight:"900"},sceneCaption:{color:"#fff",fontSize:11,marginTop:4},
   section:{backgroundColor:"#111",borderRadius:18,padding:14,marginBottom:12,borderWidth:1,borderColor:"#242424"},sectionTitle:{color:"#fff",fontSize:15,fontWeight:"900",marginBottom:11},
   row:{gap:8},choice:{width:100,height:82,borderRadius:14,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},choiceActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},choiceIcon:{color:"#fff",fontSize:22},choiceText:{color:"#ddd",fontSize:10,fontWeight:"800",marginTop:6,textAlign:"center"},note:{color:"#777",fontSize:10,lineHeight:15,marginTop:10},
-  pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
+  pill:{paddingHorizontal:13,paddingVertical:9,borderRadius:20,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",marginRight:7,marginBottom:7},preset:{width:92,height:82,borderRadius:16,backgroundColor:"#1b1b1b",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center",marginRight:8},presetActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},presetIcon:{fontSize:25},presetText:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:6},pillActive:{backgroundColor:"#ff2d55",borderColor:"#ff2d55"},pillText:{color:"#fff",fontSize:11,fontWeight:"900"},
   wrap:{flexDirection:"row",flexWrap:"wrap"},
   stickerGrid:{flexDirection:"row",flexWrap:"wrap",gap:7},sticker:{width:42,height:42,borderRadius:13,backgroundColor:"#1d1d1d",borderWidth:1,borderColor:"#303030",alignItems:"center",justifyContent:"center"},stickerActive:{borderColor:"#ff2d55",backgroundColor:"#241116"},stickerText:{fontSize:21},stickerEditor:{marginTop:12,padding:12,borderRadius:14,backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d"},editorTitle:{color:"#fff",fontWeight:"900",marginBottom:8},controlRow:{flexDirection:"row",alignItems:"center",gap:8,marginBottom:8},adjust:{width:34,height:34,borderRadius:10,backgroundColor:"#252525",alignItems:"center",justifyContent:"center"},adjustText:{color:"#fff",fontSize:20,fontWeight:"900"},value:{color:"#fff",fontWeight:"800",minWidth:50,textAlign:"center"},sliderRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:9},label:{color:"#fff",fontSize:12,fontWeight:"800"},number:{width:70,backgroundColor:"#1d1d1d",borderRadius:10,color:"#fff",paddingVertical:8,paddingHorizontal:10,textAlign:"center",borderWidth:1,borderColor:"#333"},percent:{color:"#888",marginLeft:-36,marginRight:12},toggle:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:7},
   error:{color:"#ff91a8",fontSize:12,fontWeight:"800",marginBottom:10},go:{backgroundColor:"#ff2d55",borderRadius:26,paddingVertical:16,alignItems:"center"},goText:{color:"#fff",fontSize:15,fontWeight:"900"},footer:{color:"#666",fontSize:10,textAlign:"center",marginTop:12}
