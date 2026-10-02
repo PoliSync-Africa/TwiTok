@@ -74,8 +74,8 @@ export default function RegisterScreen() {
       setStep(3);
       return;
     }
-    if (password.length < 12) {
-      setError("Password must contain at least 12 characters.");
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
       return;
     }
     if (password !== confirmPassword) {
@@ -126,7 +126,7 @@ export default function RegisterScreen() {
     "Choose a sign-up method, just like the TikTok-style flow.",
     "Choose your country first. TwiTok never assumes a default country.",
     "Your date of birth helps us apply age and safety requirements.",
-    "Use a strong password with at least 12 characters."
+    "Use a password with at least 8 characters."
   ];
 
   return (
@@ -225,7 +225,7 @@ export default function RegisterScreen() {
               placeholderTextColor="#777"
               secureTextEntry
             />
-            <Text style={styles.helper}>At least 12 characters. After registration, you will set your profile photo, nickname, username and privacy settings.</Text>
+            <Text style={styles.helper}>At least 8 characters. After registration, you will set your profile photo, nickname, username and privacy settings.</Text>
           </View>
         ) : null}
 
