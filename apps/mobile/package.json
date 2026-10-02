@@ -29,6 +29,9 @@
     "livekit-client": "^2.22.3"
   },
   "overrides": {
-    "electron-to-chromium": "1.5.439"
+    "electron-to-chromium": "1.5.439",
+    "decode-uri-component": "0.5.0",
+    "uuid": "11.1.1",
+    "node-forge": "1.4.0"
   }
 }
