@@ -27,7 +27,8 @@ export function rateLimit(options: { windowMs: number; max: number; key?: (req: 
       res.setHeader("RateLimit-Remaining", Math.max(0, options.max - redis.count));
       res.setHeader("RateLimit-Reset", redis.ttlSeconds);
       if (redis.count > options.max) {
-        return res.status(429).json({ error: "Too many requests. Please try again later." });
+        res.setHeader("Retry-After", Math.max(1, redis.ttlSeconds));
+        return res.status(429).json({ error: "Too many requests. Please try again later.", retryAfterSeconds: Math.max(1, redis.ttlSeconds) });
       }
       return next();
     }
@@ -47,7 +48,9 @@ export function rateLimit(options: { windowMs: number; max: number; key?: (req: 
     res.setHeader("RateLimit-Remaining", Math.max(0, options.max - current.count));
     res.setHeader("RateLimit-Reset", Math.ceil(Math.max(0, current.resetAt - now) / 1000));
     if (current.count > options.max) {
-      return res.status(429).json({ error: "Too many requests. Please try again later." });
+      const retryAfterSeconds = Math.max(1, Math.ceil(Math.max(0, current.resetAt - now) / 1000));
+      res.setHeader("Retry-After", retryAfterSeconds);
+      return res.status(429).json({ error: "Too many requests. Please try again later.", retryAfterSeconds });
     }
     return next();
   };
