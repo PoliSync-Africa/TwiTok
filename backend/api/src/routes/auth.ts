@@ -82,7 +82,10 @@ authRouter.post("/password/forgot", rateLimit({ windowMs: 15 * 60 * 1000, max: 5
       { projection: { email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, status: 1 } }
     );
     if (!user || user.status !== "ACTIVE") return res.status(200).json(generic);
+    const requestedChannel = String(req.body?.channel ?? "").toLowerCase();
     const channel: OtpChannel | null =
+      requestedChannel === "email" && user.email && user.emailVerified === true ? "email" :
+      requestedChannel === "phone" && user.phone && user.phoneVerified === true ? "phone" :
       user.email && user.emailVerified === true ? "email" :
       user.phone && user.phoneVerified === true ? "phone" : null;
     if (!channel) return res.status(200).json(generic);
