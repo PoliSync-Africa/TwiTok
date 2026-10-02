@@ -1,6 +1,23 @@
 import { ObjectId, type Db } from "mongodb";
 import { verifyMediaObject } from "../media/storage.js";
 
+const MAX_PROCESSING_ERROR_LENGTH = 500;
+const MAX_OUTPUT_URL_LENGTH = 2048;
+
+function safeProcessingError(value: unknown) {
+  return String(value ?? "processing error").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_PROCESSING_ERROR_LENGTH);
+}
+
+function safeAssetUrl(value: unknown, field: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw.length > MAX_OUTPUT_URL_LENGTH) throw new Error(`Invalid ${field}`);
+  const url = new URL(raw);
+  if (url.protocol !== "https:" || url.username || url.password) throw new Error(`Invalid ${field}`);
+  const allowedHosts = (process.env.TWITOK_MEDIA_OUTPUT_ALLOWED_HOSTS ?? "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+  if (allowedHosts.length && !allowedHosts.includes(url.hostname.toLowerCase())) throw new Error(`Untrusted ${field}`);
+  return url.toString();
+}
+
 export type VideoProcessingState =
   | "QUEUED"
   | "RUNNING"
@@ -97,19 +114,22 @@ export async function markVideoProcessingSucceeded(
   if (!job) throw new Error("Processing job not found");
 
   const now = new Date();
+  const hlsUrl = safeAssetUrl(assets.hlsUrl, "HLS URL");
+  const thumbnailUrl = assets.thumbnailUrl ? safeAssetUrl(assets.thumbnailUrl, "thumbnail URL") : null;
+  const safeAssets = { hlsUrl, thumbnailUrl, durationMs: assets.durationMs == null ? null : Math.max(0, Math.min(Number(assets.durationMs), 24 * 60 * 60 * 1000)) };
   await db.collection("video_processing_jobs").updateOne(
     { _id: jobId },
-    { $set: { status: "SUCCEEDED", assets, finishedAt: now, updatedAt: now }, $unset: { leaseExpiresAt: "" } }
+    { $set: { status: "SUCCEEDED", assets: safeAssets, finishedAt: now, updatedAt: now }, $unset: { leaseExpiresAt: "" } }
   );
 
   await db.collection("video_uploads").updateOne(
     { uploadId: job.uploadId },
-    { $set: { status: "READY", updatedAt: now, playback: assets } }
+    { $set: { status: "READY", updatedAt: now, playback: safeAssets } }
   );
 
   await db.collection("videos").updateOne(
     { uploadId: job.uploadId },
-    { $set: { status: "READY", playback: assets, thumbnail: assets.thumbnailUrl ?? null, updatedAt: now } }
+    { $set: { status: "READY", playback: safeAssets, thumbnail: safeAssets.thumbnailUrl, updatedAt: now } }
   );
 }
 
@@ -127,7 +147,7 @@ export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMe
     {
       $set: {
         status: terminal ? "DEAD_LETTER" : "QUEUED",
-        lastError: errorMessage,
+        lastError: safeProcessingError(errorMessage),
         nextAttemptAt: terminal ? null : nextAttemptAt,
         updatedAt: now
       },
@@ -138,7 +158,7 @@ export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMe
   if (terminal) {
     await db.collection("video_uploads").updateOne(
       { uploadId: job.uploadId },
-      { $set: { status: "FAILED", updatedAt: now, processingError: errorMessage } }
+      { $set: { status: "FAILED", updatedAt: now, processingError: safeProcessingError(errorMessage) } }
     );
     await db.collection("videos").updateOne(
       { uploadId: job.uploadId },
