@@ -24,7 +24,8 @@ const LIVE_STUDIO_EFFECTS = new Set([
 ]);
 const LIVE_STUDIO_FILTER_MAX = 64;
 const LIVE_STUDIO_STICKER_MAX = 32;
-const LIVE_STUDIO_LAYOUTS = new Set(["SOLO", "DUO", "TRIO", "GRID", "PANEL", "PIP"]);\nconst LIVE_STICKER_ANIMATIONS = new Set(["NONE", "BOUNCE", "PULSE", "FLOAT"]);
+const LIVE_STUDIO_LAYOUTS = new Set(["SOLO", "DUO", "TRIO", "GRID", "PANEL", "PIP"]);
+const LIVE_STICKER_ANIMATIONS = new Set(["NONE", "BOUNCE", "PULSE", "FLOAT"]);
 
 async function requireLiveHost(streamId: string, userId: string) {
   const stream = await (await getDb()).collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1, status: 1 } });
