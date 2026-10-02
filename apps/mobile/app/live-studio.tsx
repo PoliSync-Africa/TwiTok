@@ -31,18 +31,25 @@ const DEFAULTS: Studio = {
 
 const BACKGROUNDS = [
   ["NONE","No background","○"],["BLUR","Soft blur","◌"],["STUDIO","Creator Studio","▣"],["SUNSET","Sunset","☀"],
-  ["CITY","City lights","⌂"],["GOLD","Gold","◆"],["KENTE","Kente","▦"],["NIGHT","Night","☾"],
-  ["NEON","Neon room","✦"],["BEACH","Beach","⌁"],["FOREST","Forest","♣"],["MOUNTAINS","Mountains","▲"],
-  ["SPACE","Space","✧"],["GALAXY","Galaxy","✦"],["AURORA","Aurora","≋"],["CLOUDS","Clouds","☁"],
-  ["CHERRY","Cherry","●"],["SAKURA","Sakura","✿"],["TROPICAL","Tropical","🌴"],["OCEAN","Ocean","≈"],
-  ["DESERT","Desert","◇"],["LUXURY","Luxury","♛"],["CONCERT","Concert","♫"],["SPORTS","Sports","★"],
-  ["NEWS","Newsroom","▤"],["OFFICE","Office","▥"],["CLASSROOM","Classroom","▧"],["CAFE","Cafe","☕"],
-  ["STAGE","Stage","◉"],["FIRE","Fire","♨"],["RAIN","Rain","☂"],["HEARTS","Hearts","♥"],
-  ["PRIDE","Pride","🏳️‍🌈"],["GHANA","Ghana","★"],["AFRICA","Africa","◆"],["CUSTOM","My photo","＋"]
+  ["CITY","City lights","⌂"],["GOLD","Gold","◆"],["KENTE","Kente","▦"],["NIGHT","Night","☾"],["NEON","Neon room","✦"],
+  ["BEACH","Beach","⌁"],["FOREST","Forest","♣"],["MOUNTAINS","Mountains","▲"],["SPACE","Space","✧"],["GALAXY","Galaxy","✦"],
+  ["AURORA","Aurora","≋"],["CLOUDS","Clouds","☁"],["CHERRY","Cherry","●"],["SAKURA","Sakura","✿"],["TROPICAL","Tropical","🌴"],
+  ["OCEAN","Ocean","≈"],["DESERT","Desert","◇"],["LUXURY","Luxury","♛"],["CONCERT","Concert","♫"],["SPORTS","Sports","★"],
+  ["NEWS","Newsroom","▤"],["OFFICE","Office","▥"],["CLASSROOM","Classroom","▧"],["CAFE","Cafe","☕"],["STAGE","Stage","◉"],
+  ["FIRE","Fire","♨"],["RAIN","Rain","☂"],["HEARTS","Hearts","♥"],["PRIDE","Pride","🏳️‍🌈"],["GHANA","Ghana","★"],["AFRICA","Africa","◆"],
+  ["ROYAL","Royal Palace","♛"],["GOLD_COAST","Gold Coast","◆"],["ASHANTI","Ashanti Court","✦"],["ADINKRA","Adinkra","▦"],
+  ["BAOBAB","Baobab","♣"],["SAFARI","Safari","◎"],["LAGOS","Lagos skyline","⌂"],["ACCRA","Accra skyline","⌂"],
+  ["CAPE_COAST","Cape Coast","▤"],["KUMASI","Kumasi","✦"],["DUBAI","Dubai","◇"],["PARIS","Paris","✿"],["TOKYO","Tokyo","◉"],
+  ["NEW_YORK","New York","⌂"],["LONDON","London","♜"],["RIO","Rio","☀"],["SANTORINI","Santorini","≈"],["ICELAND","Iceland","❄"],
+  ["HALLOWEEN","Halloween","🎃"],["CHRISTMAS","Christmas","🎄"],["NEW_YEAR","New Year","🎆"],["BIRTHDAY","Birthday","🎂"],
+  ["WEDDING","Wedding","💍"],["GRADUATION","Graduation","🎓"],["ROMANCE","Romance","♥"],["COMEDY","Comedy stage","😂"],
+  ["GAMING","Gaming room","🎮"],["PODCAST","Podcast studio","🎙️"],["MUSIC","Music studio","🎵"],["BEAUTY_ROOM","Beauty room","💄"],
+  ["TECH","Tech studio","⌘"],["CREATOR_LOFT","Creator loft","▣"],["MINIMAL","Minimal white","□"],["DARK_LUXE","Dark luxe","◆"],
+  ["CUSTOM","My photo","＋"]
 ] as const;
-const FILTERS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO","CINEMATIC","VINTAGE","DREAM","FADE","SUNNY","DUSK","POP","FILM","NOIR","GLOW","SHARP","SOFT","PORTRAIT","PARTY","FESTIVAL","GOLDEN","TEAL","ROSE"];
+const FILTERS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO","CINEMATIC","VINTAGE","DREAM","FADE","SUNNY","DUSK","POP","FILM","NOIR","GLOW","SHARP","SOFT","PORTRAIT","PARTY","FESTIVAL","GOLDEN","TEAL","ROSE","AMBER","ARCTIC","COFFEE","LATTE","MINT","LAVENDER","PEACH","CORAL","CRIMSON","SAPPHIRE","EMERALD","PLATINUM","CHROME","MATRIX","RETRO","POLAROID","ANIME","CANDY","TOY","SKETCH","ILLUSTRATION","HALFTONE","VHS","CYBERPUNK","SUNSET","MOONLIGHT","AFRICAN_SUN","KENTE_TONE","GOLD_DUST","ROYAL","DRAMA","THRILLER","FAIRY","MAGIC","PARTY_LIGHTS","NEON_POP","STUDIO_CLEAN"];
 const EFFECTS = ["NONE","BEAUTY","VIVID","WARM","COOL","MONO"];
-const STICKERS = ["❤️","😂","🔥","👏","😍","🥳","✨","⭐","💯","🎉","🎁","🎵","🎤","👑","💎","🌟","💫","🌈","☀️","🌙","☁️","⚡","🌸","🌺","🌴","🦋","🐝","🍀","🍕","🍔","🍹","⚽","🏆","🎮","📸","🎬","🇬🇭","🇳🇬","🇰🇪","🇿🇦","🇺🇸","🇬🇧"];
+const STICKERS = ["❤️","😂","🔥","👏","😍","🥳","✨","⭐","💯","🎉","🎁","🎵","🎤","👑","💎","🌟","💫","🌈","☀️","🌙","☁️","⚡","🌸","🌺","🌴","🦋","🐝","🍀","🍕","🍔","🍹","⚽","🏆","🎮","📸","🎬","🇬🇭","🇳🇬","🇰🇪","🇿🇦","🇺🇸","🇬🇧","🇨🇦","🇧🇷","🇫🇷","🇩🇪","🇯🇵","🇮🇳","🇨🇳","🇦🇺","🇿🇦","🙏","💪","🤩","😎","🥰","😘","😇","🤗","🤯","😱","😴","🤔","🙌","👏🏻","👏🏿","✌️","🤟","👌","👍","👎","💖","💗","💓","💞","💥","💦","💨","🌍","🌎","🌏","🌍","🪩","🎈","🎊","🎀","🧿","🪄","🦄","🐼","🐯","🦁","🐘","🦒","🐒","🌻","🌹","🌷","🍓","🍉","🍍","🥭","🍌","🌶️","🍿","🍩","☕","🥤","🍾","🎧","🎹","🥁","🎸","🎻","🎭","🎨","🖌️","🎯","🏅","🏀","🏈","⚾","🎾","🏎️","✈️","🚀","💡","📱","💻","🔔","💬","❤️‍🔥","🫶","🕺","💃","🕊️","🌺","🌊","🌙","⭐","🌟","✨"];
 const LAYOUTS = ["SOLO","DUO","TRIO","GRID","PANEL","PIP"];
 
 export default function LiveStudioScreen() {
