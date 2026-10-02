@@ -113,7 +113,30 @@ export default function LiveViewerScreen() {
       }
     };
     void load();
-    const timer = setInterval(() => void load(), 5000);
+    const timer = setInterval(() => void load(), 15000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [streamId]);
+
+  useEffect(() => {
+    if (!streamId) return;
+    let alive = true;
+    const refreshStudio = async () => {
+      try {
+        const token = await getAuthToken();
+        const headers: Record<string, string> = token ? { Authorization: "Bearer " + token } : {};
+        const response = await fetch(API + "/live/streams/" + encodeURIComponent(String(streamId)) + "/studio", { headers });
+        const data = await response.json().catch(() => ({}));
+        if (!alive || !response.ok) return;
+        setStudioOverlay({
+          filter: String(data.studio?.filter ?? "NONE"),
+          stickers: normalizeLiveStickers(data.studio?.stickers)
+        });
+      } catch {
+        // Keep the last known Studio state during transient network failures.
+      }
+    };
+    void refreshStudio();
+    const timer = setInterval(() => void refreshStudio(), 2000);
     return () => { alive = false; clearInterval(timer); };
   }, [streamId]);
 
