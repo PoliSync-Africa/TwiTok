@@ -59,50 +59,39 @@ async function deliverOtp(channel: OtpChannel, destination: string, code: string
     return;
   }
 
-  const webhook = process.env.TWITOK_OTP_DELIVERY_WEBHOOK_URL?.trim();
-  const allowConsole = process.env.NODE_ENV !== "production" && process.env.TWITOK_OTP_ALLOW_CONSOLE === "true";
+  const apiKey = process.env.ARKESEL_API_KEY?.trim();
+  const senderId = process.env.ARKESEL_SENDER_ID?.trim() || "TwiTok";
+  if (!apiKey) throw new Error("ARKESEL_API_KEY must be configured");
 
-  if (!webhook) {
-    if (allowConsole) {
-      console.info(`[TwiTok OTP] ${channel} ${destination}: ${code}`);
-      return;
-    }
-    throw new Error("OTP delivery is not configured");
-  }
+  const response = await fetch("https://sms.arkesel.com/api/otp/generate", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      expiry: Math.min(10, Math.max(1, Math.ceil(expiresInSeconds / 60))),
+      length: 6,
+      medium: "sms",
+      message: purpose === "PASSWORD_RESET"
+        ? "Your TwiTok password reset code is %otp_code%. It expires soon."
+        : "Your TwiTok verification code is %otp_code%. It expires soon.",
+      number: destination,
+      sender_id: senderId,
+      type: "numeric"
+    }),
+    signal: AbortSignal.timeout(8000)
+  });
 
-  let url: URL;
+  let payload: { code?: string; message?: string };
   try {
-    url = new URL(webhook);
+    payload = await response.json() as { code?: string; message?: string };
   } catch {
-    throw new Error("TWITOK_OTP_DELIVERY_WEBHOOK_URL is invalid");
+    throw new Error("Arkesel returned an invalid response");
   }
-  if (url.protocol !== "https:") throw new Error("OTP delivery webhook must use HTTPS");
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const secret = process.env.TWITOK_OTP_DELIVERY_WEBHOOK_SECRET?.trim();
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(secret ? { Authorization: `Bearer ${secret}` } : {})
-      },
-      body: JSON.stringify({
-        channel,
-        destination,
-        code,
-        expiresInSeconds,
-        template: "TWITOK_VERIFICATION"
-      }),
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error("OTP delivery provider rejected the request");
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") throw new Error("OTP delivery provider timed out");
-    throw error instanceof Error ? error : new Error("OTP delivery failed");
-  } finally {
-    clearTimeout(timeout);
+  if (!response.ok || payload.code !== "1000") {
+    throw new Error("SMS OTP delivery failed");
   }
 }
 
