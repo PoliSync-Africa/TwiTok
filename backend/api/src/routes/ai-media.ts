@@ -113,6 +113,12 @@ function validateProviderEndpoint(value: unknown): string | null {
   }
 }
 
+function validateProviderStatusEndpoint(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (!value.includes("{jobId}")) return null;
+  return validateProviderEndpoint(value);
+}
+
 function validateProviderOutputUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const raw = value.trim();
@@ -261,7 +267,7 @@ aiMediaRouter.get("/jobs/:jobId", rateLimit({ windowMs: 60 * 1000, max: 120, key
     }
   }
 
-  const statusEndpoint = validateProviderEndpoint(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT);
+  const statusEndpoint = validateProviderStatusEndpoint(process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT);
   if (!outputUrl && (status === "PROCESSING" || status === "QUEUED") && job.providerJobId && statusEndpoint && process.env.TWITOK_AI_MEDIA_API_KEY) {
     try {
       const providerJobId = normalizeProviderJobId(job.providerJobId);
