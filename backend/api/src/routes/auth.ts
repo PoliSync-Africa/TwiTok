@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import { getDb, withMongoTransaction } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken, issueVerificationToken } from "../auth/user.js";
-import { requireUser, requireVerificationUser } from "../auth/middleware.js";
+import { requireUser, requireIncompleteProfileUser, requireVerificationUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 import { sendOtp, verifyOtp, type OtpChannel } from "../verification/otp.js";
 
@@ -253,7 +253,7 @@ authRouter.get("/me", requireUser, userReadLimit, async (req, res) => {
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 });
 
-authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res) => {
+authRouter.patch("/profile-setup", requireIncompleteProfileUser, userWriteLimit, async (req, res) => {
   try {
     const username = String(req.body?.username ?? "").trim().toLowerCase(), nickname = String(req.body?.nickname ?? "").trim(), bio = String(req.body?.bio ?? "").trim(), isPrivate = Boolean(req.body?.isPrivate);
     if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) return res.status(400).json({ error: "Username must be 3-24 characters, use letters, numbers, dots or underscores, and not end with a dot" });
