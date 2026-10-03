@@ -12,7 +12,7 @@ type Step = "credentials" | "verify" | "profile";
 
 const countries = [
   ["GH","Ghana"],["NG","Nigeria"],["KE","Kenya"],["ZA","South Africa"],["UG","Uganda"],["TZ","Tanzania"],["RW","Rwanda"],["SN","Senegal"],
-  ["CI","Côte d'Ivoire"],["CM","Cameroon"],["ET","Ethiopia"],["EG","Egypt"],["MA","Morocco"],["DZ","Algeria"],["TN","Tunisia"],["ZM","Zambia"],
+  ["CI","Côte d'Ivoire"],["CM","Cameroon"],["BI","Burundi"],["ET","Ethiopia"],["EG","Egypt"],["MA","Morocco"],["DZ","Algeria"],["TN","Tunisia"],["ZM","Zambia"],
   ["ZW","Zimbabwe"],["BW","Botswana"],["NA","Namibia"],["MW","Malawi"],["MZ","Mozambique"],["SL","Sierra Leone"],["LR","Liberia"],["GM","Gambia"],
   ["BJ","Benin"],["TG","Togo"],["BF","Burkina Faso"],["ML","Mali"],["NE","Niger"],["CD","DR Congo"],["CG","Republic of the Congo"],["AO","Angola"],
   ["GA","Gabon"],["GQ","Equatorial Guinea"],["CV","Cabo Verde"],["MU","Mauritius"],["SC","Seychelles"],["SO","Somalia"],["SD","Sudan"],["SS","South Sudan"],
