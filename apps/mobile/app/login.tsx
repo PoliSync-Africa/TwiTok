@@ -27,7 +27,7 @@ export default function LoginScreen() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to sign in");
       await saveAuthToken(data.token);
-      router.replace("/feed");
+      router.replace(data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in");
     } finally {
@@ -40,7 +40,7 @@ export default function LoginScreen() {
       <Text style={styles.logo}>TwiTok</Text>
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.subtitle}>Sign in to your TwiTok account</Text>
-      <TextInput value={identifier} onChangeText={setIdentifier} placeholder="Username or email" placeholderTextColor="#777" autoCapitalize="none" style={styles.input} />
+      <TextInput value={identifier} onChangeText={setIdentifier} placeholder="Username, email or phone" placeholderTextColor="#777" autoCapitalize="none" style={styles.input} />
       <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable style={styles.button} onPress={login} disabled={busy}>
