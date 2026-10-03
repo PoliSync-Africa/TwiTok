@@ -250,19 +250,21 @@ export async function recordModerationAction(db: Db, input: {
     if (!target) throw new Error("Target content not found");
     previousState = { status: target.status, visibility: target.visibility, restoreStatus: target.moderationPreviousStatus, restoreVisibility: target.moderationPreviousVisibility };
     if (input.action === "CONTENT_BLOCK") {
-      await db.collection("videos").updateOne(
+      const updated = await db.collection("videos").updateOne(
         { _id: target._id, status: target.status, visibility: target.visibility },
         { $set: { status: "BLOCKED", visibility: "PRIVATE", moderationPreviousStatus: target.status, moderationPreviousVisibility: target.visibility, moderationBlockedAt: new Date(), moderationBlockedBy: input.actorId } }
       );
+      if (updated.matchedCount !== 1) throw new Error("Target content changed concurrently; refresh and retry");
     } else {
       if (target.status !== "BLOCKED") throw new Error("Content is not currently blocked");
       if (target.moderationPreviousStatus === undefined || target.moderationPreviousVisibility === undefined) {
         throw new Error("Blocked content has no preserved moderation state");
       }
-      await db.collection("videos").updateOne(
-        { _id: target._id, status: "BLOCKED" },
+      const updated = await db.collection("videos").updateOne(
+        { _id: target._id, status: "BLOCKED", moderationPreviousStatus: target.moderationPreviousStatus, moderationPreviousVisibility: target.moderationPreviousVisibility },
         { $set: { status: String(target.moderationPreviousStatus), visibility: String(target.moderationPreviousVisibility) }, $unset: { moderationBlockedAt: "", moderationBlockedBy: "", moderationPreviousStatus: "", moderationPreviousVisibility: "" } }
       );
+      if (updated.matchedCount !== 1) throw new Error("Target content changed concurrently; refresh and retry");
     }
   }
   } catch (error) {
