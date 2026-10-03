@@ -49,15 +49,21 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
 authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: authRateLimit }), async (req, res) => {
   try {
     const { identifier, password } = req.body ?? {};
-    if (!identifier || !password) return res.status(400).json({ error: "identifier and password are required" });
+    const loginIdentifier = String(identifier ?? "").trim();
+    const loginPassword = String(password ?? "");
+    if (!loginIdentifier || !loginPassword) return res.status(400).json({ error: "Email or phone number and password are required" });
+    const isEmailLogin = loginIdentifier.includes("@");
+    const phoneDigits = loginIdentifier.replace(/\D/g, "");
+    if (!isEmailLogin && phoneDigits.length < 7) return res.status(400).json({ error: "Log in with your email address or phone number" });
+    if (isEmailLogin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier)) return res.status(400).json({ error: "Enter a valid email address" });
     const db = await getDb();
-    const user = await authenticateUser(db, identifier, password);
+    const user = await authenticateUser(db, loginIdentifier, loginPassword);
     const stored = await db.collection("users").findOne(
       { _id: new (await import("mongodb")).ObjectId(user._id) },
       { projection: { firstName: 1, emailVerified: 1, phoneVerified: 1, email: 1, phone: 1, profileSetupComplete: 1 } }
     );
     let verificationChannel: OtpChannel | null = null;
-    const identifierValue = String(identifier).trim().toLowerCase();
+    const identifierValue = loginIdentifier.toLowerCase();
     if (identifierValue.includes("@") && user.email && stored?.emailVerified !== true) verificationChannel = "email";
     else if (!identifierValue.includes("@") && stored?.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
     else if (user.email && stored?.emailVerified !== true) verificationChannel = "email";
