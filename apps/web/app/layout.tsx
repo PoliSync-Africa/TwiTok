@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import AuthGate from "./auth-gate";
 
 export const metadata: Metadata = {
   title: "TwiTok — Africa's Video Platform",
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{children: React.ReactNode}>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body><AuthGate>{children}</AuthGate></body>
+    </html>
+  );
 }
