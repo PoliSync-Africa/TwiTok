@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { cacheDelete } from "../cache/redis.js";
-import { evaluateText, listModerationCases, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateModerationCase } from "../safety/engine.js";
+import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { rateLimit } from "../security/rate-limit.js";
@@ -57,6 +57,54 @@ safetyRouter.patch("/moderation/cases/:caseId", requireUser, safetyReviewLimit, 
     return res.json({ case: result });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update moderation case" });
+  }
+});
+
+
+safetyRouter.post("/moderation/cases/:caseId/appeals", requireUser, safetyReviewLimit, async (req, res) => {
+  try {
+    const appeal = await createAppeal(await getDb(), {
+      caseId: String(req.params.caseId),
+      userId: req.userId!.toHexString(),
+      reason: String(req.body?.reason ?? "")
+    });
+    return res.status(201).json({ appeal });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to submit appeal" });
+  }
+});
+
+safetyRouter.get("/moderation/appeals", requireUser, safetyReviewLimit, async (req, res) => {
+  try {
+    const status = req.query.status ? String(req.query.status).toUpperCase() : undefined;
+    if (status && !["OPEN", "IN_REVIEW", "UPHELD", "OVERTURNED", "CLOSED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid appeal status" });
+    }
+    const appeals = await listAppeals(await getDb(), {
+      userId: req.query.mine === "true" ? req.userId!.toHexString() : undefined,
+      status: status as any,
+      limit: Number(req.query.limit ?? 50)
+    });
+    return res.json({ appeals });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to list appeals" });
+  }
+});
+
+safetyRouter.patch("/moderation/appeals/:appealId", requireUser, safetyReviewLimit, async (req, res) => {
+  try {
+    const status = String(req.body?.status ?? "").toUpperCase();
+    if (!["OPEN", "IN_REVIEW", "UPHELD", "OVERTURNED", "CLOSED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid appeal status" });
+    }
+    const appeal = await updateAppeal(await getDb(), String(req.params.appealId), {
+      status: status as any,
+      reviewerId: req.userId!.toHexString(),
+      resolution: req.body?.resolution
+    });
+    return res.json({ appeal });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update appeal" });
   }
 });
 
