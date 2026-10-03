@@ -203,5 +203,5 @@ export async function authenticateUser(db: Db, identifier: string, password: str
       { $set: { phoneHash: hashPhone(user.phone), phoneSuffixHash: hashPhoneSuffix(user.phone), updatedAt: new Date() } }
     );
   }
-  return { _id: user._id.toHexString(), firstName: user.firstName, username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
+  return { _id: user._id.toHexString(), firstName: user.firstName, username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, emailVerified: user.emailVerified === true, phoneVerified: user.phoneVerified === true, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }
