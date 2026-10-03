@@ -2,11 +2,34 @@ import { type Db, ObjectId } from "mongodb";
 
 function escapeRegex(value: string) { return value.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\$&"); }
 
+async function ensureSearchIndex(
+  db: Db,
+  collectionName: string,
+  key: Record<string, 1 | -1 | "text">,
+  options: { unique?: boolean; name?: string } = {}
+) {
+  const collection = db.collection(collectionName);
+  const indexes = await collection.listIndexes().toArray();
+  const requestedName = options.name;
+  const sameKey = indexes.filter((index) => JSON.stringify(index.key) === JSON.stringify(key));
+  const existing = requestedName
+    ? indexes.find((index) => index.name === requestedName)
+    : sameKey[0];
+
+  if (existing) {
+    const uniqueMatches = Boolean(existing.unique) === Boolean(options.unique);
+    if (uniqueMatches) return;
+    await collection.dropIndex(existing.name);
+  }
+
+  await collection.createIndex(key, options);
+}
+
 export async function initializeSearchIndexes(db: Db) {
   await Promise.all([
-    db.collection("videos").createIndex({ caption: "text", hashtags: "text" }),
-    db.collection("users").createIndex({ username: 1 }),
-    db.collection("users").createIndex({ nickname: 1 })
+    ensureSearchIndex(db, "videos", { caption: "text", hashtags: "text" }),
+    ensureSearchIndex(db, "users", { username: 1 }, { unique: true, name: "username_1" }),
+    ensureSearchIndex(db, "users", { nickname: 1 })
   ]);
 }
 
