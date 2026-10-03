@@ -183,7 +183,6 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
 }
 
 export default function FeedScreen() {
-  const insets = useSafeAreaInsets();
   const { videoId: requestedVideoId } = useLocalSearchParams<{ videoId?: string }>();
   const [videos, setVideos] = useState<Video[]>([]);
   const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"AFRICA">("FOR_YOU");
