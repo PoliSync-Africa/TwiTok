@@ -18,6 +18,9 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_cases").createIndex({ reportId: 1 }, { unique: true, sparse: true }),
     db.collection("moderation_cases").createIndex({ assigneeId: 1, status: 1, updatedAt: -1 }),
     db.collection("moderation_case_events").createIndex({ caseId: 1, createdAt: -1 }),
+    db.collection("appeals").createIndex({ caseId: 1, userId: 1 }, { unique: true }),
+    db.collection("appeals").createIndex({ status: 1, createdAt: -1 }),
+    db.collection("appeal_events").createIndex({ appealId: 1, createdAt: -1 }),
     db.collection("appeals").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("user_mutes").createIndex({ muterId: 1, mutedId: 1 }, { unique: true }),
     db.collection("user_mutes").createIndex({ muterId: 1, createdAt: -1 }),
@@ -55,6 +58,71 @@ export async function openHumanReview(db: Db, input: { userId:string; contentId:
   };
   const result = await db.collection("moderation_cases").insertOne(caseRecord);
   return { ...caseRecord, caseId: String(result.insertedId) };
+}
+
+export type AppealStatus = "OPEN" | "IN_REVIEW" | "UPHELD" | "OVERTURNED" | "CLOSED";
+
+export async function createAppeal(db: Db, input: {
+  caseId: string;
+  userId: string;
+  reason: string;
+}) {
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(input.caseId)) throw new Error("Invalid moderation case id");
+  const caseRecord = await db.collection("moderation_cases").findOne({ _id: new ObjectId(input.caseId) });
+  if (!caseRecord) throw new Error("Moderation case not found");
+  if (caseRecord.status !== "RESOLVED" && caseRecord.status !== "DISMISSED") throw new Error("Case is not appealable");
+  const record = {
+    caseId: input.caseId,
+    userId: input.userId,
+    reason: String(input.reason).slice(0, 2000),
+    status: "OPEN" as AppealStatus,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  try {
+    const result = await db.collection("appeals").insertOne(record);
+    return { ...record, appealId: result.insertedId.toHexString() };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
+      throw new Error("An appeal already exists for this case");
+    }
+    throw error;
+  }
+}
+
+export async function listAppeals(db: Db, input: { userId?: string; status?: AppealStatus; limit?: number }) {
+  const limit = Math.min(Math.max(Number(input.limit ?? 50), 1), 100);
+  const filter: Record<string, unknown> = {};
+  if (input.userId) filter.userId = input.userId;
+  if (input.status) filter.status = input.status;
+  return db.collection("appeals").find(filter).sort({ createdAt: -1 }).limit(limit).toArray();
+}
+
+export async function updateAppeal(db: Db, appealId: string, input: {
+  status: AppealStatus;
+  reviewerId: string;
+  resolution?: string;
+}) {
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(appealId)) throw new Error("Invalid appeal id");
+  const filter = { _id: new ObjectId(appealId) };
+  const existing = await db.collection("appeals").findOne(filter);
+  if (!existing) throw new Error("Appeal not found");
+  const update = {
+    status: input.status,
+    resolution: input.resolution ? String(input.resolution).slice(0, 2000) : existing.resolution,
+    lastReviewedBy: input.reviewerId,
+    updatedAt: new Date()
+  };
+  await db.collection("appeals").updateOne(filter, { $set: update });
+  await db.collection("appeal_events").insertOne({
+    appealId,
+    reviewerId: input.reviewerId,
+    changes: update,
+    createdAt: new Date()
+  });
+  return db.collection("appeals").findOne(filter);
 }
 
 export async function listModerationCases(db: Db, input: { status?: ModerationCaseStatus; limit?: number }) {
