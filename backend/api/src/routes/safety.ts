@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { cacheDelete } from "../cache/redis.js";
-import { evaluateText, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser } from "../safety/engine.js";
+import { evaluateText, listModerationCases, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateModerationCase } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { rateLimit } from "../security/rate-limit.js";
@@ -28,6 +28,38 @@ safetyRouter.post("/review", requireUser, safetyReviewLimit, async (req, res) =>
     }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Review case creation failed" }); }
 });
+
+safetyRouter.get("/moderation/cases", requireUser, safetyReviewLimit, async (req, res) => {
+  try {
+    const status = req.query.status ? String(req.query.status).toUpperCase() : undefined;
+    if (status && !["OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid moderation case status" });
+    }
+    const cases = await listModerationCases(await getDb(), { status: status as any, limit: Number(req.query.limit ?? 50) });
+    return res.json({ cases });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to list moderation cases" });
+  }
+});
+
+safetyRouter.patch("/moderation/cases/:caseId", requireUser, safetyReviewLimit, async (req, res) => {
+  try {
+    const status = req.body?.status ? String(req.body.status).toUpperCase() : undefined;
+    if (status && !["OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid moderation case status" });
+    }
+    const result = await updateModerationCase(await getDb(), String(req.params.caseId), {
+      status: status as any,
+      assigneeId: req.body?.assigneeId === null ? null : (req.body?.assigneeId ? String(req.body.assigneeId) : undefined),
+      resolution: req.body?.resolution,
+      reviewerId: req.userId!.toHexString()
+    });
+    return res.json({ case: result });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update moderation case" });
+  }
+});
+
 safetyRouter.get("/blocks", safetyReviewLimit, requireUser, async (req, res) => {
   try {
     const blocks = await listBlocks(await getDb(), req.userId!.toHexString());
