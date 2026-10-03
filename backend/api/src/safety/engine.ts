@@ -351,6 +351,131 @@ export async function reconcileModerationAction(db: Db, input: {
   const { ObjectId } = await import("mongodb");
   if (!ObjectId.isValid(input.actionId)) throw new Error("Invalid moderation action id");
   if (!input.actorId || !input.reason) throw new Error("actorId and reason are required");
+
+  const actionId = new ObjectId(input.actionId);
+  const action = await db.collection("moderation_actions").findOne({ _id: actionId });
+  if (!action) throw new Error("Moderation action not found");
+
+  const status = String(action.status);
+  if (!["FAILED", "AUDIT_PENDING", "ROLLING_BACK"].includes(status)) {
+    throw new Error("Moderation action is not in a reconciliable state");
+  }
+
+  // AUDIT_PENDING is uniquely recoverable: never mutate the target again.
+  // Reuse an existing APPLY event if present; otherwise create exactly one.
+  if (status === "AUDIT_PENDING") {
+    if (input.resolution !== "MARK_APPLIED") {
+      throw new Error("AUDIT_PENDING actions may only be finalized as APPLIED");
+    }
+    const existingEvent = await db.collection("moderation_action_events").findOne({
+      actionId: input.actionId,
+      event: "APPLY"
+    });
+    if (!existingEvent) {
+      await db.collection("moderation_action_events").insertOne({
+        actionId: input.actionId,
+        actorId: String(action.actorId ?? input.actorId),
+        event: "APPLY",
+        action: String(action.action),
+        reconciled: true,
+        createdAt: new Date()
+      });
+    }
+    const result = await db.collection("moderation_actions").updateOne(
+      { _id: actionId, status: "AUDIT_PENDING" },
+      {
+        $set: {
+          status: "APPLIED",
+          reconciledBy: input.actorId,
+          reconciledAt: new Date(),
+          reconciliationReason: String(input.reason).slice(0, 2000)
+        },
+        $unset: { auditFailureAt: "", auditFailureReason: "" }
+      }
+    );
+    if (result.matchedCount !== 1) throw new Error("Moderation action changed concurrently; refresh and retry");
+    return db.collection("moderation_actions").findOne({ _id: actionId });
+  }
+
+  // FAILED actions are never replayed or silently promoted. They remain failed
+  // until a separate, explicitly verified target-state reconciliation exists.
+  if (status === "FAILED") {
+    if (input.resolution !== "MARK_FAILED") {
+      throw new Error("FAILED actions cannot be promoted or rolled back automatically; manual target-state verification is required");
+    }
+  }
+
+  // ROLLING_BACK may only be finalized when the target already matches the
+  // exact preserved pre-action state. No second mutation is attempted here.
+  if (status === "ROLLING_BACK") {
+    if (input.resolution !== "MARK_ROLLED_BACK") {
+      throw new Error("ROLLING_BACK actions may only be finalized as ROLLED_BACK");
+    }
+    const previousState = (action.previousState ?? {}) as Record<string, unknown>;
+    let targetVerified = false;
+
+    if (String(action.action).startsWith("ACCOUNT_") && action.targetUserId && ObjectId.isValid(String(action.targetUserId))) {
+      const target = await db.collection("users").findOne(
+        { _id: new ObjectId(String(action.targetUserId)) },
+        { projection: { status: 1 } }
+      );
+      targetVerified = Boolean(target && String(target.status ?? "") === String(previousState.status ?? ""));
+    } else if (String(action.action).startsWith("CONTENT_") && action.targetContentId && ObjectId.isValid(String(action.targetContentId))) {
+      const target = await db.collection("videos").findOne(
+        { _id: new ObjectId(String(action.targetContentId)) },
+        { projection: { status: 1, visibility: 1, moderationPreviousStatus: 1, moderationPreviousVisibility: 1 } }
+      );
+      if (target) {
+        if (action.action === "CONTENT_BLOCK") {
+          targetVerified =
+            String(target.status ?? "") === String(previousState.status ?? "") &&
+            String(target.visibility ?? "") === String(previousState.visibility ?? "");
+        } else {
+          targetVerified =
+            String(target.status ?? "") === "BLOCKED" &&
+            String(target.visibility ?? "") === "PRIVATE";
+        }
+      }
+    }
+
+    if (!targetVerified) {
+      throw new Error("Rollback target state could not be verified; manual reconciliation is required");
+    }
+  }
+
+  const nextStatus = status === "FAILED" ? "FAILED" : "ROLLED_BACK";
+  const result = await db.collection("moderation_actions").updateOne(
+    { _id: actionId, status },
+    {
+      $set: {
+        status: nextStatus,
+        reconciledBy: input.actorId,
+        reconciledAt: new Date(),
+        reconciliationReason: String(input.reason).slice(0, 2000)
+      },
+      $unset: { rollbackStartedAt: "", rollbackStartedBy: "", auditFailureAt: "", auditFailureReason: "" }
+    }
+  );
+  if (result.matchedCount !== 1) throw new Error("Moderation action changed concurrently; refresh and retry");
+
+  try {
+    await db.collection("moderation_action_events").insertOne({
+      actionId: input.actionId,
+      actorId: input.actorId,
+      event: "RECONCILE",
+      resolution: nextStatus,
+      reason: String(input.reason).slice(0, 2000),
+      createdAt: new Date()
+    });
+  } catch (error) {
+    throw new Error("Reconciliation state saved but audit finalization failed; manual reconciliation is required");
+  }
+
+  return db.collection("moderation_actions").findOne({ _id: actionId });
+}) {
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(input.actionId)) throw new Error("Invalid moderation action id");
+  if (!input.actorId || !input.reason) throw new Error("actorId and reason are required");
   const allowed = new Set(["FAILED", "AUDIT_PENDING", "ROLLING_BACK"]);
   const action = await db.collection("moderation_actions").findOne({ _id: new ObjectId(input.actionId) });
   if (!action) throw new Error("Moderation action not found");
