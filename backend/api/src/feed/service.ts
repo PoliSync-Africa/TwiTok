@@ -2,7 +2,7 @@ import { ObjectId, type Db } from "mongodb";
 import { createPresignedPlayback, mediaConfigured } from "../media/storage.js";
 import { getCachedFeedIds, setCachedFeedIds } from "./cache.js";
 
-export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "DISCOVER";
+export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "EXPLORE";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
 
 export async function initializeFeedIndexes(db: Db) {
@@ -71,7 +71,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const interestHashtags = [...new Set(interestRows.map((x: any) => String(x._id ?? "").toLowerCase()).filter(Boolean))];
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
-  if (surface === "DISCOVER" && countryCode) query.countryCode = String(countryCode).toUpperCase();
+  if (surface === "EXPLORE" && countryCode) query.countryCode = String(countryCode).toUpperCase();
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const cachedIds = cursor ? [] : await getCachedFeedIds(db, userId, surface);
   const candidateQuery = cachedIds.length
