@@ -80,10 +80,17 @@ export async function rollbackModerationAction(db: Db, input: {
   const action = await db.collection("moderation_actions").findOne(filter);
   if (!action) throw new Error("Moderation action not found");
   if (action.reversible !== true) throw new Error("Moderation action is not reversible");
+  if (action.status === "ROLLING_BACK") throw new Error("Moderation action rollback is already in progress; manual reconciliation is required");
   if (action.status !== "APPLIED") throw new Error("Moderation action is not currently applied");
   const targetUserId = action.targetUserId ? String(action.targetUserId) : undefined;
   const targetContentId = action.targetContentId ? String(action.targetContentId) : undefined;
   const previousState = (action.previousState ?? {}) as Record<string, unknown>;
+  const rollbackStartedAt = new Date();
+  const reservation = await db.collection("moderation_actions").updateOne(
+    { _id: new ObjectId(input.actionId), status: "APPLIED" },
+    { $set: { status: "ROLLING_BACK", rollbackStartedAt, rollbackStartedBy: input.actorId } }
+  );
+  if (reservation.matchedCount !== 1) throw new Error("Moderation action changed concurrently; refresh and retry");
   if (action.action === "ACCOUNT_RESTRICT" || action.action === "ACCOUNT_RESTORE") {
     if (!targetUserId || !ObjectId.isValid(targetUserId)) throw new Error("Moderation action has invalid target user");
     const expected = action.action === "ACCOUNT_RESTRICT" ? "SUSPENDED" : "ACTIVE";
@@ -111,16 +118,20 @@ export async function rollbackModerationAction(db: Db, input: {
     }
   }
   const result = await db.collection("moderation_actions").updateOne(
-    { ...filter, status: "APPLIED" },
-    { $set: { status: "ROLLED_BACK", rolledBackBy: input.actorId, rolledBackAt: new Date() } }
+    { ...filter, status: "ROLLING_BACK", rollbackStartedBy: input.actorId },
+    { $set: { status: "ROLLED_BACK", rolledBackBy: input.actorId, rolledBackAt: new Date() }, $unset: { rollbackStartedAt: "", rollbackStartedBy: "" } }
   );
   if (result.matchedCount !== 1) throw new Error("Moderation action changed concurrently; refresh and retry");
-  await db.collection("moderation_action_events").insertOne({
-    actionId: input.actionId,
-    actorId: input.actorId,
-    event: "ROLLBACK",
-    createdAt: new Date()
-  });
+  try {
+    await db.collection("moderation_action_events").insertOne({
+      actionId: input.actionId,
+      actorId: input.actorId,
+      event: "ROLLBACK",
+      createdAt: new Date()
+    });
+  } catch (error) {
+    throw new Error("Rollback applied but audit finalization failed; manual reconciliation is required");
+  }
   return db.collection("moderation_actions").findOne(filter);
 }
 
