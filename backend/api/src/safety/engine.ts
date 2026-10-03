@@ -21,6 +21,7 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_case_events").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("moderation_evidence").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("moderation_actions").createIndex({ caseId: 1, createdAt: -1 }),
+    db.collection("moderation_actions").createIndex({ idempotencyKey: 1 }, { unique: true, sparse: true }),
     db.collection("moderation_actions").createIndex({ targetUserId: 1, status: 1, createdAt: -1 }),
     db.collection("moderation_action_events").createIndex({ actionId: 1, createdAt: -1 }),
     db.collection("appeals").createIndex({ caseId: 1, userId: 1 }, { unique: true }),
@@ -103,7 +104,12 @@ export async function recordModerationAction(db: Db, input: {
   targetContentId?: string;
   reason: string;
   evidenceId?: string;
+  idempotencyKey?: string;
 }) {
+  if (input.idempotencyKey) {
+    const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
+    if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
+  }
   const record = {
     caseId: input.caseId,
     actorId: input.actorId,
@@ -113,6 +119,7 @@ export async function recordModerationAction(db: Db, input: {
     targetContentId: input.targetContentId,
     reason: String(input.reason).slice(0, 2000),
     evidenceId: input.evidenceId,
+    idempotencyKey: input.idempotencyKey,
     status: "APPLIED",
     reversible: true,
     createdAt: new Date()
