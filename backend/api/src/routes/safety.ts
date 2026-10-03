@@ -4,6 +4,7 @@ import { evaluateText, openHumanReview } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { rateLimit } from "../security/rate-limit.js";
+import { blockUser, unblockUser } from "../social/blocks.js";
 
 export const safetyRouter = Router();
 const safetyEvaluateLimit = rateLimit({ windowMs: 60 * 1000, max: 60 });
@@ -25,4 +26,26 @@ safetyRouter.post("/review", requireUser, safetyReviewLimit, async (req, res) =>
       userId: req.userId!.toHexString(), contentId, reason: String(reason).slice(0, 1000), priority
     }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Review case creation failed" }); }
+});
+safetyRouter.get("/blocks", safetyReviewLimit, requireUser, async (req, res) => {
+  const blocks = await (await getDb()).collection("user_blocks")
+    .find({ blockerId: req.userId!.toHexString() }, { projection: { _id: 0, blockedId: 1, createdAt: 1 } })
+    .sort({ createdAt: -1 }).limit(500).toArray();
+  return res.json({ blocks });
+});
+
+safetyRouter.post("/blocks/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+  try {
+    return res.status(201).json(await blockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to block user" });
+  }
+});
+
+safetyRouter.delete("/blocks/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+  try {
+    return res.json(await unblockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to unblock user" });
+  }
 });

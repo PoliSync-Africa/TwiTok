@@ -6,6 +6,7 @@ import { requireUser } from "../auth/middleware.js";
 import { createPresignedPlayback, createPresignedUpload, headMediaObject, newMediaJobId, verifyMediaObject } from "../media/storage.js";
 import { createTextMessage, createVoiceMessage, getOrCreateDirectConversation, listConversations, listMessages, markMessagesDelivered, markMessagesRead } from "../social/messaging.js";
 import { broadcastToUser } from "../realtime/ws.js";
+import { isBlockedEitherDirection } from "../social/blocks.js";
 
 const MAX_VOICE_BYTES = 25 * 1024 * 1024;
 const MAX_VOICE_DURATION_MS = 5 * 60 * 1000;
@@ -42,6 +43,7 @@ messagesRouter.post("/conversations/direct", requireUser, userActionLimit, async
     } else {
       return res.status(400).json({ error: "userId or username is required" });
     }
+    if (await isBlockedEitherDirection(db, req.userId!.toHexString(), otherUserId.toHexString())) return res.status(403).json({ error: "Messaging is unavailable because one user has blocked the other" });
     const conversation = await getOrCreateDirectConversation(db, req.userId!, otherUserId);
     res.status(201).json({ conversation });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to create conversation" }); }
@@ -59,6 +61,10 @@ messagesRouter.post("/conversations/:conversationId/messages", requireUser, mess
   try {
     const db = await getDb();
     const conversationId = new ObjectId(String(req.params.conversationId));
+    const conversation = await db.collection("conversations").findOne({ _id: conversationId, memberIds: req.userId! }, { projection: { memberIds: 1 } });
+    if (!conversation) return res.status(404).json({ error: "Conversation not found" });
+    const recipientId = conversation.memberIds.find((id: ObjectId) => !id.equals(req.userId!));
+    if (!recipientId || await isBlockedEitherDirection(db, req.userId!.toHexString(), recipientId.toHexString())) return res.status(403).json({ error: "Messaging is unavailable because one user has blocked the other" });
     const message = await createTextMessage(db, req.userId!, conversationId, String(req.body?.text ?? ""));
     if (!message) throw new Error("Unable to create message");
     broadcastToUser(String(message.recipientId), { type: "message:new", message });
@@ -99,6 +105,10 @@ messagesRouter.post("/conversations/:conversationId/voice", requireUser, message
     if (!sizeBytes || sizeBytes > MAX_VOICE_BYTES) return res.status(400).json({ error: "Voice message is too large" });
     if (!Number.isFinite(durationMs) || durationMs <= 0 || durationMs > MAX_VOICE_DURATION_MS) return res.status(400).json({ error: "Invalid voice duration" });
 
+    const conversation = await db.collection("conversations").findOne({ _id: conversationId, memberIds: req.userId! }, { projection: { memberIds: 1 } });
+    if (!conversation) return res.status(404).json({ error: "Conversation not found" });
+    const recipientId = conversation.memberIds.find((id: ObjectId) => !id.equals(req.userId!));
+    if (!recipientId || await isBlockedEitherDirection(db, req.userId!.toHexString(), recipientId.toHexString())) return res.status(403).json({ error: "Messaging is unavailable because one user has blocked the other" });
     const message = await createVoiceMessage(db, req.userId!, conversationId, { objectKey, mimeType, durationMs, sizeBytes });
     if (!message) throw new Error("Unable to create voice message");
     broadcastToUser(String(message.recipientId), { type: "message:new", message });
