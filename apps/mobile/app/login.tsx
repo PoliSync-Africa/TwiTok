@@ -28,7 +28,7 @@ export default function LoginScreen() {
 
   async function login() {
     if (!identifier.trim() || !password) {
-      setError("Enter your username, email or phone number and password.");
+      setError("Enter your email or phone number and password.");
       return;
     }
 
@@ -106,7 +106,7 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Help"
                 hitSlop={12}
-                onPress={() => setError("Use your TwiTok username, email or phone number to sign in.")}
+                onPress={() => setError("Use your TwiTok email address or phone number to sign in.")}
                 style={styles.helpButton}
               >
                 <Ionicons name="help-outline" size={23} color="#111" />
@@ -116,7 +116,7 @@ export default function LoginScreen() {
             <View style={styles.credentialHeader}>
               <Text style={styles.title}>Log in to TwiTok</Text>
               <Text style={styles.subtitle}>
-                Use your phone, email or username.
+                Use your phone number or email address.
               </Text>
             </View>
 
@@ -129,7 +129,7 @@ export default function LoginScreen() {
                     setIdentifier(value);
                     if (error) setError("");
                   }}
-                  placeholder="Phone / email / username"
+                  placeholder="Phone number or email"
                   placeholderTextColor="#8A8A8A"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -261,7 +261,7 @@ export default function LoginScreen() {
             <View style={styles.leadingIcon}>
               <Ionicons name="person-outline" size={25} color="#111" />
             </View>
-            <Text style={styles.methodTextLarge}>Use phone/email/username</Text>
+            <Text style={styles.methodTextLarge}>Use phone or email</Text>
             <Ionicons name="chevron-forward" size={20} color="#777" />
           </Pressable>
 
