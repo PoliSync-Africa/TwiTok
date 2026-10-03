@@ -390,17 +390,19 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#111",
-    fontSize: 34,
-    lineHeight: 39,
-    fontWeight: "900",
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: "700",
+    fontFamily: "TikTokSans",
     letterSpacing: -1.1,
     textAlign: "center"
   },
   subtitle: {
     color: "#737373",
-    fontSize: 16,
-    lineHeight: 22,
-    marginTop: 9,
+    fontSize: 14,
+    lineHeight: 19,
+    marginTop: 7,
+    fontFamily: "TikTokSans",
     textAlign: "center"
   },
   methodList: {
@@ -423,9 +425,10 @@ const styles = StyleSheet.create({
   methodTextLarge: {
     flex: 1,
     color: "#111",
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: "700"
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "700",
+    fontFamily: "TikTokSans"
   },
   divider: {
     flexDirection: "row",
@@ -439,8 +442,9 @@ const styles = StyleSheet.create({
   },
   or: {
     color: "#7A7A7A",
-    fontSize: 18,
-    paddingHorizontal: 17
+    fontSize: 16,
+    paddingHorizontal: 15,
+    fontFamily: "TikTokSans"
   },
   form: {
     gap: 12
@@ -457,8 +461,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: "#111",
-    fontSize: 16,
-    paddingVertical: 0
+    fontSize: 15,
+    paddingVertical: 0,
+    fontFamily: "TikTokSans"
   },
   forgotWrap: {
     alignSelf: "flex-start",
@@ -466,8 +471,9 @@ const styles = StyleSheet.create({
   },
   forgot: {
     color: "#222",
-    fontSize: 14,
-    fontWeight: "700"
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "TikTokSans"
   },
   primaryButton: {
     minHeight: 56,
@@ -479,8 +485,9 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: "#fff",
-    fontSize: 17,
-    fontWeight: "800"
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "TikTokSans"
   },
   methodButton: {
     minHeight: 58,
@@ -493,13 +500,15 @@ const styles = StyleSheet.create({
   },
   methodText: {
     color: "#111",
-    fontSize: 16,
-    fontWeight: "700"
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "TikTokSans"
   },
   legal: {
     color: "#818181",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: "TikTokSans",
     textAlign: "center",
     paddingHorizontal: 10,
     marginTop: 28
@@ -521,13 +530,15 @@ const styles = StyleSheet.create({
   },
   bottomPrompt: {
     color: "#858585",
-    fontSize: 17,
-    fontWeight: "600"
+    fontSize: 15,
+    fontWeight: "400",
+    fontFamily: "TikTokSans"
   },
   bottomAction: {
     color: "#FE2C55",
-    fontSize: 17,
-    fontWeight: "800"
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "TikTokSans"
   },
   error: {
     color: "#C62845",
