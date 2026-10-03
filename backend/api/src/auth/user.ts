@@ -12,7 +12,7 @@ const USER_SECRET = () => {
 
 export type UserToken = { sub: string; role: "USER"; username?: string; sv?: number; purpose?: "AUTH" | "VERIFICATION" };
 
-export function issueUserToken(user: { _id: string; username: string; sessionVersion?: number }) {
+export function issueUserToken(user: { _id: string; username?: string; sessionVersion?: number }) {
   return jwt.sign(
     { sub: user._id, role: "USER", ...(user.username ? { username: user.username } : {}), sv: Number(user.sessionVersion ?? 0), purpose: "AUTH" },
     USER_SECRET(),
@@ -20,9 +20,9 @@ export function issueUserToken(user: { _id: string; username: string; sessionVer
   );
 }
 
-export function issueVerificationToken(user: { _id: string; username: string; sessionVersion?: number }) {
+export function issueVerificationToken(user: { _id: string; username?: string; sessionVersion?: number }) {
   return jwt.sign(
-    { sub: user._id, role: "USER", username: user.username, sv: Number(user.sessionVersion ?? 0), purpose: "VERIFICATION" },
+    { sub: user._id, role: "USER", ...(user.username ? { username: user.username } : {}), sv: Number(user.sessionVersion ?? 0), purpose: "VERIFICATION" },
     USER_SECRET(),
     { expiresIn: "15m", issuer: "twitok" }
   );
