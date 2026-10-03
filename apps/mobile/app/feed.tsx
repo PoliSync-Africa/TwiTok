@@ -4,6 +4,7 @@ import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 type Video = {
   id: string;
@@ -171,13 +172,13 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
       <View style={styles.scrim} />
       <View style={styles.shopShortcut}><Pressable onPress={() => router.push("/shop")}><Text style={styles.shopShortcutText}>Shop</Text></Pressable></View>
       <View style={styles.rightRail}>
-        <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("repost")}><Text style={[styles.actionIcon, engagement?.reposted && styles.activeIcon]}>↻</Text><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.actionIcon}>♫</Text><Text style={styles.actionLabel}>Sound</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("like")}><Ionicons name={engagement?.liked ? "heart" : "heart-outline"} size={32} color={engagement?.liked ? "#FE2C55" : "#fff"} style={styles.actionIcon} /><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={onComments}><Ionicons name="chatbubble-ellipses-outline" size={31} color="#fff" style={styles.actionIcon} /><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("save")}><Ionicons name={engagement?.saved ? "bookmark" : "bookmark-outline"} size={31} color={engagement?.saved ? "#FE2C55" : "#fff"} style={styles.actionIcon} /><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("repost")}><Ionicons name="repeat-outline" size={31} color={engagement?.reposted ? "#FE2C55" : "#fff"} style={styles.actionIcon} /><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Ionicons name="musical-notes" size={30} color="#fff" style={styles.actionIcon} /><Text style={styles.actionLabel}>Sound</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("share")}><Ionicons name="share-outline" size={31} color="#fff" style={styles.actionIcon} /><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={onNotInterested}><Ionicons name="ellipsis-horizontal" size={31} color="#fff" style={styles.actionIcon} /><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
       {item.shopProducts?.length ? <Pressable style={styles.productCard} onPress={() => setShopOpen(true)}>
         <Text style={styles.productBadge}>SHOP · {item.shopProducts.length} {item.shopProducts.length === 1 ? "PRODUCT" : "PRODUCTS"}</Text>
@@ -201,25 +202,25 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<View style={styles.feedVerified}><Text style={styles.feedVerifiedSeal}>✺</Text><Text style={styles.feedVerifiedCheck}>✓</Text></View>}</View></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
-        {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
+        {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Ionicons name="musical-notes" size={18} color="#fff" style={styles.soundDisc} /><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
       <View style={styles.topChrome}>
         <Pressable style={styles.liveButton} onPress={() => router.push("/live")} accessibilityLabel="LIVE">
-          <Text style={styles.liveIcon}>▣</Text>
+          <Ionicons name="radio" size={27} color="#fff" style={styles.liveIcon} />
         </Pressable>
         <Pressable onPress={() => onSurface("EXPLORE")}><Text style={surface==="EXPLORE"?styles.topTabActive:styles.topTab}>Explore</Text></Pressable>
         <Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.topTabActive:styles.topTab}>Following</Text></Pressable>
         <Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.topTabActive:styles.topTab}>For You</Text></Pressable>
         <Pressable style={styles.searchButton} onPress={() => router.push("/search")} accessibilityLabel="Search">
-          <Text style={styles.searchIcon}>⌕</Text>
+          <Ionicons name="search" size={28} color="#fff" style={styles.searchIcon} />
         </Pressable>
       </View>
       <View style={styles.bottomNav}>
-        <Pressable style={styles.navItem} onPress={() => onSurface("FOR_YOU")}><Text style={styles.navIcon}>⌂</Text><Text style={styles.navLabel}>Home</Text></Pressable>
-        <Pressable style={styles.navItem} onPress={() => router.push("/find-friends")}><Text style={styles.navIcon}>♧</Text><Text style={styles.navLabel}>Friends</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => onSurface("FOR_YOU")}><Ionicons name="home" size={25} color="#fff" style={styles.navIcon} /><Text style={styles.navLabel}>Home</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => router.push("/find-friends")}><Ionicons name="people-outline" size={25} color="#fff" style={styles.navIcon} /><Text style={styles.navLabel}>Friends</Text></Pressable>
         <Pressable style={styles.createButton} onPress={() => router.push("/create")} accessibilityLabel="Create"><Text style={styles.createPlus}>＋</Text></Pressable>
-        <Pressable style={styles.navItem} onPress={() => router.push("/notifications")}><View><Text style={styles.navIcon}>▢</Text><View style={styles.inboxBadge}><Text style={styles.inboxBadgeText}>2</Text></View></View><Text style={styles.navLabel}>Inbox</Text></Pressable>
-        <Pressable style={styles.navItem} onPress={() => router.push("/profile")}><Text style={styles.navIcon}>♙</Text><Text style={styles.navLabel}>Profile</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => router.push("/notifications")}><View><Ionicons name="notifications-outline" size={25} color="#fff" style={styles.navIcon} /><View style={styles.inboxBadge}><Text style={styles.inboxBadgeText}>2</Text></View></View><Text style={styles.navLabel}>Inbox</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={25} color="#fff" style={styles.navIcon} /><Text style={styles.navLabel}>Profile</Text></Pressable>
       </View>
     </>
   );
@@ -325,29 +326,29 @@ const styles = StyleSheet.create({
   shopShortcutText:{color:"#fff",fontSize:12,fontWeight:"900"},
   rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
   action: { alignItems: "center", minWidth: 52 },
-  actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
+  actionIcon: { width: 36, height: 36, textShadowColor: "#000", textShadowRadius: 4 },
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
   activeIcon: { color: "#ff2d55" },
   meta: { position: "absolute", left: 16, right: 82, bottom: 102 },
   usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
   feedVerified:{width:20,height:20,alignItems:"center",justifyContent:"center",marginLeft:1},feedVerifiedSeal:{position:"absolute",color:"#20B2AA",fontSize:24,fontWeight:"900",lineHeight:24,textShadowColor:"rgba(0,0,0,0.28)",textShadowOffset:{width:0,height:1},textShadowRadius:1},feedVerifiedCheck:{color:"#fff",fontSize:10,fontWeight:"900",lineHeight:12,textShadowColor:"rgba(0,0,0,0.22)",textShadowOffset:{width:0,height:1},textShadowRadius:1},
-  username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
-  caption: { color: "#fff", fontSize: 15, lineHeight: 21 },
+  username: { color: "#fff", fontFamily: "TikTokSans", fontSize: 16, fontWeight: "800", marginBottom: 7 },
+  caption: { color: "#fff", fontFamily: "TikTokSans", fontSize: 15, lineHeight: 21 },
   soundMeta: { flexDirection: "row", alignItems: "center", marginTop: 10, maxWidth: "88%" },
-  soundDisc: { color: "#fff", fontSize: 18, fontWeight: "800", marginRight: 7 },
-  soundText: { color: "#fff", fontSize: 13, fontWeight: "700", flexShrink: 1 },
+  soundDisc: { marginRight: 7 },
+  soundText: { color: "#fff", fontFamily: "TikTokSans", fontSize: 13, fontWeight: "700", flexShrink: 1 },
   unavailable: { color: "#aaa", textAlign: "center", marginBottom: height * 0.45 },
   topChrome:{position:"absolute",top:48,left:12,right:10,zIndex:25,height:48,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:25},
   liveButton:{position:"absolute",left:0,width:42,height:42,alignItems:"center",justifyContent:"center"},
-  liveIcon:{color:"#fff",fontSize:29,fontWeight:"900",textShadowColor:"#000",textShadowRadius:5},
+  liveIcon:{width:32,height:32,textShadowColor:"#000",textShadowRadius:5},
   searchButton:{position:"absolute",right:0,width:44,height:44,alignItems:"center",justifyContent:"center"},
-  searchIcon:{color:"#fff",fontSize:39,fontWeight:"300",lineHeight:42,textShadowColor:"#000",textShadowRadius:5},
-  topTab:{color:"rgba(255,255,255,0.62)",fontSize:16,fontWeight:"700",textShadowColor:"#000",textShadowRadius:5},
-  topTabActive:{color:"#fff",fontSize:16,fontWeight:"900",textShadowColor:"#000",textShadowRadius:5},
+  searchIcon:{width:32,height:32,textShadowColor:"#000",textShadowRadius:5},
+  topTab:{color:"rgba(255,255,255,0.62)",fontFamily:"TikTokSans",fontSize:15,fontWeight:"500",textShadowColor:"#000",textShadowRadius:5},
+  topTabActive:{color:"#fff",fontFamily:"TikTokSans",fontSize:15,fontWeight:"800",textShadowColor:"#000",textShadowRadius:5},
   bottomNav:{position:"absolute",left:0,right:0,bottom:0,height:76,paddingBottom:7,backgroundColor:"rgba(0,0,0,0.94)",borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:"rgba(255,255,255,0.14)",flexDirection:"row",alignItems:"center",justifyContent:"space-around",zIndex:30},
   navItem:{width:62,alignItems:"center",justifyContent:"center",gap:1},
-  navIcon:{color:"#fff",fontSize:29,fontWeight:"400",lineHeight:31},
-  navLabel:{color:"#fff",fontSize:11,fontWeight:"700"},
+  navIcon:{width:27,height:27,marginBottom:1},
+  navLabel:{color:"#fff",fontFamily:"TikTokSans",fontSize:10,fontWeight:"600"},
   createButton:{width:52,height:36,borderRadius:10,backgroundColor:"#fff",borderLeftWidth:5,borderLeftColor:"#20D5EC",borderRightWidth:5,borderRightColor:"#FE2C55",alignItems:"center",justifyContent:"center"},
   createPlus:{color:"#111",fontSize:27,lineHeight:29,fontWeight:"700"},
   inboxBadge:{position:"absolute",right:-7,top:-5,minWidth:19,height:19,borderRadius:10,backgroundColor:"#FE2C55",alignItems:"center",justifyContent:"center",borderWidth:2,borderColor:"#000"},
