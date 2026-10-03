@@ -159,6 +159,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
 }
 
 function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
     <>
       <View style={styles.scrim} />
