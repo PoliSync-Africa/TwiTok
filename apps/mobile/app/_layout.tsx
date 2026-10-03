@@ -119,7 +119,7 @@ function TwiTokSplash() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  useFonts({
     TikTokSans: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@5.3.0/latin-400-normal.ttf"
   });
 
