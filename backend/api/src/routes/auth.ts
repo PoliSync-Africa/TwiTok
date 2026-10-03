@@ -30,16 +30,13 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     if (!firstName || !password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "firstName, password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { firstName, username, password, email, phone, dateOfBirth, countryCode });
     const token = issueVerificationToken(user);
-    const channel: OtpChannel = email ? "email" : "phone";
-    let retryAfterSeconds = 0;
-    try {
-      const sent = await sendOtp(db, user._id, channel);
-      retryAfterSeconds = sent.retryAfterSeconds;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to send verification code";
-      return res.status(503).json({ error: "Account created, but verification delivery is temporarily unavailable. Please use the resend verification option.", token, verificationRequired: true, channel, retryAfterSeconds, user });
-    }
-    res.status(201).json({ token, verificationRequired: true, channel, retryAfterSeconds, user });
+    res.status(201).json({
+      token,
+      verificationRequired: true,
+      verificationChannels: ["email", "phone"],
+      verificationDelivery: "choose",
+      user
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
     res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
@@ -59,31 +56,19 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const db = await getDb();
     const user = await authenticateUser(db, loginIdentifier, loginPassword);
     const stored = await db.collection("users").findOne(
-      { _id: new (await import("mongodb")).ObjectId(user._id) },
+      { _id: new ObjectId(user._id) },
       { projection: { firstName: 1, emailVerified: 1, phoneVerified: 1, email: 1, phone: 1, profileSetupComplete: 1 } }
     );
-    let verificationChannel: OtpChannel | null = null;
-    const identifierValue = loginIdentifier.toLowerCase();
-    if (identifierValue.includes("@") && user.email && stored?.emailVerified !== true) verificationChannel = "email";
-    else if (!identifierValue.includes("@") && stored?.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
-    else if (user.email && stored?.emailVerified !== true) verificationChannel = "email";
-    else if (stored?.phone && stored?.phoneVerified !== true) verificationChannel = "phone";
-    if (verificationChannel) {
-      let retryAfterSeconds = 0;
-      try {
-        const sent = await sendOtp(db, user._id, verificationChannel);
-        retryAfterSeconds = sent.retryAfterSeconds;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to send verification code";
-        const waitMatch = message.match(/^Please wait (\\d+) seconds before requesting another code$/);
-        if (waitMatch) {
-          retryAfterSeconds = Number(waitMatch[1]);
-        } else {
-          return res.status(503).json({ error: "Verification delivery is temporarily unavailable. Please try again shortly." });
-        }
-      }
+    const verificationRequired = stored?.emailVerified !== true || stored?.phoneVerified !== true;
+    if (verificationRequired) {
       const token = issueVerificationToken(user);
-      return res.json({ token, verificationRequired: true, channel: verificationChannel, retryAfterSeconds, user });
+      return res.json({
+        token,
+        verificationRequired: true,
+        verificationChannels: ["email", "phone"],
+        verificationDelivery: "choose",
+        user
+      });
     }
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
@@ -177,16 +162,20 @@ authRouter.post("/verification/verify", requireVerificationUser, otpVerifyLimit,
     const result = await verifyOtp(db, req.userId!.toHexString(), channel, code);
     const user = await db.collection("users").findOne(
       { _id: req.userId! },
-      { projection: { username: 1, sessionVersion: 1, nickname: 1, email: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1 } }
+      { projection: { username: 1, sessionVersion: 1, nickname: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1 } }
     );
     if (!user) return res.status(404).json({ error: "Account not found" });
+    const verificationRequired = user.emailVerified !== true || user.phoneVerified !== true;
+    if (verificationRequired) {
+      return res.json({ ...result, verificationRequired: true, verificationChannels: ["email", "phone"], user: { ...user, _id: user._id.toHexString() } });
+    }
     const token = issueUserToken({
       _id: user._id.toHexString(),
       username: user.username,
       sessionVersion: Number(user.sessionVersion ?? 0)
     });
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    return res.json({ ...result, token, user: { ...user, _id: user._id.toHexString() } });
+    return res.json({ ...result, token, verificationRequired: false, user: { ...user, _id: user._id.toHexString() } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to verify code";
     return res.status(/too many incorrect|rate/i.test(message) ? 429 : 400).json({ error: message });

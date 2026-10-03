@@ -190,23 +190,54 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
   const destination = channel === "email"
     ? normalizeDestination(channel, user.email ?? "")
     : normalizeDestination(channel, user.phone ?? "");
-  const expectedHash = hashCode(userId, channel, destination, String(code), purpose);
 
-  const expectedBuffer = Buffer.from(expectedHash, "hex");
-  const storedBuffer = Buffer.from(String(otp.codeHash), "hex");
-  const matches = expectedBuffer.length === storedBuffer.length && timingSafeEqual(expectedBuffer, storedBuffer);
-
-  if (!matches) {
-    const nextAttempts = attempts + 1;
-    await db.collection("auth_otps").updateOne(
-      { _id: otp._id, purpose, consumedAt: { $exists: false } },
-      { $inc: { attempts: 1 }, $set: { updatedAt: now } }
-    );
-    if (nextAttempts >= OTP_MAX_ATTEMPTS) {
-      await db.collection("auth_otps").updateOne({ _id: otp._id, consumedAt: { $exists: false } }, { $set: { consumedAt: now, updatedAt: now } });
-      throw new Error("Too many incorrect attempts. Request a new code");
+  if (channel === "phone" && purpose === "VERIFICATION") {
+    const apiKey = process.env.ARKESEL_API_KEY?.trim();
+    if (!apiKey) throw new Error("ARKESEL_API_KEY must be configured");
+    const response = await fetch("https://sms.arkesel.com/api/otp/verify", {
+      method: "POST",
+      headers: { "api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: String(code), number: destination }),
+      signal: AbortSignal.timeout(8000)
+    });
+    const payload = await response.json().catch(() => ({})) as { code?: string; message?: string };
+    if (!response.ok || payload.code !== "1100") {
+      const nextAttempts = attempts + 1;
+      await db.collection("auth_otps").updateOne(
+        { _id: otp._id, purpose, consumedAt: { $exists: false } },
+        { $inc: { attempts: 1 }, $set: { updatedAt: now } }
+      );
+      if (nextAttempts >= OTP_MAX_ATTEMPTS) {
+        await db.collection("auth_otps").updateOne(
+          { _id: otp._id, purpose, consumedAt: { $exists: false } },
+          { $set: { consumedAt: now, updatedAt: now } }
+        );
+        throw new Error("Too many incorrect attempts. Request a new code");
+      }
+      if (payload.code === "1105") throw new Error("The verification code has expired");
+      throw new Error("The verification code is incorrect");
     }
-    throw new Error("The verification code is incorrect");
+  } else {
+    const expectedHash = hashCode(userId, channel, destination, String(code), purpose);
+    const expectedBuffer = Buffer.from(expectedHash, "hex");
+    const storedBuffer = Buffer.from(String(otp.codeHash), "hex");
+    const matches = expectedBuffer.length === storedBuffer.length && timingSafeEqual(expectedBuffer, storedBuffer);
+
+    if (!matches) {
+      const nextAttempts = attempts + 1;
+      await db.collection("auth_otps").updateOne(
+        { _id: otp._id, purpose, consumedAt: { $exists: false } },
+        { $inc: { attempts: 1 }, $set: { updatedAt: now } }
+      );
+      if (nextAttempts >= OTP_MAX_ATTEMPTS) {
+        await db.collection("auth_otps").updateOne(
+          { _id: otp._id, purpose, consumedAt: { $exists: false } },
+          { $set: { consumedAt: now, updatedAt: now } }
+        );
+        throw new Error("Too many incorrect attempts. Request a new code");
+      }
+      throw new Error("The verification code is incorrect");
+    }
   }
 
   const consumed = await db.collection("auth_otps").findOneAndUpdate(

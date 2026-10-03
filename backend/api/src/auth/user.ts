@@ -160,7 +160,8 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
   const ageCutoff = new Date();
   ageCutoff.setUTCFullYear(ageCutoff.getUTCFullYear() - 13);
   if (dob > ageCutoff) throw new Error("You must be at least 13 years old to create a TwiTok account");
-  if (!input.email && !input.phone) throw new Error("Email or phone is required");
+  if (!input.email) throw new Error("Email address is required");
+  if (!input.phone) throw new Error("Phone number is required");
   const normalizedEmail = input.email?.trim().toLowerCase();
   if (normalizedEmail) {
     if (!isValidEmailAddress(normalizedEmail)) throw new Error("Invalid email address");
@@ -202,5 +203,5 @@ export async function authenticateUser(db: Db, identifier: string, password: str
       { $set: { phoneHash: hashPhone(user.phone), phoneSuffixHash: hashPhoneSuffix(user.phone), updatedAt: new Date() } }
     );
   }
-  return { _id: user._id.toHexString(), firstName: user.firstName, username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
+  return { _id: user._id.toHexString(), firstName: user.firstName, username: user.username, sessionVersion: Number(user.sessionVersion ?? 0), nickname: user.nickname, email: user.email, phone: user.phone, countryCode: user.countryCode, accountType: user.accountType, monetizationEnabled: user.monetizationEnabled === true, isVerified: user.isVerified === true, verificationType: user.verificationType ?? null, emailVerified: user.emailVerified === true, phoneVerified: user.phoneVerified === true, isPrivate: user.isPrivate, profileSetupComplete: user.profileSetupComplete !== false };
 }
