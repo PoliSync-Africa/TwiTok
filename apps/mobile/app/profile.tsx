@@ -9,7 +9,8 @@ type Video = { id:string; thumbnail?:string|null; playback?:string|null; caption
 type Profile = { id:string; username:string; nickname?:string; bio?:string; countryCode?:string; followers:number; following:number; likes:number; isFollowing:boolean; followPending:boolean; isPrivate:boolean; isVerified?:boolean; verificationType?:string|null; profilePhotoUrl?:string|null };
 
 export default function ProfileScreen() {
-  const { username } = useLocalSearchParams<{username:string}>();
+  const { username: requestedUsername } = useLocalSearchParams<{username?:string}>();
+  const [username, setUsername] = useState<string | null>(requestedUsername ? String(requestedUsername) : null);
   const [profile,setProfile]=useState<Profile|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
@@ -19,10 +20,18 @@ export default function ProfileScreen() {
   const [viewerId,setViewerId]=useState("");
 
   async function load() {
-    if(!username) return;
     try {
       const token=await getAuthToken();
-      const r=await fetch(API+"/profile/"+encodeURIComponent(String(username)),{headers:token?{Authorization:"Bearer "+token}:{}});
+      let target = username;
+      if (!target) {
+        if (!token) throw new Error("Sign in required");
+        const me = await fetch(API+"/auth/me",{headers:{Authorization:"Bearer "+token}});
+        const md = await me.json().catch(()=>({}));
+        target = md.user?.username ? String(md.user.username) : null;
+        if (!target) throw new Error("Profile setup is incomplete");
+        setUsername(target);
+      }
+      const r=await fetch(API+"/profile/"+encodeURIComponent(target),{headers:token?{Authorization:"Bearer "+token}:{}});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Profile unavailable");
       setProfile(d.profile);
