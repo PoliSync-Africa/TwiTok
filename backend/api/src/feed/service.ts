@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { createPresignedPlayback, mediaConfigured } from "../media/storage.js";
+import { cacheGet, cacheSet } from "../cache/redis.js";
 
 export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
@@ -57,6 +58,15 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
 }
 
 export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string) {
+  const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
+  const normalizedCountry = String(countryCode ?? "").toUpperCase();
+  const cacheKey = cursor
+    ? ""
+    : "feed:v1:" + userId.toHexString() + ":" + surface + ":" + normalizedCountry + ":" + safeLimit;
+  if (cacheKey) {
+    const cached = await cacheGet<{ videos: unknown[]; nextCursor: string | null }>(cacheKey);
+    if (cached) return cached;
+  }
   const viewer = await db.collection("users").findOne({ _id: userId }, { projection: { countryCode: 1 } });
   const viewerCountryCode = String(countryCode ?? viewer?.countryCode ?? "").toUpperCase();
   const following = await db.collection("follows").find({ followerId: userId }).project({ followingId: 1 }).limit(5000).toArray();
@@ -90,7 +100,6 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: blockedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !blockedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
-  const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const videos = await db.collection("videos").aggregate([
     { $match: query },
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
@@ -273,5 +282,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     const photos = mediaConfigured() ? (await Promise.all(photoKeys.map((key: string) => createPresignedPlayback(key, 3600).catch(() => null)))).filter(Boolean).map((x: any) => x.url) : [];
     return { id: v._id.toHexString(), promoted: Boolean(v._promotion?.length), promotionObjective: v._promotion?.[0]?.objective ?? null, ownerId: v.ownerId?.toHexString?.() ?? String(v.ownerId), owner: v.owner ? { username: v.owner.username, nickname: v.owner.nickname, countryCode: v.owner.countryCode, isVerified: v.owner.isVerified === true, verificationType: v.owner.verificationType ?? null } : null, mediaType: v.mediaType ?? "VIDEO", textBody: v.textBody ?? "", photos, engagement: v.engagement ?? { likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0, repostCount: 0, liked: false, saved: false, reposted: false }, caption: v.caption ?? "", hashtags: v.hashtags ?? [], sound: sound ? { id: sound._id.toHexString(), title: sound.title ?? "", artist: sound.artist ?? "", coverUrl: sound.coverUrl ?? null } : null, playback: v.playback ?? null, thumbnail: v.thumbnail ?? null, autoCaptionsUrl: v.autoCaptionsUrl ?? null, autoCaptionsStatus: v.autoCaptionsStatus ?? null, autoCaptionLanguage: v.autoCaptionLanguage ?? "auto", captionTracks: v.captionTracks ?? {}, publishedAt: v.publishedAt ?? null };
   }));
-  return { videos: hydrated, nextCursor: next };
+  const result = { videos: hydrated, nextCursor: next };
+  if (cacheKey) await cacheSet(cacheKey, result, 8);
+  return result;
 }
