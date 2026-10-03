@@ -30,7 +30,16 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     if (!firstName || !password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "firstName, password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { firstName, username, password, email, phone, dateOfBirth, countryCode });
     const token = issueVerificationToken(user);
-    res.status(201).json({ token, verificationRequired: true, channel: email ? "email" : "phone", user });
+    const channel: OtpChannel = email ? "email" : "phone";
+    let retryAfterSeconds = 0;
+    try {
+      const sent = await sendOtp(db, user._id, channel);
+      retryAfterSeconds = sent.retryAfterSeconds;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send verification code";
+      return res.status(503).json({ error: "Account created, but verification delivery is temporarily unavailable. Please use the resend verification option.", token, verificationRequired: true, channel, retryAfterSeconds, user });
+    }
+    res.status(201).json({ token, verificationRequired: true, channel, retryAfterSeconds, user });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
     res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
