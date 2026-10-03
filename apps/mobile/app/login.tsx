@@ -37,7 +37,7 @@ export default function LoginScreen() {
         });
         return;
       }
-      router.replace(data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
+      router.replace(data.profileSetupRequired || data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in");
     } finally {
