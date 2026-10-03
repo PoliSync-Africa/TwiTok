@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { cacheDeletePrefix } from "../cache/redis.js";
-import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase, recordModerationAction, rollbackModerationAction } from "../safety/engine.js";
+import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase, recordModerationAction, rollbackModerationAction, reconcileModerationAction } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { requireOwner } from "../auth/admin-middleware.js";
@@ -132,6 +132,24 @@ safetyRouter.post("/moderation/actions", requireOwner, safetyReviewLimit, async 
     return res.status(201).json({ action: result });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to apply moderation action" });
+  }
+});
+
+safetyRouter.post("/moderation/actions/:actionId/reconcile", requireOwner, safetyReviewLimit, async (req, res) => {
+  try {
+    const resolution = String(req.body?.resolution ?? "").toUpperCase();
+    if (!["MARK_FAILED", "MARK_ROLLED_BACK", "MARK_APPLIED"].includes(resolution)) {
+      return res.status(400).json({ error: "Invalid reconciliation resolution" });
+    }
+    const action = await reconcileModerationAction(await getDb(), {
+      actionId: String(req.params.actionId),
+      actorId: req.ownerId!,
+      resolution: resolution as "MARK_FAILED" | "MARK_ROLLED_BACK" | "MARK_APPLIED",
+      reason: String(req.body?.reason ?? "")
+    });
+    return res.json({ action });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to reconcile moderation action" });
   }
 });
 
