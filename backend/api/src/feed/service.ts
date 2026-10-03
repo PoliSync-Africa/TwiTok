@@ -108,7 +108,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     { $match: query },
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
       { $match: { userId } },
-      { $match: { $expr: { $eq: ["$videoId", "$videoId"] } } },
+      { $match: { $expr: { $eq: ["$videoId", "$$videoId"] } } },
       { $group: { _id: null,
         eventScore: { $sum: { $switch: {
           branches: [
@@ -129,7 +129,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     ], as: "viewerEvents" } },
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
       { $match: { $expr: { $and: [
-        { $eq: ["$videoId", "$videoId"] },
+        { $eq: ["$videoId", "$$videoId"] },
         { $gte: ["$createdAt", new Date(Date.now() - 24 * 60 * 60 * 1000)] },
         { $in: ["$type", ["VIEW_2S", "VIEW_COMPLETE", "REWATCH", "LIKE", "COMMENT", "SHARE", "SAVE", "FOLLOW"]] }
       ] } } },
@@ -167,7 +167,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
     } },
         { $lookup: { from: "promotion_campaigns", let: { videoId: "$_id" }, pipeline: [
       { $match: { $expr: { $and: [
-        { $eq: ["$videoId", "$videoId"] },
+        { $eq: ["$videoId", "$$videoId"] },
         { $eq: ["$status", "ACTIVE"] },
         { $lt: ["$spentMinor", "$budgetMinor"] },
         { $or: [
