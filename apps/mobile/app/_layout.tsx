@@ -110,7 +110,7 @@ function TwiTokSplash() {
           </View>
         ) : null}
         {stage === "connecting" ? (
-          <Text style={styles.connectingText}>Connecting Africa</Text>
+          <Text style={styles.connectingText}>Connecting you</Text>
         ) : null}
       </Animated.View>
     </View>
