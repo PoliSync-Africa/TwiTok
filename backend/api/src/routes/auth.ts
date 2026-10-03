@@ -162,16 +162,20 @@ authRouter.post("/verification/verify", requireVerificationUser, otpVerifyLimit,
     const result = await verifyOtp(db, req.userId!.toHexString(), channel, code);
     const user = await db.collection("users").findOne(
       { _id: req.userId! },
-      { projection: { username: 1, sessionVersion: 1, nickname: 1, email: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1 } }
+      { projection: { username: 1, sessionVersion: 1, nickname: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, countryCode: 1, accountType: 1, monetizationEnabled: 1, isVerified: 1, verificationType: 1, isPrivate: 1, profileSetupComplete: 1 } }
     );
     if (!user) return res.status(404).json({ error: "Account not found" });
+    const verificationRequired = user.emailVerified !== true || user.phoneVerified !== true;
+    if (verificationRequired) {
+      return res.json({ ...result, verificationRequired: true, verificationChannels: ["email", "phone"], user: { ...user, _id: user._id.toHexString() } });
+    }
     const token = issueUserToken({
       _id: user._id.toHexString(),
       username: user.username,
       sessionVersion: Number(user.sessionVersion ?? 0)
     });
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    return res.json({ ...result, token, user: { ...user, _id: user._id.toHexString() } });
+    return res.json({ ...result, token, verificationRequired: false, user: { ...user, _id: user._id.toHexString() } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to verify code";
     return res.status(/too many incorrect|rate/i.test(message) ? 429 : 400).json({ error: message });
