@@ -106,6 +106,13 @@ export async function recordModerationAction(db: Db, input: {
   evidenceId?: string;
   idempotencyKey?: string;
 }) {
+  if (!input.caseId || !input.actorId || !input.reason) throw new Error("caseId, actorId and reason are required");
+  if (!["AUTOMATED", "OWNER"].includes(input.source)) throw new Error("Invalid moderation action source");
+  if (!["CONTENT_BLOCK", "CONTENT_RESTORE", "ACCOUNT_RESTRICT", "ACCOUNT_RESTORE"].includes(input.action)) throw new Error("Invalid moderation action");
+  const contentAction = input.action.startsWith("CONTENT_");
+  const accountAction = input.action.startsWith("ACCOUNT_");
+  if (contentAction && !input.targetContentId) throw new Error("Content moderation actions require targetContentId");
+  if (accountAction && !input.targetUserId) throw new Error("Account moderation actions require targetUserId");
   if (input.idempotencyKey) {
     const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
     if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
