@@ -78,8 +78,10 @@ export async function sendAccountVerification(db: Db, userId: string, channel: V
   if (!user) throw new Error("Account not found");
 
   const now = Date.now();
-  if (user.verificationOtpSentAt && now - new Date(user.verificationOtpSentAt).getTime() < RESEND_COOLDOWN_MS) {
-    throw new VerificationDeliveryError("Please wait before requesting another verification code");
+  const sentAtField = channel === "email" ? "verificationOtpSentAtEmail" : "verificationOtpSentAtPhone";
+  const lastSentAt = user[sentAtField];
+  if (lastSentAt && now - new Date(lastSentAt).getTime() < RESEND_COOLDOWN_MS) {
+    throw new VerificationDeliveryError("Please wait before requesting another verification code to this destination");
   }
 
   const destination = channel === "email" ? cleanEmail(user.email) : String(user.phone ?? "").trim();
@@ -94,9 +96,10 @@ export async function sendAccountVerification(db: Db, userId: string, channel: V
       ...(channel === "email" ? { verificationOtpHash: hashCode(code) } : {}),
       verificationOtpChannel: channel,
       verificationOtpExpiresAt: new Date(now + CODE_TTL_MS),
-      verificationOtpSentAt: new Date(now),
+      [sentAtField]: new Date(now),
       verificationOtpAttempts: 0,
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      ...(channel === "phone" ? { verificationOtpHash: undefined } : {})
     }
   });
   return { channel, maskedDestination: channel === "email" ? destination.replace(/^(.{2}).*(@.*)$/, "$1***$2") : destination.replace(/\d(?=\d{4})/g, "*") };
@@ -137,7 +140,7 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
       verificationStatus: "VERIFIED",
       updatedAt: new Date()
     },
-    $unset: { verificationOtpHash: "", verificationOtpChannel: "", verificationOtpExpiresAt: "", verificationOtpSentAt: "", verificationOtpAttempts: "" }
+    $unset: { verificationOtpHash: "", verificationOtpChannel: "", verificationOtpExpiresAt: "", verificationOtpSentAtEmail: "", verificationOtpSentAtPhone: "", verificationOtpAttempts: "" }
   });
   return { verified: true, channel };
 }
