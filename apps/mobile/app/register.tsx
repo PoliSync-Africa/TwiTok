@@ -10,7 +10,7 @@ export default function RegisterScreen() {
   const [phone,setPhone]=useState("");
   const [password,setPassword]=useState("");
   const [dateOfBirth,setDateOfBirth]=useState("");
-  const [countryCode,setCountryCode]=useState("GH");
+  const [countryCode,setCountryCode]=useState("US");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
 
