@@ -27,7 +27,7 @@ export default function VerifyAccountScreen() {
   async function loadAccount() {
     const token=await getAuthToken();
     if(!token) throw new Error("Your session has expired. Please sign in again.");
-    const r=await fetch(API+"/auth/me",{headers:{Authorization:"Bearer "+token}});
+    const r=await fetch(API+"/auth/verification/status",{headers:{Authorization:"Bearer "+token}});
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.user) throw new Error(d.error??"Unable to load your account");
     setAccount(d.user);
