@@ -19,11 +19,16 @@ export default function SplashScreen() {
       if (token) {
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 1200);
+          const timeout = setTimeout(() => controller.abort(), 1500);
           const response = await fetch(API + "/auth/me", { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
           clearTimeout(timeout);
-          const data = await response.json().catch(() => ({}));
-          if (response.ok) destination = data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed";
+          if (response.ok) {
+            const data = await response.json().catch(() => ({}));
+            destination = data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed";
+          } else if (response.status === 403) {
+            const data = await response.json().catch(() => ({}));
+            if (data.code === "CONTACT_VERIFICATION_REQUIRED") destination = "/verify-account";
+          }
         } catch {}
       }
       await new Promise(resolve => setTimeout(resolve, 1750));
