@@ -107,7 +107,7 @@ export default function AuthPage() {
     <div className="auth-glow auth-glow-one"/><div className="auth-glow auth-glow-two"/>
     <section className="auth-card">
       <div className="auth-brand">Twi<span>Tok</span></div>
-      <div className="auth-badge">AFRICA'S VIDEO PLATFORM</div>
+      <div className="auth-badge">SOCIAL VIDEO COMMUNITY</div>
       <h1>{step==="verify"?"Verify your account":step==="profile"?"Set up your profile":mode==="login"?"Welcome back":"Create your account"}</h1>
       <p className="auth-subtitle">{step==="verify"?"Enter your one-time verification code.":step==="profile"?"Every account must have a unique username before entering TwiTok.":"Sign in or create your account to continue."}</p>
 
