@@ -25,8 +25,16 @@ const JWT_SECRET = () => {
 export async function ensureOwnerAccount(db: Db) {
   const email = process.env.TWITOK_OWNER_EMAIL?.trim().toLowerCase();
   const displayName = process.env.TWITOK_OWNER_NAME?.trim() || "TwiTok Owner";
-  const passwordHash = process.env.TWITOK_OWNER_PASSWORD_HASH;
-  if (!email || !passwordHash) return;
+  const configuredPasswordHash = process.env.TWITOK_OWNER_PASSWORD_HASH?.trim();
+  const configuredPassword = process.env.TWITOK_OWNER_PASSWORD;
+
+  if (!email) return;
+
+  const passwordHash =
+    configuredPasswordHash ||
+    (configuredPassword ? await bcrypt.hash(configuredPassword, 12) : "");
+
+  if (!passwordHash) return;
 
   const collection = db.collection<OwnerAccount>("owner_accounts");
   const existing = await collection.findOne({ email });
