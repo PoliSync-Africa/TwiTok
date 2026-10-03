@@ -220,7 +220,8 @@ export async function verifyOtp(db: Db, userId: string, channel: OtpChannel, cod
     const verifiedField = channel === "email" ? "emailVerified" : "phoneVerified";
     await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { [verifiedField]: true, updatedAt: now } }
+      { $set: { [verifiedField]: true, updatedAt: now } },
+      session ? { session } : undefined
     );
   }
 
