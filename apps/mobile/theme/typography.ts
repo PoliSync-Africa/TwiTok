@@ -1,3 +1,12 @@
+import type { TextStyle } from "react-native";
+
+const numeric: TextStyle = {
+  fontSize: 20,
+  lineHeight: 24,
+  fontWeight: "800",
+  fontVariant: ["tabular-nums"],
+};
+
 export const Typography = {
   display: { fontSize: 32, lineHeight: 38, fontWeight: "800" as const, letterSpacing: -0.5 },
   title: { fontSize: 24, lineHeight: 30, fontWeight: "800" as const, letterSpacing: -0.2 },
@@ -10,7 +19,7 @@ export const Typography = {
   label: { fontSize: 14, lineHeight: 18, fontWeight: "600" as const },
   button: { fontSize: 16, lineHeight: 20, fontWeight: "700" as const },
   tab: { fontSize: 13, lineHeight: 17, fontWeight: "600" as const },
-  numeric: { fontSize: 20, lineHeight: 24, fontWeight: "800" as const, fontVariant: ["tabular-nums"] as const },
+  numeric,
 } as const;
 
 export const Colors = {
