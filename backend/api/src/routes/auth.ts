@@ -72,6 +72,22 @@ authRouter.get("/me", requireUser, userReadLimit, async (req, res) => {
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 });
 
+authRouter.get("/username-availability", requireUser, userReadLimit, async (req, res) => {
+  try {
+    const username = String(req.query?.username ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) {
+      return res.status(400).json({ available: false, error: "Username must be 3-24 characters, use letters, numbers, dots or underscores, and not end with a dot" });
+    }
+    const existing = await (await getDb()).collection("users").findOne(
+      { username, _id: { $ne: req.userId! } },
+      { projection: { _id: 1 } }
+    );
+    return res.json({ username, available: !existing });
+  } catch {
+    return res.status(500).json({ available: false, error: "Unable to check username availability" });
+  }
+});
+
 authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res) => {
   try {
     const username = String(req.body?.username ?? "").trim().toLowerCase(), nickname = String(req.body?.nickname ?? "").trim(), bio = String(req.body?.bio ?? "").trim(), isPrivate = Boolean(req.body?.isPrivate);
