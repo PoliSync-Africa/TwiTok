@@ -214,10 +214,12 @@ export async function recordModerationAction(db: Db, input: {
     if (!target) throw new Error("Target user not found");
     previousState = { status: String(target.status ?? "ACTIVE") };
     if (input.action === "ACCOUNT_RESTRICT") {
-      await db.collection("users").updateOne({ _id: target._id, status: previousState.status }, { $set: { status: "SUSPENDED", updatedAt: new Date() } });
+      const updated = await db.collection("users").updateOne({ _id: target._id, status: previousState.status }, { $set: { status: "SUSPENDED", updatedAt: new Date() } });
+      if (updated.matchedCount !== 1) throw new Error("Target account changed concurrently; refresh and retry");
     } else {
       if (previousState.status !== "SUSPENDED") throw new Error("Account is not currently restricted");
-      await db.collection("users").updateOne({ _id: target._id, status: "SUSPENDED" }, { $set: { status: "ACTIVE", updatedAt: new Date() } });
+      const updated = await db.collection("users").updateOne({ _id: target._id, status: "SUSPENDED" }, { $set: { status: "ACTIVE", updatedAt: new Date() } });
+      if (updated.matchedCount !== 1) throw new Error("Target account changed concurrently; refresh and retry");
     }
   } else {
     const target = await db.collection("videos").findOne(
