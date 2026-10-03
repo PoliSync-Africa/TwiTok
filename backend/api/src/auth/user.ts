@@ -1,4 +1,4 @@
-import type { Db } from "mongodb";
+import type { Collection, Db, Document } from "mongodb";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -25,7 +25,7 @@ export function verifyUserToken(token: string): UserToken {
   return decoded;
 }
 
-async function dropLegacyUniqueIndex(collection: ReturnType<Db["collection"]>, name: string) {
+async function dropLegacyUniqueIndex(collection: Collection<Document>, name: string) {
   try {
     await collection.dropIndex(name);
   } catch (error) {
