@@ -5,6 +5,8 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+const WEB_TOKEN_KEY = "twitok_web_session";
+const WEB_VERIFICATION_KEY = "twitok_web_verification";
 type Mode = "login" | "signup";
 type Step = "credentials" | "verify" | "profile";
 
@@ -42,7 +44,13 @@ export default function AuthPage() {
   const [isPrivate,setIsPrivate]=useState(false);
 
   useEffect(()=>{
-    fetch(API+"/auth/me",{credentials:"include",cache:"no-store"}).then(async r=>{
+    fetch(API+"/auth/me",{
+      credentials:"include",
+      cache:"no-store",
+      headers: typeof window!=="undefined" && localStorage.getItem(WEB_TOKEN_KEY)
+        ? {Authorization:"Bearer "+localStorage.getItem(WEB_TOKEN_KEY)}
+        : {}
+    }).then(async r=>{
       if(!r.ok)return;
       const d=await r.json();
       if(d.user?.profileSetupComplete===false)setStep("profile"); else router.replace("/");
@@ -59,8 +67,8 @@ export default function AuthPage() {
         const r=await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({identifier:identifier.trim(),password})});
         const d=await r.json().catch(()=>({}));
         if(!r.ok)throw new Error(d.error??"Unable to sign in.");
-        if(d.verificationRequired){setToken(d.token??"");setChannel(d.channel==="phone"?"phone":"email");setStep("verify");setMessage("Enter the verification code sent to your account.");return;}
-        if(d.profileSetupRequired||d.user?.profileSetupComplete===false){setStep("profile");setMessage("Finish your profile before entering TwiTok.");return;}
+        if(d.verificationRequired){setToken(d.token??""); if(d.token) localStorage.setItem(WEB_VERIFICATION_KEY,d.token);setChannel(d.channel==="phone"?"phone":"email");setStep("verify");setMessage("Enter the verification code sent to your account.");return;}
+        if(d.token) localStorage.setItem(WEB_TOKEN_KEY,d.token); if(d.profileSetupRequired||d.user?.profileSetupComplete===false){setToken(d.token??"");setStep("profile");setMessage("Finish your profile before entering TwiTok.");return;}
         router.replace("/"); router.refresh(); return;
       }
       if(!firstName.trim())throw new Error("Enter your first name.");
@@ -72,7 +80,7 @@ export default function AuthPage() {
       const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({firstName:firstName.trim(),email:channel==="email"?email.trim().toLowerCase():undefined,phone:channel==="phone"?phone.trim():undefined,password,dateOfBirth,countryCode})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(d.error??"Unable to create account.");
-      setToken(d.token??""); setChannel(d.channel==="phone"?"phone":channel); setStep("verify"); setMessage("Account created. Enter the verification code.");
+      setToken(d.token??""); if(d.token) localStorage.setItem(WEB_VERIFICATION_KEY,d.token); setChannel(d.channel==="phone"?"phone":channel); setStep("verify"); setMessage("Account created. Enter the verification code.");
     }catch(err){setError(err instanceof Error?err.message:"Something went wrong.");}
     finally{setBusy(false);}
   }
@@ -81,10 +89,10 @@ export default function AuthPage() {
     e.preventDefault();setBusy(true);setError("");
     try{
       if(!/^\d{6}$/.test(code))throw new Error("Enter the 6-digit verification code.");
-      const r=await fetch(API+"/auth/verification/verify",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},credentials:"include",body:JSON.stringify({channel,code})});
+      const verificationToken=token||localStorage.getItem(WEB_VERIFICATION_KEY)||""; if(!verificationToken)throw new Error("Verification session expired. Please start again."); const r=await fetch(API+"/auth/verification/verify",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+verificationToken},credentials:"include",body:JSON.stringify({channel,code})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(d.error??"Verification failed.");
-      if(d.user?.profileSetupComplete===false){setStep("profile");setMessage("Verification complete. Choose your unique username.");}
+      if(d.token) localStorage.setItem(WEB_TOKEN_KEY,d.token); localStorage.removeItem(WEB_VERIFICATION_KEY); setToken(d.token??verificationToken); if(d.user?.profileSetupComplete===false){setStep("profile");setMessage("Verification complete. Choose your unique username.");}
       else{router.replace("/");router.refresh();}
     }catch(err){setError(err instanceof Error?err.message:"Verification failed.");}
     finally{setBusy(false);}
