@@ -21,15 +21,13 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    let verificationDelivery = "not_required";
-    if (user.email && !user.emailVerified) {
-      try { await sendAccountVerification(db, user._id, "email"); verificationDelivery = "sent"; }
-      catch { verificationDelivery = "unavailable"; }
-    } else if (user.phone && !user.phoneVerified) {
-      try { await sendAccountVerification(db, user._id, "phone"); verificationDelivery = "sent"; }
-      catch { verificationDelivery = "unavailable"; }
-    }
-    res.status(201).json({ token, user, verificationRequired: Boolean((user.email && !user.emailVerified) || (user.phone && !user.phoneVerified)), verificationDelivery });
+    res.status(201).json({
+      token,
+      user,
+      verificationRequired: true,
+      verificationChannels: ["email", "phone"],
+      verificationDelivery: "choose"
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
     res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
@@ -44,16 +42,17 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const user = await authenticateUser(db, identifier, password, countryCode);
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    const isPhoneIdentifier = /^[+0-9][0-9\\s().-]{6,20}$/.test(String(identifier).trim());
-    const verificationRequired = isPhoneIdentifier ? user.phoneVerified !== true : user.email ? user.emailVerified !== true : user.phoneVerified !== true;
-    let verificationDelivery = "not_required";
+    const verificationRequired = user.emailVerified !== true || user.phoneVerified !== true;
     if (verificationRequired) {
-      const channel: VerificationChannel = isPhoneIdentifier || !user.email ? "phone" : "email";
-      try { await sendAccountVerification(db, user._id, channel); verificationDelivery = "sent"; }
-      catch { verificationDelivery = "unavailable"; }
-      return res.json({ token, user, verificationRequired: true, verificationChannel: channel, verificationDelivery });
+      return res.json({
+        token,
+        user,
+        verificationRequired: true,
+        verificationChannels: ["email", "phone"],
+        verificationDelivery: "choose"
+      });
     }
-    res.json({ token, user, verificationRequired: false, verificationDelivery });
+    res.json({ token, user, verificationRequired: false, verificationDelivery: "not_required" });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
@@ -61,7 +60,12 @@ authRouter.post("/verification/send", requireUser, rateLimit({ windowMs: 15 * 60
   try {
     const channel = String(req.body?.channel ?? "").trim().toLowerCase() as VerificationChannel;
     if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "Verification channel must be email or phone" });
-    const result = await sendAccountVerification(await getDb(), req.userId!.toHexString(), channel);
+    const db = await getDb();
+    const current = await db.collection("users").findOne({ _id: req.userId! }, { projection: { email: 1, phone: 1, emailVerified: 1, phoneVerified: 1 } });
+    if (!current?.email || !current?.phone) return res.status(400).json({ error: "Both email address and phone number are required for verification" });
+    if (channel === "email" && current.emailVerified === true) return res.status(400).json({ error: "This email address is already verified" });
+    if (channel === "phone" && current.phoneVerified === true) return res.status(400).json({ error: "This phone number is already verified" });
+    const result = await sendAccountVerification(db, req.userId!.toHexString(), channel);
     return res.json({ verificationRequired: true, ...result });
   } catch (error) {
     return res.status(503).json({ error: error instanceof Error ? error.message : "Verification delivery is temporarily unavailable", verificationDeliveryUnavailable: true });
@@ -72,9 +76,11 @@ authRouter.post("/verification/verify", requireUser, rateLimit({ windowMs: 15 * 
   try {
     const code = String(req.body?.code ?? "").trim();
     if (!/^\\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
-    const result = await verifyAccountCode(await getDb(), req.userId!.toHexString(), code);
-    const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
-    return res.json({ ...result, user });
+    const db = await getDb();
+    const result = await verifyAccountCode(db, req.userId!.toHexString(), code);
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
+    const remainingVerificationRequired = user?.emailVerified !== true || user?.phoneVerified !== true;
+    return res.json({ ...result, user, verificationRequired: remainingVerificationRequired });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Verification failed" });
   }
