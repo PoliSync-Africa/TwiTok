@@ -222,7 +222,7 @@ export async function recordModerationAction(db: Db, input: {
   } else {
     const target = await db.collection("videos").findOne(
       { _id: new ObjectId(input.targetContentId!) },
-      { projection: { status: 1, visibility: 1 } }
+      { projection: { status: 1, visibility: 1, moderationPreviousStatus: 1, moderationPreviousVisibility: 1 } }
     );
     if (!target) throw new Error("Target content not found");
     previousState = { status: target.status, visibility: target.visibility, restoreStatus: target.moderationPreviousStatus, restoreVisibility: target.moderationPreviousVisibility };
