@@ -11,7 +11,12 @@
     "dev:admin": "npm --workspace apps/admin run dev",
     "build:admin": "npm --workspace apps/admin run build",
     "start:admin": "npm --workspace apps/admin run start",
-    "build:api": "npm --workspace @twitok/api run build",
+    "build:api": "npm install --include=dev && npm --workspace @twitok/api run build",
     "start:api": "npm --workspace @twitok/api run start"
+  },
+  "overrides": {
+    "postcss": "8.5.28",
+    "minimatch": "10.2.6",
+    "brace-expansion": "5.0.12"
   }
 }

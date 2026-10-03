@@ -65,18 +65,28 @@ export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: st
   return { uploadId, status: "READY" };
 }
 
-export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean }) {
+export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; editPlan?: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean }) {
   const uploadIds = Array.isArray(input.uploadIds) ? [...new Set(input.uploadIds.map(String).filter(Boolean))].slice(0, 35) : [];
   if (!uploadIds.length) throw new Error("At least one photo is required");
   const uploads = await db.collection("photo_uploads").find({ uploadId: { $in: uploadIds }, userId, status: "READY" }).toArray();
   if (uploads.length !== uploadIds.length) throw new Error("One or more photos are not ready");
+  const rawPhotoEdit = (input as any).editPlan && typeof (input as any).editPlan === "object" ? (input as any).editPlan : {};
+  const photoEditPlan = {
+    quality: ["ORIGINAL","CLEAN","HD"].includes(String(rawPhotoEdit.quality)) ? String(rawPhotoEdit.quality) : "HD",
+    filter: ["NONE","VIVID","WARM","COOL","NOIR","VINTAGE","CINEMATIC"].includes(String(rawPhotoEdit.filter)) ? String(rawPhotoEdit.filter) : "NONE",
+    crop: ["ORIGINAL","9:16","1:1","4:5","16:9"].includes(String(rawPhotoEdit.crop)) ? String(rawPhotoEdit.crop) : "ORIGINAL",
+    rotate: [0,90,180,270].includes(Number(rawPhotoEdit.rotate)) ? Number(rawPhotoEdit.rotate) : 0,
+    mirror: Boolean(rawPhotoEdit.mirror),
+    aiTool: String(rawPhotoEdit.aiTool ?? "NONE").slice(0, 40),
+    aiPrompt: String(rawPhotoEdit.aiPrompt ?? "").trim().slice(0, 600)
+  };
   const caption = String(input.caption ?? "").trim().slice(0, 2200);
   const postId = new ObjectId();
   const safety = await evaluateText(db, { userId: userId.toHexString(), contentId: postId.toHexString(), text: caption, actionType: "VIDEO_CAPTION" });
   if (safety.decision === "BLOCK") throw new Error("Caption blocked by TwiTok Safety Engine");
   const now = new Date();
   await db.collection("videos").insertOne({
-    _id: postId, ownerId: userId, mediaType: "PHOTO", photoObjectKeys: uploads.map(x => x.objectKey),
+    _id: postId, ownerId: userId, mediaType: "PHOTO", editPlan: photoEditPlan, photoObjectKeys: uploads.map(x => x.objectKey),
     photoMimeTypes: uploads.map(x => x.mimeType), caption, hashtags: normalizeHashtags(input.hashtags), mentions: normalizeMentions(input.mentions), location: String(input.location ?? "").trim().slice(0, 120) || null,
     visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
     status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
@@ -133,7 +143,7 @@ export async function completeUpload(db: Db, userId: ObjectId, uploadId: string)
 
 export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   uploadId: string; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility;
-  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown; clipTrimRanges?: unknown; clipTransitions?: unknown; clipSettings?: unknown;
+  allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; editPlan?: unknown; coverTimeMs?: number; trimStartMs?: number; trimEndMs?: number; speed?: number; soundId?: string; originalVolume?: number; addedSoundVolume?: number; textOverlays?: unknown; captions?: unknown; autoCaptions?: boolean; captionLanguage?: string; effect?: string; stickers?: unknown; clipUploadIds?: unknown; clipTrimRanges?: unknown; clipTransitions?: unknown; clipSettings?: unknown;
 }) {
   const upload = await db.collection("video_uploads").findOne({ uploadId: input.uploadId, userId });
   if (!upload) throw new Error("Upload session not found");
@@ -147,6 +157,17 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   const now = new Date();
   const allowedEffects = new Set(["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE","BRIGHT","FADE"]);
   const effect = allowedEffects.has(String(input.effect ?? "NONE")) ? String(input.effect ?? "NONE") : "NONE";
+  const rawEditPlan = (input as any).editPlan && typeof (input as any).editPlan === "object" ? (input as any).editPlan : {};
+  const editPlan = {
+    quality: ["ORIGINAL","CLEAN","HD","ULTRA"].includes(String(rawEditPlan.quality)) ? String(rawEditPlan.quality) : "ULTRA",
+    filter: ["NONE","VIVID","WARM","COOL","NOIR","VINTAGE","CINEMATIC"].includes(String(rawEditPlan.filter)) ? String(rawEditPlan.filter) : "NONE",
+    crop: ["ORIGINAL","9:16","1:1","4:5","16:9"].includes(String(rawEditPlan.crop)) ? String(rawEditPlan.crop) : "ORIGINAL",
+    rotate: [0,90,180,270].includes(Number(rawEditPlan.rotate)) ? Number(rawEditPlan.rotate) : 0,
+    mirror: Boolean(rawEditPlan.mirror),
+    speed: [0.5,0.75,1,1.5,2].includes(Number(rawEditPlan.speed)) ? Number(rawEditPlan.speed) : 1,
+    aiTool: String(rawEditPlan.aiTool ?? "NONE").slice(0, 40),
+    aiPrompt: String(rawEditPlan.aiPrompt ?? "").trim().slice(0, 600)
+  };
   const rawStickers = Array.isArray((input as any).stickers) ? (input as any).stickers : [];
   const stickers = rawStickers.slice(0, 20).map((item: any) => ({ stickerId: String(item?.stickerId ?? "").slice(0, 40), startMs: Math.max(0, Number(item?.startMs ?? 0)), endMs: Math.max(100, Number(item?.endMs ?? 3000)), x: Math.max(0, Math.min(1, Number(item?.x ?? 0.5))), y: Math.max(0, Math.min(1, Number(item?.y ?? 0.5))), size: Math.max(24, Math.min(180, Number(item?.size ?? 72))), rotation: Math.max(-180, Math.min(180, Number(item?.rotation ?? 0))) })).filter((x: any) => x.stickerId && getSticker(x.stickerId));
   const rawOverlays = Array.isArray(input.textOverlays) ? input.textOverlays.slice(0, 20) : [];
@@ -200,6 +221,7 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
     allowComments: input.allowComments !== false,
     allowDuet: input.allowDuet !== false,
     allowStitch: input.allowStitch !== false,
+    editPlan,
     coverTimeMs: (() => { const requested = Number(input.coverTimeMs); const start = Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0; const end = Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > start ? Number(input.trimEndMs) : null; return Number.isFinite(requested) ? Math.max(start, Math.min(requested, end ?? Number.MAX_SAFE_INTEGER)) : start; })(),
     trimStartMs: Number.isFinite(Number(input.trimStartMs)) ? Math.max(0, Number(input.trimStartMs)) : 0,
     trimEndMs: Number.isFinite(Number(input.trimEndMs)) && Number(input.trimEndMs) > 0 ? Number(input.trimEndMs) : null,

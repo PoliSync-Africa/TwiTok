@@ -132,7 +132,9 @@ export async function createPresignedPlayback(objectKey: string, expiresInSecond
 export function publicMediaUrl(objectKey: string) {
   validateObjectKey(objectKey);
   const base = process.env.MEDIA_PUBLIC_BASE_URL?.replace(/\/$/, "");
-  return base ? `${base}/${objectKey}` : null;
+  if (!base) return null;
+  const encodedKey = objectKey.split("/").map(segment => encodeURIComponent(segment)).join("/");
+  return `${base}/${encodedKey}`;
 }
 
 export function newMediaJobId() { return crypto.randomUUID(); }

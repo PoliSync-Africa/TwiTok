@@ -63,9 +63,12 @@ moneyRouter.post("/withdrawals", requireAdultUser, rateLimit({ windowMs: 60 * 60
 
     const existing = await db.collection("withdrawals").findOne(
       { userId: req.userId!.toHexString(), idempotencyKey },
-      { projection: { status: 1, withdrawalId: 1, payoutCurrency: 1 } }
+      { projection: { status: 1, withdrawalId: 1, payoutCurrency: 1, type: 1, amountUsd: 1 } }
     );
     if (existing) {
+      if (String(existing.type) !== payoutType || Number(existing.amountUsd) !== amount) {
+        return res.status(409).json({ error: "Idempotency-Key conflicts with an existing withdrawal" });
+      }
       return res.status(200).json({
         status: existing.status,
         withdrawalId: existing.withdrawalId,

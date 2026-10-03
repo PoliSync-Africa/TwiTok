@@ -27,7 +27,17 @@ export default function LoginScreen() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to sign in");
       await saveAuthToken(data.token);
-      router.replace("/feed");
+      if (data.verificationRequired) {
+        router.replace({
+          pathname: "/verify-otp",
+          params: {
+            channel: data.channel === "phone" ? "phone" : "email",
+            retryAfterSeconds: String(Number(data.retryAfterSeconds ?? 60) || 60)
+          }
+        });
+        return;
+      }
+      router.replace(data.profileSetupRequired || data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in");
     } finally {
@@ -42,6 +52,9 @@ export default function LoginScreen() {
       <Text style={styles.subtitle}>Sign in to your TwiTok account</Text>
       <TextInput value={identifier} onChangeText={setIdentifier} placeholder="Username or email" placeholderTextColor="#777" autoCapitalize="none" style={styles.input} />
       <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry style={styles.input} />
+      <Pressable onPress={() => router.push("/forgot-password")}>
+        <Text style={styles.forgot}>Forgot password?</Text>
+      </Pressable>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable style={styles.button} onPress={login} disabled={busy}>
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
@@ -59,6 +72,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: "#171717", borderWidth: 1, borderColor: "#2d2d2d", borderRadius: 12, color: "#fff", paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12, fontSize: 16 },
   button: { backgroundColor: "#ff2d55", borderRadius: 12, padding: 15, alignItems: "center", marginTop: 8 },
   buttonText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  forgot: { color: "#ff6b87", textAlign: "right", marginBottom: 4, fontSize: 14, fontWeight: "700" },
   error: { color: "#ff7188", marginBottom: 8, textAlign: "center" },
   back: { color: "#aaa", textAlign: "center", marginTop: 20, fontSize: 15 }
 });

@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "scheme": "twitok",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
@@ -41,7 +41,19 @@
           "microphonePermission": "Allow TwiTok to record audio with your videos.",
           "recordAudioAndroid": true
         }
-      ]
-    ]
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow TwiTok to use your contacts to help you find people you know."
+        }
+      ],
+      "@livekit/react-native-expo-plugin"
+    ],
+    "splash": {
+      "image": "./assets/twitok-logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    }
   }
 }

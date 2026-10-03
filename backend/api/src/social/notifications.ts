@@ -1,7 +1,7 @@
 import { ObjectId, type Db } from "mongodb";
 import { broadcastToUser } from "../realtime/ws.js";
 
-export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT" | "REPOST" | "MENTION";
+export type NotificationType = "FOLLOW" | "LIKE" | "COMMENT" | "REPOST" | "MENTION" | "LIVE_GUEST_INVITE" | "LIVE_GUEST_RESPONSE";
 
 export async function initializeNotificationIndexes(db: Db) {
   await Promise.all([
@@ -13,7 +13,7 @@ export async function initializeNotificationIndexes(db: Db) {
 
 export async function createNotification(
   db: Db,
-  input: { recipientId: ObjectId; actorId: ObjectId; type: NotificationType; videoId?: ObjectId; commentId?: ObjectId }
+  input: { recipientId: ObjectId; actorId: ObjectId; type: NotificationType; videoId?: ObjectId; commentId?: ObjectId; streamId?: string; metadata?: Record<string, string> }
 ) {
   if (input.recipientId.equals(input.actorId)) return null;
   if (await db.collection("blocks").findOne({
@@ -30,10 +30,12 @@ export async function createNotification(
     type: input.type,
     videoId: input.videoId ?? null,
     commentId: input.commentId ?? null,
+    streamId: input.streamId ?? null,
+    metadata: input.metadata ?? null,
     readAt: null,
     createdAt: now
   });
-  const payload = { id: result.insertedId.toHexString(), type: input.type, videoId: input.videoId?.toHexString?.() ?? null, commentId: input.commentId?.toHexString?.() ?? null, createdAt: now };
+  const payload = { id: result.insertedId.toHexString(), type: input.type, videoId: input.videoId?.toHexString?.() ?? null, commentId: input.commentId?.toHexString?.() ?? null, streamId: input.streamId ?? null, metadata: input.metadata ?? null, createdAt: now };
   broadcastToUser(input.recipientId.toHexString(), { type: "notification:new", notification: payload });
   return payload;
 }
@@ -54,6 +56,8 @@ export async function listNotifications(db: Db, userId: ObjectId, limit = 30) {
     createdAt: item.createdAt,
     videoId: item.videoId?.toHexString?.() ?? null,
     commentId: item.commentId?.toHexString?.() ?? null,
+    streamId: item.streamId ?? null,
+    metadata: item.metadata ?? null,
     actor: item.actor ? {
       id: item.actor._id.toHexString(),
       username: item.actor.username,

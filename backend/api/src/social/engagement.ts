@@ -16,18 +16,41 @@ async function getPublicVideo(db: Db, videoId: ObjectId) {
   return video;
 }
 
+async function ensureUniqueEngagementIndex(
+  db: Db,
+  collectionName: string,
+  key: Record<string, 1 | -1>,
+  indexName: string
+) {
+  const collection = db.collection(collectionName);
+  const indexes = await collection.listIndexes().toArray();
+  const sameKey = indexes.filter((index) => JSON.stringify(index.key) === JSON.stringify(key));
+  const existingDesired = sameKey.find((index) => index.name === indexName);
+
+  if (existingDesired?.unique === true) return;
+
+  const replacementName = existingDesired ? indexName + "_unique" : indexName;
+  if (!sameKey.some((index) => index.name === replacementName && index.unique === true)) {
+    await collection.createIndex(key, { unique: true, name: replacementName });
+  }
+
+  if (existingDesired && existingDesired.name !== replacementName) {
+    await collection.dropIndex(existingDesired.name);
+  }
+}
+
 export async function initializeEngagementIndexes(db: Db) {
   await Promise.all([
-    db.collection("video_likes").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "video_likes", { videoId: 1, userId: 1 }, "videoId_1_userId_1"),
     db.collection("video_likes").createIndex({ videoId: 1, createdAt: -1 }),
-    db.collection("video_saves").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "video_saves", { videoId: 1, userId: 1 }, "videoId_1_userId_1"),
     db.collection("video_saves").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ videoId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ userId: 1, createdAt: -1 }),
-    db.collection("comment_likes").createIndex({ commentId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "comment_likes", { commentId: 1, userId: 1 }, "commentId_1_userId_1"),
     db.collection("comment_likes").createIndex({ commentId: 1, createdAt: -1 }),
     db.collection("video_shares").createIndex({ videoId: 1, createdAt: -1 }),
-    db.collection("video_reposts").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "video_reposts", { videoId: 1, userId: 1 }, "videoId_1_userId_1"),
     db.collection("video_reposts").createIndex({ videoId: 1, createdAt: -1 })
   ]);
 }
@@ -104,8 +127,12 @@ export async function addComment(db: Db, userId: ObjectId, videoIdString: string
     parentObjectId = new ObjectId(parentId);
   }
   const createdAt = new Date();
+  const sanitizedAttachments = attachments.map(a => ({
+    objectKey: a.objectKey,
+    mimeType: a.mimeType.toLowerCase()
+  }));
   const result = await db.collection("video_comments").insertOne({
-    videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments, ...(parentObjectId ? { parentId: parentObjectId } : {})
+    videoId, userId, text: body, status: "ACTIVE", createdAt, updatedAt: createdAt, attachments: sanitizedAttachments, ...(parentObjectId ? { parentId: parentObjectId } : {})
   });
   if (video.ownerId) await createNotification(db, { recipientId: video.ownerId, actorId: userId, type: "COMMENT", videoId, commentId: result.insertedId });
   const mentioned = [...new Set((body.match(/@[a-z0-9._]{3,24}/gi) ?? []).map(x => x.slice(1).toLowerCase()))].slice(0, 20);
@@ -152,8 +179,9 @@ export async function toggleRepost(db: Db, userId: ObjectId, videoIdString: stri
 export async function toggleCommentLike(db: Db, userId: ObjectId, commentIdString: string) {
   if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
   const commentId = new ObjectId(commentIdString);
-  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { _id: 1 } });
+  const comment = await db.collection("video_comments").findOne({ _id: commentId, status: "ACTIVE" }, { projection: { _id: 1, videoId: 1 } });
   if (!comment) throw new Error("Comment not found");
+  await getPublicVideo(db, comment.videoId);
   const existing = await db.collection("comment_likes").findOne({ commentId, userId }, { projection: { _id: 1 } });
   if (existing) {
     await db.collection("comment_likes").deleteOne({ _id: existing._id });
@@ -166,9 +194,25 @@ export async function toggleCommentLike(db: Db, userId: ObjectId, commentIdStrin
 export async function listCommentReplies(db: Db, commentIdString: string, limit = 50) {
   if (!ObjectId.isValid(commentIdString)) throw new Error("Invalid comment id");
   const commentId = new ObjectId(commentIdString);
+  const parent = await db.collection("video_comments").findOne(
+    { _id: commentId, status: "ACTIVE" },
+    { projection: { videoId: 1 } }
+  );
+  if (!parent) throw new Error("Comment not found");
+  await getPublicVideo(db, parent.videoId);
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 100);
   const rows = await db.collection("video_comments").find({ parentId: commentId, status: "ACTIVE" }).sort({ createdAt: 1 }).limit(safeLimit).toArray();
-  return rows.map(comment => ({ id: comment._id.toHexString(), userId: comment.userId.toHexString(), text: comment.text, createdAt: comment.createdAt, parentId: commentIdString, attachments: comment.attachments ?? [] }));
+  return Promise.all(rows.map(async comment => ({
+    id: comment._id.toHexString(),
+    userId: comment.userId.toHexString(),
+    text: comment.text,
+    createdAt: comment.createdAt,
+    parentId: commentIdString,
+    attachments: await Promise.all((comment.attachments ?? []).map(async (a: {objectKey:string;mimeType:string}) => ({
+      mimeType: a.mimeType,
+      url: (await createPresignedPlayback(a.objectKey, 900)).url
+    })))
+  })));
 }
 
 

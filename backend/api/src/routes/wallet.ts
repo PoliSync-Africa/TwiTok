@@ -12,7 +12,7 @@ import { currencyForCountry, exchangeRateEnvName, resolveCollectionProvider, res
 import { requireUser, requireAdultUser } from "../auth/middleware.js";
 import { broadcastToUser } from "../realtime/ws.js";
 import { rateLimit } from "../security/rate-limit.js";
-import { rateLimit as expressRateLimit } from "express-rate-limit";
+import { rateLimit as expressRateLimit, ipKeyGenerator } from "express-rate-limit";
 
 export const walletRouter = Router();
 
@@ -90,7 +90,7 @@ walletRouter.get("/me/ledger", requireUser, async (req, res) => {
 });
 
 
-walletRouter.get("/me/earnings", requireUser, expressRateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false, keyGenerator: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+walletRouter.get("/me/earnings", requireUser, expressRateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false, keyGenerator: req => req.userId?.toHexString() ?? ipKeyGenerator(req.ip ?? "unknown") }), async (req, res) => {
   try {
     const db = await getDb();
     const now = new Date();
@@ -190,9 +190,32 @@ walletRouter.post("/coins/paystack/initialize", requireAdultUser, async (req, re
     const amountGhs = Number((pkg.priceUsd * rate).toFixed(2));
     const reference = "TWITOK-" + randomUUID().replaceAll("-", "").slice(0, 24);
     const callbackUrl = process.env.TWITOK_PAYSTACK_CALLBACK_URL;
-    const result = await initializeCoinPurchase({ email: user.email, amountGhs, reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, callbackUrl });
-    await db.collection("coin_purchases").insertOne({ reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, priceUsd: pkg.priceUsd, amountGhs, status: "INITIALIZED", provider: "PAYSTACK", createdAt: new Date() });
-    return res.status(201).json({ reference, authorizationUrl: result.authorization_url, accessCode: result.access_code, amountGhs, currency: "GHS", coins: pkg.coins });
+    const purchase = {
+      reference,
+      userId: req.userId!.toHexString(),
+      sku: pkg.sku,
+      coins: pkg.coins,
+      priceUsd: pkg.priceUsd,
+      amountGhs,
+      status: "INITIALIZING",
+      provider: "PAYSTACK",
+      createdAt: new Date()
+    };
+    await db.collection("coin_purchases").insertOne(purchase);
+    try {
+      const result = await initializeCoinPurchase({ email: user.email, amountGhs, reference, userId: req.userId!.toHexString(), sku: pkg.sku, coins: pkg.coins, callbackUrl });
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "PAYSTACK" },
+        { $set: { status: "INITIALIZED", initializedAt: new Date() } }
+      );
+      return res.status(201).json({ reference, authorizationUrl: result.authorization_url, accessCode: result.access_code, amountGhs, currency: "GHS", coins: pkg.coins });
+    } catch (error) {
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "PAYSTACK", status: "INITIALIZING" },
+        { $set: { status: "FAILED", failedAt: new Date() } }
+      );
+      throw error;
+    }
   } catch (error) { return res.status(502).json({ error: error instanceof Error ? error.message : "Coin purchase initialization failed" }); }
 });
 
@@ -231,7 +254,29 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
 
     const purchaseEvents = new Set(["INITIAL_PURCHASE", "NON_RENEWING_PURCHASE"]);
     const refundEvents = new Set(["CANCELLATION"]);
+    const isCustomerSupportRefund = refundEvents.has(eventType) && String(event?.cancel_reason ?? "").toUpperCase() === "CUSTOMER_SUPPORT";
     const db = await getDb();
+
+    // Bind both purchases and refunds to the original RevenueCat transaction.
+    // Cancellation events may carry a transaction ID different from the original
+    // purchase, so refunds must resolve original_transaction_id first.
+    const refundTransactionId = String(event?.original_transaction_id ?? transactionId).trim();
+    const providerTransactionId = "REVENUECAT:" + store + ":" + (isCustomerSupportRefund ? refundTransactionId : transactionId);
+    const existingIap = await db.collection("iap_transactions").findOne(
+      { providerTransactionId },
+      { projection: { userId: 1, provider: 1, sku: 1, coins: 1 } }
+    );
+    if (existingIap) {
+      const samePurchase =
+        String(existingIap.userId) === userId &&
+        String(existingIap.provider) === "REVENUECAT" &&
+        String(existingIap.sku) === pkg.sku &&
+        Number(existingIap.coins) === pkg.coins;
+      if (!samePurchase) return res.status(409).json({ error: "RevenueCat transaction is already bound to a different purchase" });
+    } else if (isCustomerSupportRefund) {
+      return res.status(404).json({ error: "Original RevenueCat Coin purchase not found" });
+    }
+
     const account = ObjectId.isValid(userId) ? await db.collection("users").findOne({ _id: new ObjectId(userId) }, { projection: { _id: 1 } }) : null;
     if (!account) return res.status(404).json({ error: "RevenueCat App User is not a TwiTok account" });
 
@@ -271,8 +316,8 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
       return res.status(200).json({ ok: true, duplicate: result.duplicate });
     }
 
-    if (refundEvents.has(eventType) && String(event?.cancel_reason ?? "").toUpperCase() === "CUSTOMER_SUPPORT") {
-      const originalTransactionId = "REVENUECAT:" + store + ":" + transactionId;
+    if (isCustomerSupportRefund) {
+      const originalTransactionId = providerTransactionId;
       const refundGrossUsdRaw = Number(event?.price);
       const taxPct = Number(event?.tax_percentage ?? 0);
       const commissionPct = Number(event?.commission_percentage ?? 0);
@@ -354,20 +399,6 @@ walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req,
 
     const amountLocal = Number((pkg.priceUsd * rate).toFixed(2));
     const reference = "TWITOK-FLW-" + randomUUID().replaceAll("-", "").slice(0, 24);
-    const result = await initializeFlutterwaveCheckout({
-      email: user.email,
-      phoneNumber: user.phoneNumber ? String(user.phoneNumber) : undefined,
-      name: user.name ? String(user.name) : undefined,
-      amount: amountLocal,
-      currency,
-      reference,
-      redirectUrl: process.env.TWITOK_FLUTTERWAVE_CALLBACK_URL,
-      paymentOptions: process.env.TWITOK_FLUTTERWAVE_PAYMENT_OPTIONS,
-      userId: req.userId!.toHexString(),
-      sku: pkg.sku,
-      coins: pkg.coins
-    });
-
     await db.collection("coin_purchases").insertOne({
       reference,
       userId: req.userId!.toHexString(),
@@ -376,12 +407,37 @@ walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req,
       priceUsd: pkg.priceUsd,
       amountLocal,
       currency,
-      status: "INITIALIZED",
+      status: "INITIALIZING",
       provider: "FLUTTERWAVE",
       createdAt: new Date()
     });
 
-    return res.status(201).json({ reference, authorizationUrl: result.link, amount: amountLocal, currency, coins: pkg.coins, provider: "FLUTTERWAVE" });
+    try {
+      const result = await initializeFlutterwaveCheckout({
+        email: user.email,
+        phoneNumber: user.phoneNumber ? String(user.phoneNumber) : undefined,
+        name: user.name ? String(user.name) : undefined,
+        amount: amountLocal,
+        currency,
+        reference,
+        redirectUrl: process.env.TWITOK_FLUTTERWAVE_CALLBACK_URL,
+        paymentOptions: process.env.TWITOK_FLUTTERWAVE_PAYMENT_OPTIONS,
+        userId: req.userId!.toHexString(),
+        sku: pkg.sku,
+        coins: pkg.coins
+      });
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "FLUTTERWAVE" },
+        { $set: { status: "INITIALIZED", initializedAt: new Date() } }
+      );
+      return res.status(201).json({ reference, authorizationUrl: result.link, amount: amountLocal, currency, coins: pkg.coins, provider: "FLUTTERWAVE" });
+    } catch (error) {
+      await db.collection("coin_purchases").updateOne(
+        { reference, provider: "FLUTTERWAVE", status: "INITIALIZING" },
+        { $set: { status: "FAILED", failedAt: new Date() } }
+      );
+      throw error;
+    }
   } catch (error) {
     return res.status(502).json({ error: error instanceof Error ? error.message : "Flutterwave Coin purchase initialization failed" });
   }
@@ -406,7 +462,9 @@ walletRouter.post("/coins/flutterwave/webhook", async (req, res) => {
     if (verified.status !== "successful" || verified.tx_ref !== reference || verified.currency !== String(purchase.currency)) {
       return res.status(400).json({ error: "Flutterwave payment verification failed" });
     }
-    if (Number(verified.amount) < Number(purchase.amountLocal)) {
+    const verifiedAmount = Number(verified.amount);
+    const expectedAmount = Number(purchase.amountLocal);
+    if (!Number.isFinite(verifiedAmount) || !Number.isFinite(expectedAmount) || verifiedAmount !== expectedAmount) {
       return res.status(400).json({ error: "Flutterwave payment amount mismatch" });
     }
 
@@ -451,9 +509,11 @@ walletRouter.post("/coins/paystack/webhook", async (req, res) => {
     const db = await getDb();
     const purchase = await db.collection("coin_purchases").findOne({ reference, provider: "PAYSTACK" });
     if (!purchase) return res.status(404).json({ error: "Coin purchase not found" });
-    const rate = Number(process.env.TWITOK_USD_GHS_RATE);
     const expectedAmount = Math.round(Number(purchase.amountGhs) * 100);
-    if (!Number.isFinite(rate) || Math.abs(Number(verified.amount) - expectedAmount) > 1) return res.status(400).json({ error: "Payment amount mismatch" });
+    const verifiedAmount = Number(verified.amount);
+    if (!Number.isFinite(expectedAmount) || !Number.isFinite(verifiedAmount) || verifiedAmount !== expectedAmount) {
+      return res.status(400).json({ error: "Payment amount mismatch" });
+    }
     if (purchase.status === "CREDITED") return res.json({ ok: true, duplicate: true });
     const grossUsd = Number(purchase.priceUsd);
     const feeBps = Number(process.env.TWITOK_PAYSTACK_COLLECTION_FEE_BPS);
@@ -474,8 +534,11 @@ walletRouter.post("/payout/paystack/webhook", async (req, res) => {
     if (!["transfer.success", "transfer.failed", "transfer.reversed"].includes(event)) return res.json({ ok: true, ignored: true });
     const reference = String(req.body?.data?.reference ?? "");
     const eventId = String(req.body?.data?.id ?? reference + ":" + event);
+    const amount = Number(req.body?.data?.amount);
+    const currency = String(req.body?.data?.currency ?? "");
     if (!reference) return res.status(400).json({ error: "Transfer reference missing" });
-    const result = await reconcilePaystackTransfer(await getDb(), { eventId, event: event as "transfer.success" | "transfer.failed" | "transfer.reversed", reference, rawStatus: String(req.body?.data?.status ?? "") });
+    if (!Number.isFinite(amount) || !currency) return res.status(400).json({ error: "Transfer amount and currency are required" });
+    const result = await reconcilePaystackTransfer(await getDb(), { eventId, event: event as "transfer.success" | "transfer.failed" | "transfer.reversed", reference, amount, currency, rawStatus: String(req.body?.data?.status ?? "") });
     return res.json({ ok: true, ...result });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Payout webhook failed" }); }
 });
@@ -543,8 +606,11 @@ walletRouter.post("/payout/flutterwave/webhook", async (req, res) => {
     const transferId = String(data?.id ?? "");
     const reference = String(data?.reference ?? "");
     const status = String(data?.status ?? "");
+    const amount = Number(data?.amount);
+    const currency = String(data?.currency ?? "");
     if (!transferId || !reference || !status) return res.status(400).json({ error: "Flutterwave transfer identifiers missing" });
-    const result = await reconcileFlutterwaveTransfer(await getDb(), { eventId: transferId + ":" + status, transferId, reference, status, rawMessage: String(data?.complete_message ?? "") });
+    if (!Number.isFinite(amount) || !currency) return res.status(400).json({ error: "Flutterwave transfer amount and currency are required" });
+    const result = await reconcileFlutterwaveTransfer(await getDb(), { eventId: transferId + ":" + status, transferId, reference, status, amount, currency, rawMessage: String(data?.complete_message ?? "") });
     return res.json({ ok: true, ...result });
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Flutterwave payout webhook failed" }); }
 });

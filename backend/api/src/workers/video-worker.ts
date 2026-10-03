@@ -16,8 +16,8 @@ const accessKeyId = process.env.MEDIA_S3_ACCESS_KEY_ID ?? "";
 const secretAccessKey = process.env.MEDIA_S3_SECRET_ACCESS_KEY ?? "";
 const publicBase = (process.env.MEDIA_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 const workerId = process.env.TWITOK_VIDEO_WORKER_ID ?? `video-worker-${process.pid}`;
-const ffmpegBin = process.env.FFMPEG_BIN ?? "ffmpeg";
-const ffprobeBin = process.env.FFPROBE_BIN ?? "ffprobe";
+const ffmpegBin = "ffmpeg";
+const ffprobeBin = "ffprobe";
 const pollMs = Number(process.env.TWITOK_VIDEO_WORKER_POLL_MS ?? 2000);
 const fontFile = process.env.TWITOK_FONT_FILE ?? "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 const stickerMap: Record<string,string> = { africa:"🌍", ghana:"🇬🇭", nigeria:"🇳🇬", kenya:"🇰🇪", "south-africa":"🇿🇦", celebrate:"🎉", love:"❤️", fire:"🔥", laugh:"😂", wow:"😮", clap:"👏", dance:"💃", drum:"🥁", music:"🎶", community:"🤝", food:"🍲" };
@@ -129,9 +129,10 @@ async function runFfmpeg(
     captions: Array<{ text: string; startMs: number; endMs: number }>;
     effect: string;
     stickers: Array<{ stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number }>;
+    editPlan?: { quality?: string; filter?: string; crop?: string; rotate?: number; mirror?: boolean; aiTool?: string; aiPrompt?: string };
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers, editPlan } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -139,11 +140,36 @@ async function runFfmpeg(
   ];
   if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
 
+  const plan = editPlan ?? {};
+  const quality = String(plan.quality ?? "ULTRA");
+  const aiTool = String(plan.aiTool ?? "NONE");
+  const filterName = String(plan.filter ?? "NONE");
+  const polish = quality === "ULTRA" ? "hqdn3d=0.9:0.9:4:4,eq=contrast=1.07:saturation=1.07:brightness=0.025:gamma=1.03,unsharp=5:5:0.55:5:5:0.0" : quality === "HD" || aiTool === "HD_ENHANCE" ? "hqdn3d=1.2:1.2:6:6,eq=contrast=1.05:saturation=1.06:brightness=0.018:gamma=1.02,unsharp=5:5:0.7:5:5:0.0" : quality === "CLEAN" || aiTool === "RESTORE" ? "hqdn3d=1:1:4:4,eq=contrast=1.03:saturation=1.03:brightness=0.01,unsharp=5:5:0.45:5:5:0.0" : "hqdn3d=0.6:0.6:2:2,eq=contrast=1.04:saturation=1.04:brightness=0.015:gamma=1.02,unsharp=5:5:0.25:5:5:0.0";
+  const filterMap: Record<string,string> = {
+    NONE:"null", VIVID:"eq=contrast=1.08:saturation=1.3", WARM:"colorbalance=rs=.08:gs=.03:bs=-.03",
+    COOL:"colorbalance=rs=-.03:gs=.03:bs=.08", NOIR:"hue=s=0,eq=contrast=1.15:brightness=-.02",
+    VINTAGE:"eq=contrast=.95:saturation=.78:brightness=.02", CINEMATIC:"eq=contrast=1.12:saturation=1.08:gamma=1.03"
+  };
+  const cropMap: Record<string,string> = {
+    "9:16":"crop=min(iw\,ih*0.5625):min(ih\,iw*1.7778)",
+    "1:1":"crop=min(iw\,ih):min(iw\,ih)",
+    "4:5":"crop=min(iw\,ih*0.8):min(ih\,iw*1.25)",
+    "16:9":"crop=min(iw\,ih*1.7778):min(ih\,iw*0.5625)"
+  };
+  const rotate = Number(plan.rotate ?? 0);
+  const geometry = [
+    cropMap[String(plan.crop ?? "ORIGINAL")] ?? "null",
+    plan.mirror ? "hflip" : "null",
+    rotate === 90 ? "transpose=1" : rotate === 180 ? "transpose=1,transpose=1" : rotate === 270 ? "transpose=2" : "null"
+  ].filter(x => x !== "null").join(",") || "null";
+  const aiVisual = aiTool === "RELIGHT" ? "eq=brightness=0.07:gamma=1.08" : aiTool === "COLORIZE" ? "hue=s=1.18" : "null";
   const filters = [
-    "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360base]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720base]`
+    "[0:v]split=5[v0][v1][v2][v3][v4]",
+    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v360base]`,
+    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v540base]`,
+    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v720base]`,
+    `[v3]scale=w=1080:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v1080base]`,
+    `[v4]scale=w=2160:h=-2:force_original_aspect_ratio=decrease,${polish},${filterMap[filterName] ?? "null"},${aiVisual},${geometry},setpts=PTS/${speed}[v2160base]`
   ];
 
   const overlayInputs: string[] = [];
@@ -156,7 +182,9 @@ async function runFfmpeg(
   const variants = [
     { base: "v360base", out: "v360", width: 360 },
     { base: "v540base", out: "v540", width: 540 },
-    { base: "v720base", out: "v720", width: 720 }
+    { base: "v720base", out: "v720", width: 720 },
+    { base: "v1080base", out: "v1080", width: 1080 },
+    { base: "v2160base", out: "v2160", width: 2160 }
   ];
   const captionInputs: string[] = [];
   for (let index = 0; index < captions.length; index += 1) {
@@ -215,14 +243,17 @@ async function runFfmpeg(
     filters.push(`[0:a]atempo=${speed},volume=1,atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB[audio]`);
   }
 
+  await fs.promises.writeFile(path.join(outputDir, "filters.txt"), filters.join(";"), "utf8");
   const audioMap = soundFile ? ["-map", "[mixed]"] : hasOriginalAudio ? ["-map", "[audio]"] : [];
   const args = [
     "-hide_banner", "-loglevel", "error", "-y",
     ...inputArgs,
-    "-filter_complex", filters.join(";"),
+    "-filter_complex_script", path.join(outputDir, "filters.txt"),
     "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
     "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
     "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
+    "-map", "[v1080]", "-c:v:3", "libx264", "-b:v:3", "5000k", "-maxrate:v:3", "6500k", "-bufsize:v:3", "10000k",
+    "-map", "[v2160]", "-c:v:4", "libx264", "-b:v:4", "14000k", "-maxrate:v:4", "18000k", "-bufsize:v:4", "28000k",
     ...audioMap,
     ...(audioMap.length ? ["-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
     "-force_key_frames", "expr:gte(t,n_forced*2)",
@@ -231,7 +262,7 @@ async function runFfmpeg(
     "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init_%v.mp4",
     "-hls_segment_filename", path.join(outputDir, "seg_%v_%05d.m4s"),
     "-master_pl_name", "master.m3u8",
-    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0" : "v:0 v:1 v:2",
+    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0 v:3,a:0 v:4,a:0" : "v:0 v:1 v:2 v:3 v:4",
     path.join(outputDir, "stream_%v.m3u8")
   ];
   await runProcess(ffmpegBin, args);
@@ -363,7 +394,8 @@ async function processJob(db: Db, job: any) {
       textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : [],
       captions: Array.isArray(video.captions) ? video.captions : [],
       effect: String(video.effect ?? "NONE"),
-      stickers: Array.isArray(video.stickers) ? video.stickers : []
+      stickers: Array.isArray(video.stickers) ? video.stickers : [],
+      editPlan: video.editPlan ?? undefined
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));

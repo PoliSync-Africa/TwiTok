@@ -10,6 +10,8 @@ export const engagementRouter = Router();
 const engagementActionLimit = rateLimit({ windowMs: 60 * 1000, max: 90, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const commentLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const engagementReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const commentLikeLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+const shareLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
 engagementRouter.get("/:videoId", requireUser, engagementReadLimit, async (req, res) => {
   try { res.json(await getEngagement(await getDb(), req.userId!, String(req.params.videoId))); }
@@ -32,7 +34,7 @@ engagementRouter.post("/:videoId/save", requireUser, engagementActionLimit, asyn
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update save" }); }
 });
 
-engagementRouter.post("/:videoId/share", requireUser, engagementActionLimit, async (req, res) => {
+engagementRouter.post("/:videoId/share", requireUser, shareLimit, async (req, res) => {
   try {
     const db = await getDb();
     const result = await recordShare(db, req.userId!, String(req.params.videoId));
@@ -57,6 +59,9 @@ engagementRouter.post("/:videoId/comments/upload-url", requireUser, commentLimit
     if (!allowed.test(mimeType)) return res.status(400).json({ error: "Unsupported comment media type" });
     const videoId = String(req.params.videoId);
     if (!ObjectId.isValid(videoId)) return res.status(400).json({ error: "Invalid video id" });
+    const db = await getDb();
+    await db.collection("videos").findOne({ _id: new ObjectId(videoId), status: "PUBLISHED", visibility: "PUBLIC" }, { projection: { _id: 1 } }) ||
+      (() => { throw new Error("Video not found"); })();
     const objectKey = "comment-media/" + req.userId!.toHexString() + "/" + new ObjectId().toHexString();
     const signed = await createPresignedUpload({ objectKey, mimeType, expiresInSeconds: 900 });
     res.json({ objectKey, ...signed });
@@ -74,6 +79,16 @@ engagementRouter.get("/comments/media", requireUser, engagementReadLimit, async 
 engagementRouter.get("/:videoId/comments", requireUser, engagementReadLimit, async (req, res) => {
   try { res.json({ comments: await listComments(await getDb(), req.userId!, String(req.params.videoId), Number(req.query.limit ?? 30)) }); }
   catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load comments" }); }
+});
+
+engagementRouter.post("/comments/:commentId/like", requireUser, commentLikeLimit, async (req, res) => {
+  try { res.json(await toggleCommentLike(await getDb(), req.userId!, String(req.params.commentId))); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update comment like" }); }
+});
+
+engagementRouter.get("/comments/:commentId/replies", requireUser, engagementReadLimit, async (req, res) => {
+  try { res.json({ replies: await listCommentReplies(await getDb(), String(req.params.commentId), Number(req.query.limit ?? 50)) }); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to load replies" }); }
 });
 
 engagementRouter.post("/:videoId/comments", requireUser, commentLimit, async (req, res) => {

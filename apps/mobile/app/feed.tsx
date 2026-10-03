@@ -18,6 +18,7 @@ type Video = {
   sound?: { id: string; title?: string; artist?: string; coverUrl?: string | null } | null;
   promoted?: boolean;
   promotionObjective?: string | null;
+  shopProducts?: { id:string; name:string; priceMinor:number; currency:string; images?:string[]; stock:number }[];
 };
 
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
@@ -150,9 +151,25 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
 }
 
 function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shopBusy, setShopBusy] = useState<string | null>(null);
+
+  async function addShopProduct(productId: string) {
+    const token = await getAuthToken();
+    if (!token || shopBusy) return;
+    setShopBusy(productId);
+    try {
+      const r = await fetch(API + "/shop/cart/items", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ productId, quantity: 1 }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "Unable to add product to cart");
+      setShopOpen(false);
+      router.push("/shop?tab=cart");
+    } catch {} finally { setShopBusy(null); }
+  }
   return (
     <>
       <View style={styles.scrim} />
+      <View style={styles.shopShortcut}><Pressable onPress={() => router.push("/shop")}><Text style={styles.shopShortcutText}>Shop</Text></Pressable></View>
       <View style={styles.rightRail}>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
@@ -162,7 +179,25 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
-      <View style={styles.meta}>
+      {item.shopProducts?.length ? <Pressable style={styles.productCard} onPress={() => setShopOpen(true)}>
+        <Text style={styles.productBadge}>SHOP · {item.shopProducts.length} {item.shopProducts.length === 1 ? "PRODUCT" : "PRODUCTS"}</Text>
+        <View style={styles.productRow}>{item.shopProducts[0].images?.[0] ? <Image source={{uri:item.shopProducts[0].images[0]}} style={styles.productThumb} /> : null}<View style={styles.productInfo}><Text style={styles.productName} numberOfLines={1}>{item.shopProducts[0].name}</Text><Text style={styles.productPrice}>{item.shopProducts[0].currency} {(item.shopProducts[0].priceMinor/100).toFixed(2)} · Tap to shop</Text></View><Text style={styles.productAction}>Shop</Text></View>
+      </Pressable> : null}
+      {shopOpen && item.shopProducts?.length ? <View style={styles.shopSheet}>
+        <Pressable style={styles.shopSheetBackdrop} onPress={() => setShopOpen(false)} />
+        <View style={styles.shopPanel}>
+          <View style={styles.shopPanelHeader}><View><Text style={styles.shopPanelTitle}>Products in this video</Text><Text style={styles.shopPanelSub}>{item.shopProducts.length} shoppable {item.shopProducts.length === 1 ? "product" : "products"}</Text></View><Pressable onPress={() => setShopOpen(false)}><Text style={styles.shopClose}>×</Text></Pressable></View>
+          {item.shopProducts.map(product => <View key={product.id} style={styles.shopItem}>
+            {product.images?.[0] ? <Image source={{uri:product.images[0]}} style={styles.shopItemImage} /> : <View style={styles.shopItemImage} />}
+            <View style={styles.shopItemInfo}><Text style={styles.shopItemName} numberOfLines={2}>{product.name}</Text><Text style={styles.shopItemPrice}>{product.currency} {(product.priceMinor/100).toFixed(2)}</Text><Text style={styles.shopItemStock}>{product.stock > 0 ? product.stock + " in stock" : "Out of stock"}</Text></View>
+            <View style={styles.shopItemActions}>
+              <Pressable disabled={!product.stock || shopBusy === product.id} style={styles.shopViewButton} onPress={() => router.push({ pathname: "/shop", params: { productId: product.id } })}><Text style={styles.shopViewText}>View</Text></Pressable>
+              <Pressable disabled={!product.stock || !!shopBusy} style={[styles.shopCartButton, (!product.stock || !!shopBusy) && styles.shopCartButtonDisabled]} onPress={() => void addShopProduct(product.id)}><Text style={styles.shopCartText}>{shopBusy === product.id ? "Adding…" : "Add"}</Text></Pressable>
+            </View>
+          </View>)}
+          <Pressable style={styles.shopAllButton} onPress={() => router.push("/shop")}><Text style={styles.shopAllText}>Open TwiTok Shop</Text></Pressable>
+        </View>
+      </View> : null}<View style={styles.meta}>
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<View style={styles.feedVerified}><Text style={styles.feedVerifiedSeal}>✺</Text><Text style={styles.feedVerifiedCheck}>✓</Text></View>}</View></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
@@ -269,6 +304,8 @@ const styles = StyleSheet.create({
   heartBurst: { color: "#fff", fontSize: 92, fontWeight: "900", textShadowColor: "#ff2d55", textShadowRadius: 16, opacity: 0.95 },
   speedBadge: { backgroundColor: "rgba(0,0,0,0.68)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22 },
   speedBadgeText: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  shopShortcut:{position:"absolute",top:58,right:14,zIndex:20,backgroundColor:"rgba(0,0,0,0.6)",borderRadius:18,paddingHorizontal:12,paddingVertical:7},
+  shopShortcutText:{color:"#fff",fontSize:12,fontWeight:"900"},
   rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
   action: { alignItems: "center", minWidth: 52 },
   actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
@@ -287,6 +324,28 @@ const styles = StyleSheet.create({
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  productCard:{position:"absolute",left:16,right:92,bottom:175,backgroundColor:"rgba(0,0,0,0.82)",borderRadius:12,padding:9,zIndex:12},productBadge:{color:"#fff",fontSize:9,fontWeight:"900",marginBottom:5},productRow:{flexDirection:"row",alignItems:"center",gap:8},productThumb:{width:42,height:42,borderRadius:7,backgroundColor:"#222"},productInfo:{flex:1},productName:{color:"#fff",fontSize:12,fontWeight:"800"},productPrice:{color:"#fff",fontSize:11,fontWeight:"700",marginTop:2},productAction:{color:"#ff2d55",fontSize:11,fontWeight:"900"},
+  shopSheet:{position:"absolute",left:0,right:0,top:0,bottom:0,zIndex:40,justifyContent:"flex-end"},
+  shopSheetBackdrop:{...StyleSheet.absoluteFill,backgroundColor:"rgba(0,0,0,0.48)"},
+  shopPanel:{backgroundColor:"#151515",borderTopLeftRadius:22,borderTopRightRadius:22,padding:16,paddingBottom:28,maxHeight:height*0.72},
+  shopPanelHeader:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginBottom:12},
+  shopPanelTitle:{color:"#fff",fontSize:19,fontWeight:"900"},
+  shopPanelSub:{color:"#888",fontSize:12,marginTop:3},
+  shopClose:{color:"#fff",fontSize:32,lineHeight:32,paddingHorizontal:6},
+  shopItem:{flexDirection:"row",alignItems:"center",backgroundColor:"#202020",borderRadius:13,padding:9,marginBottom:9,gap:9},
+  shopItemImage:{width:58,height:58,borderRadius:9,backgroundColor:"#2b2b2b"},
+  shopItemInfo:{flex:1},
+  shopItemName:{color:"#fff",fontSize:13,fontWeight:"800"},
+  shopItemPrice:{color:"#fff",fontSize:13,fontWeight:"900",marginTop:3},
+  shopItemStock:{color:"#888",fontSize:10,marginTop:2},
+  shopItemActions:{gap:6},
+  shopViewButton:{borderWidth:1,borderColor:"#555",borderRadius:8,paddingHorizontal:10,paddingVertical:7,alignItems:"center"},
+  shopViewText:{color:"#fff",fontSize:11,fontWeight:"800"},
+  shopCartButton:{backgroundColor:"#ff2d55",borderRadius:8,paddingHorizontal:10,paddingVertical:7,alignItems:"center"},
+  shopCartButtonDisabled:{opacity:0.45},
+  shopCartText:{color:"#fff",fontSize:11,fontWeight:"900"},
+  shopAllButton:{backgroundColor:"#ff2d55",borderRadius:11,paddingVertical:13,alignItems:"center",marginTop:2},
+  shopAllText:{color:"#fff",fontSize:13,fontWeight:"900"},
   promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
   promotedText:{color:"#fff",fontSize:12,fontWeight:"800"},
   tab: { color: "#aaa", fontSize: 13 },

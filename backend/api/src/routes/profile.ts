@@ -1,15 +1,18 @@
 import { Router } from "express";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { blockUser, followUser, getProfile, removeFollower, respondToFollowRequest, unfollowUser, unblockUser } from "../social/follows.js";
 import { verifyUserToken } from "../auth/user.js";
 import { createPresignedPlayback, createPresignedUpload, mediaConfigured } from "../media/storage.js";
+import { rateLimit } from "../security/rate-limit.js";
 
 export const profileRouter = Router();
+const routeRateLimit = expressRateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+profileRouter.use(routeRateLimit);
 
-
-profileRouter.patch("/me", requireUser, async (req, res) => {
+profileRouter.patch("/me", rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
     const username = String(req.body?.username ?? "").trim().toLowerCase();
     const nickname = String(req.body?.nickname ?? "").trim();
@@ -28,24 +31,25 @@ profileRouter.patch("/me", requireUser, async (req, res) => {
     }
     const existing = await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } });
     if (existing) return res.status(409).json({ error: "That username is already taken" });
-    await db.collection("users").updateOne(
-      { _id: req.userId! },
-      {
-        $set: {
-          username, nickname, bio, isPrivate, profileSetupComplete: true,
-          ...(nameChanged ? { nameLastChangedAt: new Date() } : {}),
-          ...(nameChanged && current?.isVerified === true ? { isVerified: false, verificationStatus: "REVERIFY_REQUIRED" } : {}),
-          updatedAt: new Date()
-        },
-        ...(nameChanged && current?.isVerified === true ? { $unset: { verifiedAt: "", verifiedBy: "" } } : {})
+    const userUpdate: Record<string, any> = {
+      $set: {
+        username, nickname, bio, isPrivate, profileSetupComplete: true,
+        updatedAt: new Date()
       }
-    );
+    };
+    if (nameChanged) userUpdate.$set.nameLastChangedAt = new Date();
+    if (nameChanged && current?.isVerified === true) {
+      userUpdate.$set.isVerified = false;
+      userUpdate.$set.verificationStatus = "REVERIFY_REQUIRED";
+      userUpdate.$unset = { verifiedAt: "", verifiedBy: "" };
+    }
+    await db.collection("users").updateOne({ _id: req.userId! }, userUpdate);
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
     res.json({ user });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to update profile" }); }
 });
 
-profileRouter.post("/me/photo-upload-url", requireUser, async (req, res) => {
+profileRouter.post("/me/photo-upload-url", rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), requireUser, async (req, res) => {
   try {
     const mimeType = String(req.body?.mimeType ?? "");
     if (!/^image\/(jpeg|png|webp)$/i.test(mimeType)) return res.status(400).json({ error: "Profile photo must be JPEG, PNG or WebP" });

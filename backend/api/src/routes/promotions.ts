@@ -4,6 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
+import { TWITOK_PROMOTION_DISCOUNT, TWITOK_VIEW_PACKS, TWITOK_OBJECTIVES, TWITOK_OBJECTIVE_BUDGET_PACKS, TWITOK_PARTNERSHIP_PLANS, TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT, TWITOK_SUBSCRIBER_REACH_PACKS, TWITOK_DURATION_OPTIONS, TWITOK_DEFAULT_DURATION_DAYS, discountedPromotionPrice, durationAdjustedPrice, durationAdjustedAudience, durationPriceIncreasePercent, partnershipCreatorPayout, partnershipPlatformFee, getViewPack } from "../config/promotion-pricing.js";
 
 export const promotionsRouter = Router();
 
@@ -12,7 +13,7 @@ const paymentLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, key: req => 
 const campaignReadLimit = rateLimit({ windowMs: 60 * 1000, max: 60, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const campaignActionLimit = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-const OBJECTIVES = ["MORE_VIEWS", "MORE_FOLLOWERS", "WEBSITE_TRAFFIC", "LIVE_AUDIENCE"] as const;
+const OBJECTIVES = TWITOK_OBJECTIVES;
 const CURRENCIES = ["GHS", "USD"] as const;
 
 function moneyToMinor(value: unknown) {
@@ -33,9 +34,74 @@ function publicCampaign(c: any) {
     target: c.target,
     startAt: c.startAt,
     endAt: c.endAt,
-    metrics: c.metrics ?? { impressions: 0, views: 0, follows: 0, clicks: 0 }
+    metrics: c.metrics ?? { impressions: 0, views: 0, follows: 0, clicks: 0 },
+    packageId: c.packageId ?? null,
+    benchmarkBudgetMinor: c.benchmarkBudgetMinor ?? null,
+    discountPercent: c.discountPercent ?? 0,
+    discountLabel: c.discountLabel ?? null,
+    targetViews: c.targetViews ?? null,
+    baseTargetViews: c.baseTargetViews ?? null,
+    durationDays: c.durationDays ?? null,
+    priceIncreasePercent: c.priceIncreasePercent ?? 0,
+    audienceIncreasePercent: c.audienceIncreasePercent ?? 0
   };
 }
+
+promotionsRouter.get("/packages", requireUser, campaignReadLimit, async (_req, res) => {
+  return res.json({
+    discountPercent: TWITOK_PROMOTION_DISCOUNT * 100,
+    discountLabel: "8% DISCOUNT APPLIED",
+    currency: "USD",
+    objectives: TWITOK_OBJECTIVES,
+    audienceDefaults: { scope: "GLOBAL", countryCodes: [], usesDeviceLocationWhenGranted: true },
+    durationOptions: TWITOK_DURATION_OPTIONS,
+    packages: TWITOK_VIEW_PACKS.map(pack => ({
+      id: pack.id,
+      views: pack.views,
+      durationDays: TWITOK_DEFAULT_DURATION_DAYS,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
+      recommended: Boolean("recommended" in pack && pack.recommended)
+    })),
+    partnershipPlatformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
+    partnershipPlans: TWITOK_PARTNERSHIP_PLANS.map(plan => ({
+      id: plan.id,
+      durationDays: plan.durationDays,
+      creatorCount: { min: plan.minCreators, max: plan.maxCreators },
+      creatorCountLabel: "1 to unlimited creators",
+      platformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT,
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({
+        days: option.days,
+        priceIncreasePercent: option.priceIncreasePercent,
+        cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days),
+        creatorCount: { min: plan.minCreators, max: plan.maxCreators },
+        creatorCountLabel: "1 to unlimited creators",
+        platformFeePercent: TWITOK_PARTNERSHIP_PLATFORM_FEE_PERCENT
+      })),
+      deliverables: plan.deliverables
+    })),
+    subscriberReachPackages: TWITOK_SUBSCRIBER_REACH_PACKS.map(pack => ({
+      id: pack.id,
+      audience: durationAdjustedAudience(pack.audience, TWITOK_DEFAULT_DURATION_DAYS),
+      baseAudience: pack.audience,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, TWITOK_DEFAULT_DURATION_DAYS)),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), audience: durationAdjustedAudience(pack.audience, option.days), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
+      durationDays: TWITOK_DEFAULT_DURATION_DAYS,
+      recommended: Boolean("recommended" in pack && pack.recommended)
+    })),
+    objectivePackages: TWITOK_OBJECTIVE_BUDGET_PACKS.map(pack => ({
+      id: pack.id,
+      benchmarkPrice: pack.benchmarkUsd,
+      price: discountedPromotionPrice(pack.benchmarkUsd),
+      durationOptions: TWITOK_DURATION_OPTIONS.map(option => ({ days: option.days, price: discountedPromotionPrice(durationAdjustedPrice(pack.benchmarkUsd, option.days)), priceIncreasePercent: option.priceIncreasePercent, cumulativePriceIncreasePercent: durationPriceIncreasePercent(option.days), audienceIncreasePercent: option.audienceIncreasePercent })),
+      durationDays: TWITOK_DEFAULT_DURATION_DAYS,
+      recommended: Boolean("recommended" in pack && pack.recommended),
+      note: "Budget-based promotion. Follower/profile results are estimates, not guaranteed."
+    }))
+  });
+});
 
 promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
   try {
@@ -49,7 +115,17 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     if (!OBJECTIVES.includes(objective as any)) return res.status(400).json({ error: "Invalid promotion objective" });
     const currency = String(req.body?.currency ?? "GHS").toUpperCase();
     if (!CURRENCIES.includes(currency as any)) return res.status(400).json({ error: "Unsupported currency" });
-    const budgetMinor = moneyToMinor(req.body?.budget);
+    const packageId = req.body?.packageId ? String(req.body.packageId) : "";
+    const requestedDurationDays = Number(req.body?.durationDays ?? TWITOK_DEFAULT_DURATION_DAYS);
+    const durationOption = TWITOK_DURATION_OPTIONS.find(option => option.days === requestedDurationDays);
+    if (!durationOption) return res.status(400).json({ error: "Promotion duration must be 7, 14, 30, or 60 days" });
+    const selectedPack = packageId ? getViewPack(packageId) : null;
+    if (packageId && !selectedPack) return res.status(400).json({ error: "Invalid promotion package" });
+    if (selectedPack && currency !== "USD") return res.status(400).json({ error: "TikTok-benchmark promotion packs are priced in USD" });
+    const baseBenchmarkUsd = selectedPack?.benchmarkUsd ?? Number(req.body?.benchmarkBudgetUsd ?? req.body?.budget);
+    const durationBenchmarkUsd = Number.isFinite(baseBenchmarkUsd) ? durationAdjustedPrice(baseBenchmarkUsd, durationOption.days) : Number(req.body?.budget);
+    const discountedBudget = selectedPack ? discountedPromotionPrice(durationBenchmarkUsd) : Number((durationAdjustedPrice(Number(req.body?.budget), durationOption.days) * (1 - TWITOK_PROMOTION_DISCOUNT)).toFixed(2));
+    const budgetMinor = moneyToMinor(discountedBudget);
     if (currency === "GHS" && budgetMinor < 500) return res.status(400).json({ error: "Minimum promotion budget is GHS 5" });
     if (currency === "USD" && budgetMinor < 100) return res.status(400).json({ error: "Minimum promotion budget is USD 1" });
 
@@ -64,6 +140,15 @@ promotionsRouter.post("/", requireUser, createLimit, async (req, res) => {
     const campaign = {
       _id: new ObjectId(), ownerId: req.userId!, videoId: new ObjectId(videoId), objective, currency,
       budgetMinor, spentMinor: 0, status: "DRAFT", target,
+      packageId: selectedPack?.id ?? null,
+      benchmarkBudgetMinor: selectedPack ? Math.round(selectedPack.benchmarkUsd * 100) : null,
+      discountPercent: selectedPack ? TWITOK_PROMOTION_DISCOUNT * 100 : 0,
+      discountLabel: selectedPack ? "8% DISCOUNT APPLIED" : null,
+      targetViews: selectedPack ? durationAdjustedAudience(selectedPack.views, durationOption.days) : null,
+      baseTargetViews: selectedPack?.views ?? null,
+      durationDays: durationOption.days,
+      priceIncreasePercent: durationPriceIncreasePercent(durationOption.days),
+      audienceIncreasePercent: durationOption.audienceIncreasePercent,
       metrics: { impressions: 0, views: 0, follows: 0, clicks: 0 },
       createdAt: new Date(), updatedAt: new Date()
     };
@@ -79,6 +164,57 @@ promotionsRouter.get("/me", requireUser, campaignReadLimit, async (req, res) => 
     const rows = await (await getDb()).collection("promotion_campaigns").find({ ownerId: req.userId! }).sort({ createdAt: -1 }).limit(50).toArray();
     return res.json({ campaigns: rows.map(publicCampaign) });
   } catch { return res.status(500).json({ error: "Unable to load promotions" }); }
+});
+
+promotionsRouter.get("/:campaignId", requireUser, campaignReadLimit, async (req, res) => {
+  try {
+    const campaignId = String(req.params.campaignId);
+    if (!ObjectId.isValid(campaignId)) return res.status(400).json({ error: "Invalid campaign id" });
+    const campaign = await (await getDb()).collection("promotion_campaigns").findOne({ _id: new ObjectId(campaignId), ownerId: req.userId! });
+    if (!campaign) return res.status(404).json({ error: "Promotion campaign not found" });
+    return res.json({ campaign: publicCampaign(campaign) });
+  } catch {
+    return res.status(500).json({ error: "Unable to load promotion" });
+  }
+});
+
+promotionsRouter.get("/:campaignId/analytics", requireUser, campaignReadLimit, async (req, res) => {
+  try {
+    const campaignId = String(req.params.campaignId);
+    if (!ObjectId.isValid(campaignId)) return res.status(400).json({ error: "Invalid campaign id" });
+    const db = await getDb();
+    const campaign = await db.collection("promotion_campaigns").findOne({ _id: new ObjectId(campaignId), ownerId: req.userId! });
+    if (!campaign) return res.status(404).json({ error: "Promotion campaign not found" });
+    const videoId = campaign.videoId as ObjectId;
+    const [events, payment] = await Promise.all([
+      db.collection("feed_events").aggregate([
+        { $match: { videoId, source: "PROMOTED", createdAt: { $gte: campaign.startAt ?? campaign.createdAt } } },
+        { $group: { _id: "$type", count: { $sum: 1 }, watchMs: { $sum: { $ifNull: ["$watchMs", 0] } } } }
+      ]).toArray(),
+      db.collection("promotion_payments").findOne({ campaignId: campaign._id, userId: req.userId! }, { projection: { status: 1, amountMinor: 1, currency: 1, verifiedAt: 1 } })
+    ]);
+    const byType: Record<string, number> = {};
+    let totalWatchMs = 0;
+    for (const row of events) { byType[String(row._id)] = Number(row.count ?? 0); totalWatchMs += Number(row.watchMs ?? 0); }
+    return res.json({
+      campaign: publicCampaign(campaign),
+      payment: payment ? { status: payment.status, amountMinor: payment.amountMinor, currency: payment.currency, verifiedAt: payment.verifiedAt ?? null } : null,
+      analytics: {
+        impressions: byType.IMPRESSION ?? 0,
+        views: byType.VIEW_2S ?? 0,
+        completedViews: byType.VIEW_COMPLETE ?? 0,
+        likes: byType.LIKE ?? 0,
+        comments: byType.COMMENT ?? 0,
+        shares: byType.SHARE ?? 0,
+        saves: byType.SAVE ?? 0,
+        follows: byType.FOLLOW ?? 0,
+        totalWatchMs,
+        targetViews: campaign.targetViews ?? null
+      }
+    });
+  } catch {
+    return res.status(500).json({ error: "Unable to load promotion analytics" });
+  }
 });
 
 promotionsRouter.post("/:campaignId/pay", requireUser, paymentLimit, async (req, res) => {
@@ -185,7 +321,11 @@ promotionsRouter.post("/:campaignId/start", requireUser, campaignActionLimit, as
   try {
     if (!ObjectId.isValid(String(req.params.campaignId))) return res.status(400).json({ error: "Invalid campaign id" });
     const db = await getDb();
-    const result = await db.collection("promotion_campaigns").updateOne({ _id: new ObjectId(String(req.params.campaignId)), ownerId: req.userId!, status: "PAID" }, { $set: { status: "ACTIVE", startAt: new Date(), updatedAt: new Date() } });
+    const campaign = await db.collection("promotion_campaigns").findOne({ _id: new ObjectId(String(req.params.campaignId)), ownerId: req.userId!, status: "PAID" });
+    if (!campaign) return res.status(400).json({ error: "Campaign must have a verified payment before it can start" });
+    const startAt = new Date();
+    const endAt = campaign.durationDays ? new Date(startAt.getTime() + Number(campaign.durationDays) * 24 * 60 * 60 * 1000) : null;
+    const result = await db.collection("promotion_campaigns").updateOne({ _id: campaign._id, ownerId: req.userId!, status: "PAID" }, { $set: { status: "ACTIVE", startAt, endAt, updatedAt: new Date() } });
     if (!result.matchedCount) return res.status(400).json({ error: "Campaign must have a verified payment before it can start" });
     return res.json({ status: "ACTIVE" });
   } catch { return res.status(400).json({ error: "Unable to start promotion" }); }
