@@ -143,8 +143,15 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
 }
 
 export async function authenticateUser(db: Db, identifier: string, password: string) {
-  const normalized = identifier.trim().toLowerCase();
-  const user = await db.collection("users").findOne({ $or: [{ email: normalized }, { username: normalized }, { phone: identifier.trim() }] });
+  const rawIdentifier = identifier.trim();
+  const normalized = rawIdentifier.toLowerCase();
+  const phone = hashPhone(rawIdentifier);
+  const user = await db.collection("users").findOne({
+    $or: [
+      ...(normalized.includes("@") ? [{ email: normalized }] : []),
+      ...(phone ? [{ phoneHash: phone }, { phone: rawIdentifier }] : [])
+    ]
+  });
   if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
   if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid login credentials");
   if (user.phone && (!user.phoneHash || !user.phoneSuffixHash)) {
