@@ -18,7 +18,8 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("user_mutes").createIndex({ muterId: 1, mutedId: 1 }, { unique: true }),
     db.collection("user_mutes").createIndex({ muterId: 1, createdAt: -1 }),
     db.collection("user_reports").createIndex({ reporterId: 1, createdAt: -1 }),
-    db.collection("user_reports").createIndex({ targetType: 1, targetId: 1, createdAt: -1 })
+    db.collection("user_reports").createIndex({ targetType: 1, targetId: 1, createdAt: -1 }),
+    db.collection("user_reports").createIndex({ reporterId: 1, targetType: 1, targetId: 1, status: 1 })
   ]);
 }
 
@@ -90,6 +91,13 @@ export async function openUserReport(db: Db, input: {
   details?: string;
 }) {
   if (!input.reporterId || !input.targetId || !input.reason) throw new Error("reporterId, targetId and reason are required");
+  const existing = await db.collection("user_reports").findOne({
+    reporterId: input.reporterId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    status: "OPEN"
+  }, { projection: { _id: 1, reportId: 1 } });
+  if (existing) return { reportId: existing._id.toHexString(), duplicate: true };
   const record = {
     reporterId: input.reporterId,
     targetType: input.targetType,
