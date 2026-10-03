@@ -41,7 +41,7 @@ async function sendEmailOtp(email: string, code: string) {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new VerificationDeliveryError(`Email provider rejected the verification message: ${body.slice(0, 180)}`);
+    throw new VerificationDeliveryError("Email provider rejected the verification message");
   }
 }
 
@@ -64,7 +64,7 @@ async function sendPhoneOtp(phone: string) {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new VerificationDeliveryError(`SMS provider rejected the verification message: ${body.slice(0, 180)}`);
+    throw new VerificationDeliveryError("SMS provider rejected the verification message");
   }
   const data = await response.json().catch(() => ({}));
   if (String(data?.code ?? "") !== "1000") {
