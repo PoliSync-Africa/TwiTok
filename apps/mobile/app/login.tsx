@@ -54,7 +54,7 @@ export default function LoginScreen() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to log in");
       await saveAuthToken(data.token);
-      router.replace(data.verificationRequired ? { pathname: "/verify-account", params: { channel: data.verificationChannel ?? "email" } } : data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
+      router.replace(data.verificationRequired ? "/verify-account" : data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to log in");
     } finally {
