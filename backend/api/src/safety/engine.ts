@@ -189,6 +189,7 @@ export async function updateModerationCase(db: Db, caseId: string, input: {
   assigneeId?: string | null;
   resolution?: string;
   reviewerId: string;
+  evidenceId?: string;
 }) {
   const { ObjectId } = await import("mongodb");
   if (!ObjectId.isValid(caseId)) throw new Error("Invalid moderation case id");
@@ -200,6 +201,12 @@ export async function updateModerationCase(db: Db, caseId: string, input: {
   if (input.status) update.status = input.status;
   if (input.assigneeId !== undefined) update.assigneeId = input.assigneeId;
   if (input.resolution !== undefined) update.resolution = String(input.resolution).slice(0, 2000);
+  if (input.evidenceId !== undefined) {
+    const evidence = await db.collection("moderation_evidence").findOne({ _id: new ObjectId(input.evidenceId), caseId });
+    if (!evidence) throw new Error("Evidence snapshot not found for moderation case");
+    update.evidenceId = input.evidenceId;
+    update.evidenceFingerprint = evidence.fingerprint;
+  }
   update.lastReviewedBy = input.reviewerId;
   const result = await db.collection("moderation_cases").updateOne(
     { _id: new ObjectId(caseId), status: currentStatus, updatedAt: existing.updatedAt },
