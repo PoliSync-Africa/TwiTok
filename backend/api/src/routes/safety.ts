@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
-import { evaluateText, openHumanReview } from "../safety/engine.js";
+import { evaluateText, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { rateLimit } from "../security/rate-limit.js";
@@ -52,5 +52,47 @@ safetyRouter.delete("/blocks/:userId", safetyReviewLimit, requireUser, async (re
     return res.json(await unblockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to unblock user" });
+  }
+});
+
+
+safetyRouter.get("/mutes", safetyReviewLimit, requireUser, async (req, res) => {
+  try {
+    return res.json({ mutes: await listMutedUsers(await getDb(), req.userId!.toHexString()) });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to list muted users" });
+  }
+});
+
+safetyRouter.post("/mutes/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+  try {
+    return res.status(201).json(await muteUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to mute user" });
+  }
+});
+
+safetyRouter.delete("/mutes/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+  try {
+    return res.json(await unmuteUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to unmute user" });
+  }
+});
+
+safetyRouter.post("/reports", safetyReviewLimit, requireUser, async (req, res) => {
+  try {
+    const targetType = String(req.body?.targetType ?? "").toUpperCase();
+    if (!["USER", "VIDEO", "COMMENT", "LIVE"].includes(targetType)) return res.status(400).json({ error: "Invalid report target type" });
+    const report = await openUserReport(await getDb(), {
+      reporterId: req.userId!.toHexString(),
+      targetType: targetType as "USER" | "VIDEO" | "COMMENT" | "LIVE",
+      targetId: String(req.body?.targetId ?? ""),
+      reason: String(req.body?.reason ?? ""),
+      details: String(req.body?.details ?? "")
+    });
+    return res.status(201).json({ report });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to submit report" });
   }
 });
