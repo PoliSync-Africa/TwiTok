@@ -29,6 +29,7 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
     const user = await db.collection("users").findOne({ _id: userId }, { projection: { status: 1, sessionVersion: 1 } });
     if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
     if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
+    if (user.emailVerified !== true || user.phoneVerified !== true) return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
     req.userId = userId;
     req.userToken = claims;
     next();
@@ -37,6 +38,31 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
   }
 }
 
+
+
+export async function requireContactVerificationUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const header = req.headers.authorization;
+    const token = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
+    if (!token) return res.status(401).json({ error: "Authorization required" });
+    const claims = verifyUserToken(token);
+    const userId = new ObjectId(claims.sub);
+    const db = await getDb();
+    const user = await db.collection("users").findOne(
+      { _id: userId },
+      { projection: { status: 1, sessionVersion: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, profileSetupComplete: 1 } }
+    );
+    if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
+    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
+    if (!user.email || !user.phone) return res.status(403).json({ error: "Both email address and phone number are required", code: "CONTACTS_REQUIRED" });
+    if (user.emailVerified === true && user.phoneVerified === true) return res.status(409).json({ error: "Account contacts are already verified" });
+    req.userId = userId;
+    req.userToken = claims;
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid or expired session" });
+  }
+}
 
 export async function requireAdultUser(req: Request, res: Response, next: NextFunction) {
   try {
