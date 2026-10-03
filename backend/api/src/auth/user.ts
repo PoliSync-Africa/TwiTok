@@ -106,9 +106,6 @@ export async function createUser(
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
 
-  const countryCode = String(input.countryCode ?? "").trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
-
   const now = new Date();
   const user = {
     sessionVersion: 0,
