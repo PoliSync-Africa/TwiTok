@@ -12,7 +12,8 @@
   "dependencies": {
     "next": "16.3.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "@fontsource-variable/tiktok-sans": "^5.2.4"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
