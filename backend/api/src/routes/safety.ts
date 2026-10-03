@@ -4,6 +4,7 @@ import { cacheDelete } from "../cache/redis.js";
 import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
+import { requireOwner } from "../auth/admin-middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 import { blockUser, listBlocks, unblockUser } from "../social/blocks.js";
 
@@ -29,7 +30,7 @@ safetyRouter.post("/review", requireUser, safetyReviewLimit, async (req, res) =>
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Review case creation failed" }); }
 });
 
-safetyRouter.get("/moderation/cases", requireUser, safetyReviewLimit, async (req, res) => {
+safetyRouter.get("/moderation/cases", requireOwner, safetyReviewLimit, async (req, res) => {
   try {
     const status = req.query.status ? String(req.query.status).toUpperCase() : undefined;
     if (status && !["OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED"].includes(status)) {
@@ -42,7 +43,7 @@ safetyRouter.get("/moderation/cases", requireUser, safetyReviewLimit, async (req
   }
 });
 
-safetyRouter.patch("/moderation/cases/:caseId", requireUser, safetyReviewLimit, async (req, res) => {
+safetyRouter.patch("/moderation/cases/:caseId", requireOwner, safetyReviewLimit, async (req, res) => {
   try {
     const status = req.body?.status ? String(req.body.status).toUpperCase() : undefined;
     if (status && !["OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED"].includes(status)) {
@@ -91,7 +92,7 @@ safetyRouter.get("/moderation/appeals", requireUser, safetyReviewLimit, async (r
   }
 });
 
-safetyRouter.patch("/moderation/appeals/:appealId", requireUser, safetyReviewLimit, async (req, res) => {
+safetyRouter.patch("/moderation/appeals/:appealId", requireOwner, safetyReviewLimit, async (req, res) => {
   try {
     const status = String(req.body?.status ?? "").toUpperCase();
     if (!["OPEN", "IN_REVIEW", "UPHELD", "OVERTURNED", "CLOSED"].includes(status)) {
@@ -99,7 +100,7 @@ safetyRouter.patch("/moderation/appeals/:appealId", requireUser, safetyReviewLim
     }
     const appeal = await updateAppeal(await getDb(), String(req.params.appealId), {
       status: status as any,
-      reviewerId: req.userId!.toHexString(),
+      reviewerId: req.ownerId!,
       resolution: req.body?.resolution
     });
     return res.json({ appeal });
