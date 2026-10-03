@@ -31,7 +31,7 @@ const demoVideos: FeedVideo[] = [
 const tabs = [
   { label: "You", surface: "FOR_YOU" },
   { label: "Following", surface: "FOLLOWING" },
-  { label: "Discover", surface: "DISCOVER" }
+  { label: "Explore", surface: "EXPLORE" }
 ] as const;
 
 export default function Home() {
@@ -296,7 +296,7 @@ export default function Home() {
       <div className="logo">T<span>▶</span>iTok</div>
       <nav>
         <Link href="/">⌂ <span>Home</span></Link>
-        <Link href="/discover">⌕ <span>Discover</span></Link>
+        <Link href="/discover">⌕ <span>Explore</span></Link>
         <Link href="/live">◉ <span>LIVE</span></Link>
         <Link href="/creator/studio">▣ <span>Creator Studio</span></Link>
         <Link href="/inbox">✉ <span>Inbox</span></Link>
