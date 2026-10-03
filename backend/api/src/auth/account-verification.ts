@@ -98,8 +98,9 @@ export async function sendAccountVerification(db: Db, userId: string, channel: V
       verificationOtpExpiresAt: new Date(now + CODE_TTL_MS),
       [sentAtField]: new Date(now),
       verificationOtpAttempts: 0,
-      updatedAt: new Date(),
-      ...(channel === "phone" ? { verificationOtpHash: undefined } : {})
+      updatedAt: new Date()
+    },
+    ...(channel === "phone" ? { $unset: { verificationOtpHash: "" } } : {})
     }
   });
   return { channel, maskedDestination: channel === "email" ? destination.replace(/^(.{2}).*(@.*)$/, "$1***$2") : destination.replace(/\d(?=\d{4})/g, "*") };
@@ -107,7 +108,7 @@ export async function sendAccountVerification(db: Db, userId: string, channel: V
 
 export async function verifyAccountCode(db: Db, userId: string, code: string) {
   const users = db.collection("users");
-  const user = await users.findOne({ _id: new (await import("mongodb")).ObjectId(userId) });
+  const user = await users.findOne({ _id: new ObjectId(userId) });
   if (!user) throw new Error("Account not found");
   const attempts = Number(user.verificationOtpAttempts ?? 0);
   if (attempts >= MAX_ATTEMPTS) throw new Error("Too many incorrect verification attempts. Request a new code.");
@@ -126,7 +127,7 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
     const response = await fetch("https://sms.arkesel.com/api/otp/verify", {
       method: "POST",
       headers: { accept: "application/json", "api-key": apiKey, "content-type": "application/json" },
-      body: JSON.stringify({ code: code.trim(), number: phone.replace(/^\\+/, "") })
+      body: JSON.stringify({ code: code.trim(), number: phone.replace(/^\+/, "") })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || String(data?.code ?? "") !== "1100") {
