@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Image, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
+import { Typography, Colors } from "../theme/typography";
 
 type Video = {
   id: string;
@@ -40,6 +41,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   });
 
   useEffect(() => {
+    if (!active) return;
     let alive = true;
     (async () => {
       try {
@@ -51,7 +53,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
       } catch {}
     })();
     return () => { alive = false; };
-  }, [item.id]);
+  }, [item.id, active]);
 
   function handleLongPress() {
     if (!source) return;
@@ -116,10 +118,12 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
 
   useEffect(() => {
     if (!source) return;
+    let twoSecondTimer: ReturnType<typeof setTimeout> | null = null;
     if (active) {
       startedAt.current = Date.now();
       player.play();
       onEvent("VIEW_START");
+      twoSecondTimer = setTimeout(() => onEvent("VIEW_2S"), 2000);
     } else {
       if (startedAt.current) {
         onEvent("VIEW_COMPLETE", Date.now() - startedAt.current);
@@ -127,6 +131,9 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
       }
       player.pause();
     }
+    return () => {
+      if (twoSecondTimer) clearTimeout(twoSecondTimer);
+    };
   }, [active, player, source]);
 
   if (item.mediaType === "PHOTO") {
@@ -182,6 +189,12 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const sessionId = useRef(`mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80, minimumViewTime: 120 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    const firstVisible = viewableItems.find(item => item.index !== null);
+    if (firstVisible?.index !== null && firstVisible?.index !== undefined) setActiveIndex(firstVisible.index);
+  }).current;
 
   useEffect(() => {
     let active = true;
@@ -216,7 +229,7 @@ export default function FeedScreen() {
       await fetch(API + "/feed/events", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ videoId, type, watchMs, sessionId: `mobile-${Date.now()}`, source: surface })
+        body: JSON.stringify({ videoId, type, watchMs, sessionId, source: surface })
       });
     } catch {}
   };
@@ -253,6 +266,13 @@ export default function FeedScreen() {
       onMomentumScrollEnd={event => setActiveIndex(Math.round(event.nativeEvent.contentOffset.y / height))}
       onEndReached={loadMore}
       onEndReachedThreshold={0.7}
+      initialNumToRender={2}
+      maxToRenderPerBatch={2}
+      windowSize={3}
+      updateCellsBatchingPeriod={50}
+      removeClippedSubviews={Platform.OS === "android"}
+      viewabilityConfig={viewabilityConfig}
+      onViewableItemsChanged={onViewableItemsChanged}
       ListFooterComponent={loadingMore ? <View style={styles.feedFooter}><ActivityIndicator color="#fff" /><Text style={styles.muted}>Loading more…</Text></View> : null}
       renderItem={({ item, index }) => <VideoCard item={item} active={index === activeIndex} surface={surface} onSurface={setSurface} onEvent={(type, watchMs) => recordEvent(item.id, type, watchMs)} onNotInterested={async () => { await recordEvent(item.id, "NOT_INTERESTED"); setVideos(v => v.filter(x => x.id !== item.id)); }} />}
       getItemLayout={(_, index) => ({ length: height, offset: height * index, index })}
@@ -262,7 +282,7 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  video: { height, width, backgroundColor: "#050505", justifyContent: "flex-end" },
+  video: { height, width, backgroundColor: Colors.background, justifyContent: "flex-end" },
   photoStrip:{position:"absolute",top:70,left:12,right:12,flexDirection:"row",gap:6},photoThumb:{width:48,height:64,borderRadius:6},textPost:{height,width,backgroundColor:"#171717",justifyContent:"center",alignItems:"center",padding:40},textBody:{color:"#fff",fontSize:28,lineHeight:36,textAlign:"center",fontWeight:"700"} ,
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.18)" },
   doubleTapZone: { position: "absolute", left: 0, right: 82, top: 45, bottom: 125, alignItems: "center", justifyContent: "center", zIndex: 5 },
@@ -286,10 +306,10 @@ const styles = StyleSheet.create({
   bottomTabs: { position: "absolute", bottom: 20, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 30 },
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
-  tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  tabActive: { color: Colors.text, ...Typography.tab },
   promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
   promotedText:{color:"#fff",fontSize:12,fontWeight:"800"},
-  tab: { color: "#aaa", fontSize: 13 },
+  tab: { color: Colors.textSecondary, ...Typography.tab },
   feedFooter:{height:80,backgroundColor:"#000",alignItems:"center",justifyContent:"center",gap:6},
   center: { flex: 1, minHeight: height, backgroundColor: "#000", alignItems: "center", justifyContent: "center", padding: 24, gap: 10 },
   muted: { color: "#aaa", textAlign: "center" },
