@@ -164,7 +164,7 @@ export async function recordModerationAction(db: Db, input: {
     if (input.action === "CONTENT_BLOCK") {
       await db.collection("videos").updateOne(
         { _id: target._id, status: target.status, visibility: target.visibility },
-        { $set: { status: "BLOCKED", visibility: "PRIVATE", moderationBlockedAt: new Date(), moderationBlockedBy: input.actorId } }
+        { $set: { status: "BLOCKED", visibility: "PRIVATE", moderationPreviousStatus: target.status, moderationPreviousVisibility: target.visibility, moderationBlockedAt: new Date(), moderationBlockedBy: input.actorId } }
       );
     } else {
       if (target.status !== "BLOCKED") throw new Error("Content is not currently blocked");
