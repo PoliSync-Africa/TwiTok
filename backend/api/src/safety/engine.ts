@@ -178,21 +178,14 @@ export async function recordModerationAction(db: Db, input: {
         const expiresAt = existing.processingExpiresAt instanceof Date
           ? existing.processingExpiresAt
           : new Date(0);
-        if (expiresAt > new Date()) {
-          throw new Error("A moderation action with this idempotency key is already being processed");
+        if (expiresAt <= new Date()) {
+          await db.collection("moderation_actions").updateOne(
+            { _id: existing._id, status: "PROCESSING", processingExpiresAt: existing.processingExpiresAt },
+            { $set: { status: "FAILED", failedAt: new Date(), failureReason: "Processing lease expired; manual reconciliation required" } }
+          );
+          throw new Error("Previous moderation action attempt expired; manual reconciliation is required");
         }
-        const recovered = await db.collection("moderation_actions").updateOne(
-          { _id: existing._id, status: "PROCESSING", processingExpiresAt: existing.processingExpiresAt },
-          { $set: {
-            status: "PROCESSING",
-            processingStartedAt: new Date(),
-            processingExpiresAt: new Date(Date.now() + 15 * 60 * 1000)
-          } }
-        );
-        if (recovered.matchedCount !== 1) {
-          throw new Error("A moderation action with this idempotency key is already being processed");
-        }
-        reservedActionId = existing._id.toHexString();
+        throw new Error("A moderation action with this idempotency key is already being processed");
       } else {
         throw new Error("A moderation action with this idempotency key cannot be retried automatically");
       }
