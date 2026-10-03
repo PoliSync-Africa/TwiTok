@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, Image, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import { Typography, Colors } from "../theme/typography";
 import { getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -52,6 +53,6 @@ const styles = StyleSheet.create({
   logo: { width: 190, height: 190, marginBottom: 24 },
   progressTrack: { width: 210, height: 4, borderRadius: 999, overflow: "hidden", backgroundColor: "#1f1f1f", borderWidth: 1, borderColor: "#7a5a00" },
   progressFill: { height: "100%", borderRadius: 999, backgroundColor: "#ffd21f" },
-  loading: { color: "#fff", fontSize: 14, fontWeight: "500", marginTop: 12 },
-  tagline: { position: "absolute", bottom: 56, color: "#fff", fontSize: 15, letterSpacing: 3, fontWeight: "500" }
+  loading: { color: Colors.text, ...Typography.captionMedium, marginTop: 12 },
+  tagline: { position: "absolute", bottom: 56, color: Colors.text, ...Typography.captionMedium, letterSpacing: 3 }
 });

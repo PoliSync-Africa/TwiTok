@@ -1,6 +1,7 @@
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
+import { Typography, Colors } from "../theme/typography";
 import { clearAuthToken, getAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -36,4 +37,4 @@ export default function SettingsScreen(){
     <Pressable style={styles.danger} onPress={()=>Alert.alert("Sign out","Sign out of TwiTok on this device?",[{text:"Cancel",style:"cancel"},{text:"Sign out",style:"destructive",onPress:logout}])}><Text style={styles.dangerText}>Sign out</Text></Pressable>
   </ScrollView>;
 }
-const styles=StyleSheet.create({container:{flex:1,backgroundColor:"#000"},content:{padding:24,paddingTop:70,paddingBottom:40},title:{color:"#fff",fontSize:30,fontWeight:"800",marginBottom:30},section:{color:"#fff",fontSize:20,fontWeight:"800",marginBottom:12},row:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:15,borderBottomWidth:1,borderBottomColor:"#222"},copy:{flex:1,paddingRight:16},label:{color:"#fff",fontSize:16,fontWeight:"700",marginBottom:4},hint:{color:"#888",fontSize:12,lineHeight:17},input:{marginTop:10,backgroundColor:"#171717",borderRadius:12,color:"#fff",padding:14},save:{marginTop:16,backgroundColor:"#fff",padding:15,borderRadius:12,alignItems:"center"},saveText:{color:"#000",fontWeight:"800"},danger:{marginTop:40,backgroundColor:"#241116",borderWidth:1,borderColor:"#5b2630",padding:16,borderRadius:12,alignItems:"center"},dangerText:{color:"#ff7188",fontWeight:"800",fontSize:16}});
+const styles=StyleSheet.create({container:{flex:1,backgroundColor:"#000"},content:{padding:24,paddingTop:70,paddingBottom:40},title:{color:Colors.text,...Typography.display,marginBottom:30},section:{color:Colors.text,...Typography.section,marginBottom:12},row:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:15,borderBottomWidth:1,borderBottomColor:"#222"},copy:{flex:1,paddingRight:16},label:{color:Colors.text,...Typography.bodySemibold,marginBottom:4},hint:{color:Colors.textMuted,...Typography.caption},input:{marginTop:10,backgroundColor:"#171717",borderRadius:12,color:"#fff",padding:14},save:{marginTop:16,backgroundColor:"#fff",padding:15,borderRadius:12,alignItems:"center"},saveText:{color:"#000",...Typography.button},danger:{marginTop:40,backgroundColor:"#241116",borderWidth:1,borderColor:"#5b2630",padding:16,borderRadius:12,alignItems:"center"},dangerText:{color:Colors.danger,...Typography.button}});
