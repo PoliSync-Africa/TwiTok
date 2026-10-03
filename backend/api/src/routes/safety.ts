@@ -27,14 +27,14 @@ safetyRouter.post("/review", requireUser, safetyReviewLimit, async (req, res) =>
     }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "Review case creation failed" }); }
 });
-safetyRouter.get("/blocks", requireUser, async (req, res) => {
+safetyRouter.get("/blocks", safetyReviewLimit, requireUser, async (req, res) => {
   const blocks = await (await getDb()).collection("user_blocks")
     .find({ blockerId: req.userId!.toHexString() }, { projection: { _id: 0, blockedId: 1, createdAt: 1 } })
     .sort({ createdAt: -1 }).limit(500).toArray();
   return res.json({ blocks });
 });
 
-safetyRouter.post("/blocks/:userId", requireUser, safetyReviewLimit, async (req, res) => {
+safetyRouter.post("/blocks/:userId", safetyReviewLimit, requireUser, async (req, res) => {
   try {
     return res.status(201).json(await blockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
   } catch (error) {
@@ -42,7 +42,7 @@ safetyRouter.post("/blocks/:userId", requireUser, safetyReviewLimit, async (req,
   }
 });
 
-safetyRouter.delete("/blocks/:userId", requireUser, safetyReviewLimit, async (req, res) => {
+safetyRouter.delete("/blocks/:userId", safetyReviewLimit, requireUser, async (req, res) => {
   try {
     return res.json(await unblockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
   } catch (error) {
