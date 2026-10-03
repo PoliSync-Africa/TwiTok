@@ -6,16 +6,17 @@ import { usePathname, useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 const WEB_TOKEN_KEY = "twitok_web_session";
+const ADMIN_PATH = "/admin";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [state, setState] = useState<"checking" | "authenticated">(
-    pathname.startsWith("/auth") ? "authenticated" : "checking"
+    pathname.startsWith("/auth") || pathname.startsWith(ADMIN_PATH) ? "authenticated" : "checking"
   );
 
   useEffect(() => {
-    if (pathname.startsWith("/auth")) {
+    if (pathname.startsWith("/auth") || pathname.startsWith(ADMIN_PATH)) {
       setState("authenticated");
       return;
     }
@@ -41,7 +42,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [pathname, router]);
 
-  if (pathname.startsWith("/auth")) return <>{children}</>;
+  if (pathname.startsWith("/auth") || pathname.startsWith(ADMIN_PATH)) return <>{children}</>;
   if (state !== "authenticated") {
     return <main style={{minHeight:"100dvh",display:"grid",placeItems:"center",background:"#050507",color:"#fff",fontFamily:"system-ui,-apple-system,sans-serif"}}>
       <div style={{textAlign:"center"}}><div style={{fontSize:38,fontWeight:900}}>TwiTok</div><div style={{marginTop:10,color:"#92929b"}}>Checking your account…</div></div>
