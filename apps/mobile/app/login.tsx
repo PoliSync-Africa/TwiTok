@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -114,6 +115,12 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.credentialHeader}>
+              <Image
+                source={require("../assets/twitok-logo.jpg")}
+                style={styles.loginLogo}
+                resizeMode="cover"
+                accessibilityLabel="TwiTok"
+              />
               <Text style={styles.title}>Log in to TwiTok</Text>
               <Text style={styles.subtitle}>
                 Use your phone number or email address.
@@ -246,6 +253,12 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.methodsHeader}>
+          <Image
+            source={require("../assets/twitok-logo.jpg")}
+            style={styles.loginLogo}
+            resizeMode="cover"
+            accessibilityLabel="TwiTok"
+          />
           <Text style={styles.title}>Log in to TwiTok</Text>
           <Text style={styles.subtitle}>Welcome back.</Text>
         </View>
@@ -387,6 +400,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 35,
     paddingBottom: 30
+  },
+  loginLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    marginBottom: 10
   },
   title: {
     color: "#111",
