@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { cacheDelete } from "../cache/redis.js";
-import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase } from "../safety/engine.js";
+import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase, rollbackModerationAction } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { requireOwner } from "../auth/admin-middleware.js";
@@ -106,6 +106,19 @@ safetyRouter.patch("/moderation/appeals/:appealId", requireOwner, safetyReviewLi
     return res.json({ appeal });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update appeal" });
+  }
+});
+
+
+safetyRouter.post("/moderation/actions/:actionId/rollback", requireOwner, safetyReviewLimit, async (req, res) => {
+  try {
+    const action = await rollbackModerationAction(await getDb(), {
+      actionId: String(req.params.actionId),
+      actorId: req.ownerId!
+    });
+    return res.json({ action });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to rollback moderation action" });
   }
 });
 
