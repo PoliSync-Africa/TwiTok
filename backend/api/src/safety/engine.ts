@@ -189,7 +189,7 @@ export async function recordModerationAction(db: Db, input: {
       { projection: { status: 1, visibility: 1 } }
     );
     if (!target) throw new Error("Target content not found");
-    previousState = { status: target.status, visibility: target.visibility };
+    previousState = { status: target.status, visibility: target.visibility, restoreStatus: target.moderationPreviousStatus, restoreVisibility: target.moderationPreviousVisibility };
     if (input.action === "CONTENT_BLOCK") {
       await db.collection("videos").updateOne(
         { _id: target._id, status: target.status, visibility: target.visibility },
