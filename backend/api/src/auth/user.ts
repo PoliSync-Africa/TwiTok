@@ -55,11 +55,24 @@ export function hashPhoneSuffix(value: string) {
 
 export async function ensureUserIndexes(db: Db) {
   const users = db.collection("users");
-  const existingUsernameIndexes = await users.listIndexes().toArray();
-  const usernameIndex = existingUsernameIndexes.find(index => index.name === "username_1");
-  if (usernameIndex && (usernameIndex.unique !== true || usernameIndex.sparse !== true)) {
-    await users.dropIndex("username_1");
+  const indexes = await users.listIndexes().toArray();
+
+  // Older deployments created these as non-sparse unique indexes. A null/undefined
+  // contact value would then collide with the next signup. Remove the bad index
+  // before recreating the intended sparse unique index.
+  for (const field of ["email", "phone", "username"]) {
+    const name = `${field}_1`;
+    const index = indexes.find(item => item.name === name);
+    if (index && (index.unique !== true || index.sparse !== true)) {
+      await users.dropIndex(name);
+    }
   }
+
+  // Do not store null/undefined optional contact fields. Sparse indexes only omit
+  // documents when the field is absent, not when it is explicitly null.
+  await users.updateMany({ email: null }, { $unset: { email: "" } });
+  await users.updateMany({ phone: null }, { $unset: { phone: "" } });
+
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true, sparse: true }),
     users.createIndex({ phone: 1 }, { unique: true, sparse: true }),
@@ -68,6 +81,26 @@ export async function ensureUserIndexes(db: Db) {
     users.createIndex({ username: 1 }, { unique: true, sparse: true }),
     users.createIndex({ createdAt: -1 })
   ]);
+}
+
+const AFRICAN_CALLING_CODES: Record<string, string> = {
+  DZ: "213", AO: "244", BJ: "229", BW: "267", BF: "226", BI: "257", CV: "238", CM: "237",
+  CF: "236", TD: "235", KM: "269", CD: "243", CG: "242", CI: "225", DJ: "253", EG: "20",
+  GQ: "240", ER: "291", SZ: "268", ET: "251", GA: "241", GM: "220", GH: "233", GN: "224",
+  GW: "245", KE: "254", LS: "266", LR: "231", LY: "218", MG: "261", MW: "265", ML: "223",
+  MR: "222", MU: "230", MA: "212", MZ: "258", NA: "264", NE: "227", NG: "234", RW: "250",
+  ST: "239", SN: "221", SC: "248", SL: "232", SO: "252", ZA: "27", SS: "211", SD: "249",
+  TZ: "255", TG: "228", TN: "216", UG: "256", ZM: "260", ZW: "263"
+};
+
+function normalizePhoneForCountry(value: string, countryCode: string) {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return "";
+  const callingCode = AFRICAN_CALLING_CODES[countryCode];
+  if (!callingCode) return digits;
+  if (digits.startsWith(callingCode)) return digits;
+  if (digits.startsWith("0")) return callingCode + digits.slice(1);
+  return callingCode + digits;
 }
 
 
@@ -132,13 +165,17 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
   if (normalizedEmail) {
     if (!isValidEmailAddress(normalizedEmail)) throw new Error("Invalid email address");
   }
-  const normalizedPhone = input.phone?.trim();
-  if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
+  const normalizedPhone = input.phone ? normalizePhoneForCountry(input.phone, countryCode) : "";
+  if (normalizedPhone && normalizedPhone.length < 7) throw new Error("Invalid phone number");
   const now = new Date();
   const user = {
-    sessionVersion: 0, firstName, ...(username ? { username, nickname: username } : {}), email: normalizedEmail, phone: normalizedPhone,
-    phoneHash: normalizedPhone ? hashPhone(normalizedPhone) : null,
-    phoneSuffixHash: normalizedPhone ? hashPhoneSuffix(normalizedPhone) : null,
+    sessionVersion: 0, firstName, ...(username ? { username, nickname: username } : {}),
+    ...(normalizedEmail ? { email: normalizedEmail } : {}),
+    ...(normalizedPhone ? {
+      phone: normalizedPhone,
+      phoneHash: hashPhone(normalizedPhone),
+      phoneSuffixHash: hashPhoneSuffix(normalizedPhone)
+    } : {}),
     dateOfBirth: dob, countryCode, accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false,
     profileSetupComplete: Boolean(username), status: "ACTIVE", emailVerified: false, phoneVerified: false,
     contactSyncEnabled: false, createdAt: now, updatedAt: now
