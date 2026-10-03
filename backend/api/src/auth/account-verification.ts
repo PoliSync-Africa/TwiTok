@@ -134,10 +134,12 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
       throw new Error("Invalid verification code");
     }
   }
+  const nextEmailVerified = channel === "email" ? true : user.emailVerified === true;
+  const nextPhoneVerified = channel === "phone" ? true : user.phoneVerified === true;
   await users.updateOne({ _id: user._id }, {
     $set: {
       ...(channel === "email" ? { emailVerified: true } : { phoneVerified: true }),
-      verificationStatus: "VERIFIED",
+      verificationStatus: nextEmailVerified && nextPhoneVerified ? "VERIFIED" : "PARTIALLY_VERIFIED",
       updatedAt: new Date()
     },
     $unset: { verificationOtpHash: "", verificationOtpChannel: "", verificationOtpExpiresAt: "", verificationOtpSentAtEmail: "", verificationOtpSentAtPhone: "", verificationOtpAttempts: "" }
