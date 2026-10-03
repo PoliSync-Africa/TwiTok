@@ -29,9 +29,9 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
 
 authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: authRateLimit }), async (req, res) => {
   try {
-    const { identifier, password } = req.body ?? {};
+    const { identifier, password, countryCode } = req.body ?? {};
     if (!identifier || !password) return res.status(400).json({ error: "identifier and password are required" });
-    const user = await authenticateUser(await getDb(), identifier, password);
+    const user = await authenticateUser(await getDb(), identifier, password, countryCode);
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
     res.json({ token, user });

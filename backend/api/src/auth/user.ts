@@ -2,6 +2,7 @@ import type { Collection, Db, Document } from "mongodb";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { normalizeInternationalPhone } from "./phone.js";
 
 const USER_SECRET = () => {
   const secret = process.env.TWITOK_USER_SESSION_SECRET;
@@ -62,7 +63,7 @@ export async function ensureUserIndexes(db: Db) {
   ]);
 }
 
-function normalizePhone(value: unknown) {
+function normalizePhone(value: unknown, countryCode?: string) {
   const phone = String(value ?? "").trim();
   if (!phone) return undefined;
   // Preserve international '+' numbers while removing harmless formatting spaces,
@@ -97,14 +98,13 @@ export async function createUser(
   const email = input.email?.trim().toLowerCase() || undefined;
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address");
 
-  const phone = normalizePhone(input.phone);
+  const countryCode = String(input.countryCode ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
+  const phone = normalizeInternationalPhone(input.phone, countryCode);
   if (!email && !phone) throw new Error("Email or phone is required");
 
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
-
-  const countryCode = String(input.countryCode ?? "").trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
 
   const now = new Date();
   const user = {
@@ -139,7 +139,7 @@ export async function createUser(
   };
 }
 
-export async function authenticateUser(db: Db, identifier: string, password: string) {
+export async function authenticateUser(db: Db, identifier: string, password: string, countryCode?: string) {
   const rawIdentifier = identifier.trim();
   const normalized = rawIdentifier.toLowerCase();
   const phone = rawIdentifier.replace(/[\s().-]/g, "");
