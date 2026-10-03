@@ -14,7 +14,7 @@ export type UserToken = { sub: string; role: "USER"; username?: string; sv?: num
 
 export function issueUserToken(user: { _id: string; username: string; sessionVersion?: number }) {
   return jwt.sign(
-    { sub: user._id, role: "USER", username: user.username, sv: Number(user.sessionVersion ?? 0), purpose: "AUTH" },
+    { sub: user._id, role: "USER", ...(user.username ? { username: user.username } : {}), sv: Number(user.sessionVersion ?? 0), purpose: "AUTH" },
     USER_SECRET(),
     { expiresIn: "24h", issuer: "twitok" }
   );
