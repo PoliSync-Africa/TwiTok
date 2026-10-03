@@ -207,7 +207,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.liveButton} onPress={() => router.push("/live")} accessibilityLabel="LIVE">
           <Text style={styles.liveIcon}>▣</Text>
         </Pressable>
-        <Pressable onPress={() => onSurface("DISCOVER")}><Text style={surface==="DISCOVER"?styles.topTabActive:styles.topTab}>Community</Text></Pressable>
+        <Pressable onPress={() => onSurface("DISCOVER")}><Text style={surface==="DISCOVER"?styles.topTabActive:styles.topTab}>Discover</Text></Pressable>
         <Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.topTabActive:styles.topTab}>Following</Text></Pressable>
         <Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.topTabActive:styles.topTab}>For You</Text></Pressable>
         <Pressable style={styles.searchButton} onPress={() => router.push("/search")} accessibilityLabel="Search">
