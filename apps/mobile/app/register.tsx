@@ -16,6 +16,7 @@ export default function RegisterScreen() {
 
   async function register(){
     if((!email.trim()&&!phone.trim())||!password||!dateOfBirth||!countryCode.trim()){setError("Enter an email address or phone number, plus all required fields.");return;}
+    if(password.length<8){setError("Password must contain at least 8 characters.");return;}
     setBusy(true);setError("");
     try{
       const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:countryCode.trim().toUpperCase()})});
@@ -32,7 +33,7 @@ export default function RegisterScreen() {
     <Text style={styles.subtitle}>Sign up with your email or phone number.</Text>
     <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email address (or use phone)" placeholderTextColor="#777" autoCapitalize="none" keyboardType="email-address"/>
     <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number (or use email)" placeholderTextColor="#777" keyboardType="phone-pad"/>
-    <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry/>
+    <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password (8+ characters)" placeholderTextColor="#777" secureTextEntry/>
     <TextInput style={styles.input} value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="Date of birth (YYYY-MM-DD)" placeholderTextColor="#777"/>
     <TextInput style={styles.input} value={countryCode} onChangeText={setCountryCode} placeholder="Country code" placeholderTextColor="#777" autoCapitalize="characters" maxLength={2}/>
     {error?<Text style={styles.error}>{error}</Text>:null}
