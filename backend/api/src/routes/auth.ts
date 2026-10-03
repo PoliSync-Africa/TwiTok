@@ -75,7 +75,7 @@ authRouter.post("/verification/send", requireContactVerificationUser, rateLimit(
 authRouter.post("/verification/verify", requireContactVerificationUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   try {
     const code = String(req.body?.code ?? "").trim();
-    if (!/^\\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
     const db = await getDb();
     const result = await verifyAccountCode(db, req.userId!.toHexString(), code);
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
