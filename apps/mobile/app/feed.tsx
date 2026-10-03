@@ -26,7 +26,7 @@ type Engagement = { likeCount:number; commentCount:number; shareCount:number; sa
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 const { height, width } = Dimensions.get("window");
 
-function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"DISCOVER"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"DISCOVER") => void; onNotInterested: () => void }) {
+function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"EXPLORE"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"EXPLORE") => void; onNotInterested: () => void }) {
   const [engagement, setEngagement] = useState<Engagement | null>(null);
   const [busy, setBusy] = useState(false);
   const [heartBurst, setHeartBurst] = useState(false);
@@ -150,7 +150,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   );
 }
 
-function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"DISCOVER"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"DISCOVER") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"EXPLORE"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"EXPLORE") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
   const [shopOpen, setShopOpen] = useState(false);
   const [shopBusy, setShopBusy] = useState<string | null>(null);
 
@@ -207,7 +207,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.liveButton} onPress={() => router.push("/live")} accessibilityLabel="LIVE">
           <Text style={styles.liveIcon}>▣</Text>
         </Pressable>
-        <Pressable onPress={() => onSurface("DISCOVER")}><Text style={surface==="DISCOVER"?styles.topTabActive:styles.topTab}>Discover</Text></Pressable>
+        <Pressable onPress={() => onSurface("EXPLORE")}><Text style={surface==="EXPLORE"?styles.topTabActive:styles.topTab}>Explore</Text></Pressable>
         <Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.topTabActive:styles.topTab}>Following</Text></Pressable>
         <Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.topTabActive:styles.topTab}>For You</Text></Pressable>
         <Pressable style={styles.searchButton} onPress={() => router.push("/search")} accessibilityLabel="Search">
@@ -228,7 +228,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
 export default function FeedScreen() {
   const { videoId: requestedVideoId } = useLocalSearchParams<{ videoId?: string }>();
   const [videos, setVideos] = useState<Video[]>([]);
-  const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"DISCOVER">("FOR_YOU");
+  const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"EXPLORE">("FOR_YOU");
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
