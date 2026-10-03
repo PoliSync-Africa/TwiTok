@@ -45,6 +45,11 @@ export default function ProfileSetupScreen() {
     setBusy(true);setError("");
     try{
       const token=await getAuthToken();
+      if (!token) throw new Error("Your session has expired. Please sign in again.");
+      const availability=await fetch(API+"/auth/username-availability?username="+encodeURIComponent(normalized),{headers:{Authorization:"Bearer "+token}});
+      const availabilityData=await availability.json().catch(()=>({}));
+      if(!availability.ok) throw new Error(availabilityData.error??"Unable to check username availability");
+      if(availabilityData.available!==true) throw new Error("That username is already taken. Choose another username.");
       const r=await fetch(API+"/auth/profile-setup",{method:"PATCH",headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({username:normalized,nickname:displayName,bio:bio.trim(),isPrivate})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error??"Unable to complete profile");
