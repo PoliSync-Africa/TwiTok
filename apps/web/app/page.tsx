@@ -41,7 +41,12 @@ export default function Home() {
   const [feedLoading, setFeedLoading] = useState(false);
   const [muted, setMuted] = useState(true);
   const api = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) { return fetch(input, { ...init, credentials: "include" }); }
+  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+    const token = typeof window !== "undefined" ? localStorage.getItem("twitok_web_session") : null;
+    const headers = new Headers(init.headers);
+    if (token) headers.set("Authorization", "Bearer " + token);
+    return fetch(input, { ...init, credentials: "include", headers });
+  }
   const activeRef = useRef<string | null>(null);
   const [soundMap, setSoundMap] = useState<Record<string, { _id: string; title: string; artist: string }>>({});
   const [captionLanguage, setCaptionLanguage] = useState<Record<string, string>>({});
