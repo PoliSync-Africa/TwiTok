@@ -100,7 +100,7 @@ export async function createUser(
 
   const countryCode = String(input.countryCode ?? "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
-  const phone = normalizePhone(input.phone, countryCode);
+  const phone = normalizeInternationalPhone(input.phone, countryCode);
   if (!email && !phone) throw new Error("Email or phone is required");
 
   const dob = new Date(input.dateOfBirth);
