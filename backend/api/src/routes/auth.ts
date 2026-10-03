@@ -27,7 +27,7 @@ const otpVerifyLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req =
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
   try {
     const { firstName, username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
-    if (!firstName || !password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "firstName, password, dateOfBirth and countryCode are required" });
+    if (!firstName || !username || !password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "firstName, username, password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { firstName, username, password, email, phone, dateOfBirth, countryCode });
     const token = issueVerificationToken(user);
     const channel: OtpChannel = email ? "email" : "phone";
