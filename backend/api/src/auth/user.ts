@@ -13,11 +13,7 @@ const USER_SECRET = () => {
 export type UserToken = { sub: string; role: "USER"; username: string; sv?: number };
 
 export function issueUserToken(user: { _id: string; username?: string | null; sessionVersion?: number }) {
-  return jwt.sign(
-    { sub: user._id, role: "USER", username: user.username ?? "", sv: Number(user.sessionVersion ?? 0) },
-    USER_SECRET(),
-    { expiresIn: "24h", issuer: "twitok" }
-  );
+  return jwt.sign({ sub: user._id, role: "USER", username: user.username ?? "", sv: Number(user.sessionVersion ?? 0) }, USER_SECRET(), { expiresIn: "24h", issuer: "twitok" });
 }
 
 export function verifyUserToken(token: string): UserToken {
@@ -27,9 +23,8 @@ export function verifyUserToken(token: string): UserToken {
 }
 
 async function dropLegacyUniqueIndex(collection: Collection<Document>, name: string) {
-  try {
-    await collection.dropIndex(name);
-  } catch (error) {
+  try { await collection.dropIndex(name); }
+  catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (!/index not found|does not exist|not found/i.test(message)) throw error;
   }
@@ -37,62 +32,19 @@ async function dropLegacyUniqueIndex(collection: Collection<Document>, name: str
 
 export async function ensureUserIndexes(db: Db) {
   const users = db.collection("users");
-
-  // Older unique indexes indexed explicit null values. That caused E11000
-  // duplicate-key failures when multiple accounts omitted email or phone.
+  await Promise.all([dropLegacyUniqueIndex(users, "email_1"), dropLegacyUniqueIndex(users, "phone_1"), dropLegacyUniqueIndex(users, "username_1")]);
   await Promise.all([
-    dropLegacyUniqueIndex(users, "email_1"),
-    dropLegacyUniqueIndex(users, "phone_1"),
-    dropLegacyUniqueIndex(users, "username_1")
-  ]);
-
-  await Promise.all([
-    users.createIndex(
-      { email: 1 },
-      { name: "users_email_unique", unique: true, partialFilterExpression: { email: { $type: "string" } } }
-    ),
-    users.createIndex(
-      { phone: 1 },
-      { name: "users_phone_unique", unique: true, partialFilterExpression: { phone: { $type: "string" } } }
-    ),
-    users.createIndex(
-      { username: 1 },
-      { name: "users_username_unique", unique: true, partialFilterExpression: { username: { $type: "string" } } }
-    ),
+    users.createIndex({ email: 1 }, { name: "users_email_unique", unique: true, partialFilterExpression: { email: { $type: "string" } } }),
+    users.createIndex({ phone: 1 }, { name: "users_phone_unique", unique: true, partialFilterExpression: { phone: { $type: "string" } } }),
+    users.createIndex({ username: 1 }, { name: "users_username_unique", unique: true, partialFilterExpression: { username: { $type: "string" } } }),
     users.createIndex({ createdAt: -1 }, { name: "users_createdAt_desc" })
   ]);
 }
 
-function normalizePhone(value: unknown, countryCode?: string) {
-  const phone = String(value ?? "").trim();
-  if (!phone) return undefined;
-  // Preserve international '+' numbers while removing harmless formatting spaces,
-  // brackets and hyphens. This keeps Ghanaian and international numbers usable.
-  const normalized = phone.replace(/[\s().-]/g, "");
-  if (!/^\+?[0-9]{7,15}$/.test(normalized)) throw new Error("Enter a valid phone number");
-  return normalized;
-}
-
-export async function createUser(
-  db: Db,
-  input: {
-    username?: string;
-    password: string;
-    email?: string;
-    phone?: string;
-    dateOfBirth: string;
-    countryCode: string;
-  }
-) {
+export async function createUser(db: Db, input: { username?: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
   const usernameInput = input.username?.trim().toLowerCase();
   const username = usernameInput || undefined;
-
-  // Username is completed immediately after sign-up in profile setup.
-  // We intentionally do not create a hidden/generated username.
-  if (username && (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith("."))) {
-    throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
-  }
-
+  if (username && (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith("."))) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
   if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
 
   const email = input.email?.trim().toLowerCase() || undefined;
@@ -126,30 +78,18 @@ export async function createUser(
     updatedAt: now
   };
 
-  const result = await db.collection("users").insertOne({
-    ...user,
-    passwordHash: await bcrypt.hash(input.password, 12)
-  });
-
-  return {
-    ...user,
-    _id: result.insertedId.toHexString(),
-    username: username ?? null,
-    profileSetupComplete: false
-  };
+  const result = await db.collection("users").insertOne({ ...user, passwordHash: await bcrypt.hash(input.password, 12) });
+  return { ...user, _id: result.insertedId.toHexString(), username: username ?? null, profileSetupComplete: false };
 }
 
 export async function authenticateUser(db: Db, identifier: string, password: string, countryCode?: string) {
   const rawIdentifier = identifier.trim();
   const normalized = rawIdentifier.toLowerCase();
-  const phone = rawIdentifier.replace(/[\s().-]/g, "");
+  const looksLikePhone = /^[+0-9][0-9\s().-]{6,20}$/.test(rawIdentifier);
+  const phone = looksLikePhone ? normalizeInternationalPhone(rawIdentifier, countryCode) : undefined;
 
   const user = await db.collection("users").findOne({
-    $or: [
-      { email: normalized },
-      { username: normalized },
-      { phone }
-    ]
+    $or: [{ email: normalized }, { username: normalized }, ...(phone ? [{ phone }] : [])]
   });
 
   if (!user || user.status !== "ACTIVE") throw new Error("Invalid login credentials");
