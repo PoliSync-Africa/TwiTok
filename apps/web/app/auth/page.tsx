@@ -42,6 +42,8 @@ export default function AuthPage() {
   const [nickname,setNickname]=useState("");
   const [bio,setBio]=useState("");
   const [isPrivate,setIsPrivate]=useState(false);
+  const [emailVerified,setEmailVerified]=useState(false);
+  const [phoneVerified,setPhoneVerified]=useState(false);
 
   useEffect(()=>{
     fetch(API+"/auth/me",{
@@ -67,7 +69,7 @@ export default function AuthPage() {
         const r=await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({identifier:identifier.trim(),password})});
         const d=await r.json().catch(()=>({}));
         if(!r.ok)throw new Error(d.error??"Unable to sign in.");
-        if(d.verificationRequired){setToken(d.token??""); if(d.token) localStorage.setItem(WEB_VERIFICATION_KEY,d.token);setChannel(d.channel==="phone"?"phone":"email");setStep("verify");setMessage("Enter the verification code sent to your account.");return;}
+        if(d.verificationRequired){setToken(d.token??""); if(d.token) localStorage.setItem(WEB_VERIFICATION_KEY,d.token);setEmailVerified(d.user?.emailVerified===true);setPhoneVerified(d.user?.phoneVerified===true);setChannel("email");setStep("verify");setMessage("Choose your registered email or phone number to receive an OTP.");return;}
         if(d.token) localStorage.setItem(WEB_TOKEN_KEY,d.token); if(d.profileSetupRequired||d.user?.profileSetupComplete===false){setToken(d.token??"");setStep("profile");setMessage("Finish your profile before entering TwiTok.");return;}
         router.replace("/"); router.refresh(); return;
       }
@@ -75,13 +77,26 @@ export default function AuthPage() {
       if(!dateOfBirth)throw new Error("Enter your date of birth.");
       if(password.length<8)throw new Error("Password must contain at least 8 characters.");
       if(password!==confirmPassword)throw new Error("Passwords do not match.");
-      if(channel==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))throw new Error("Enter a valid email address.");
-      if(channel==="phone"&&phone.replace(/\D/g,"").length<7)throw new Error("Enter a valid phone number.");
-      const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({firstName:firstName.trim(),email:channel==="email"?email.trim().toLowerCase():undefined,phone:channel==="phone"?phone.trim():undefined,password,dateOfBirth,countryCode})});
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))throw new Error("Enter a valid email address.");
+      if(phone.replace(/\D/g,"").length<7)throw new Error("Enter a valid phone number.");
+      const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({firstName:firstName.trim(),email:email.trim().toLowerCase(),phone:phone.trim(),password,dateOfBirth,countryCode})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(d.error??"Unable to create account.");
-      setToken(d.token??""); if(d.token) localStorage.setItem(WEB_VERIFICATION_KEY,d.token); setChannel(d.channel==="phone"?"phone":channel); setStep("verify"); setMessage("Account created. Enter the verification code.");
+      setToken(d.token??""); if(d.token) localStorage.setItem(WEB_VERIFICATION_KEY,d.token); setEmailVerified(false); setPhoneVerified(false); setChannel("email"); setStep("verify"); setMessage("Account created. Choose where you want to receive your OTP.");
     }catch(err){setError(err instanceof Error?err.message:"Something went wrong.");}
+    finally{setBusy(false);}
+  }
+
+  async function sendVerification(nextChannel:"email"|"phone"){
+    setBusy(true);setError("");setMessage("");
+    try{
+      const verificationToken=token||localStorage.getItem(WEB_VERIFICATION_KEY)||"";
+      if(!verificationToken)throw new Error("Verification session expired. Please start again.");
+      const r=await fetch(API+"/auth/verification/send",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+verificationToken},credentials:"include",body:JSON.stringify({channel:nextChannel})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(d.error??"Verification delivery is temporarily unavailable.");
+      setChannel(nextChannel);setCode("");setMessage(`OTP sent to your registered ${nextChannel==="email"?"email address":"phone number"}.`);
+    }catch(err){setError(err instanceof Error?err.message:"Verification delivery is temporarily unavailable.");}
     finally{setBusy(false);}
   }
 
@@ -89,10 +104,19 @@ export default function AuthPage() {
     e.preventDefault();setBusy(true);setError("");
     try{
       if(!/^\d{6}$/.test(code))throw new Error("Enter the 6-digit verification code.");
-      const verificationToken=token||localStorage.getItem(WEB_VERIFICATION_KEY)||""; if(!verificationToken)throw new Error("Verification session expired. Please start again."); const r=await fetch(API+"/auth/verification/verify",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+verificationToken},credentials:"include",body:JSON.stringify({channel,code})});
+      const verificationToken=token||localStorage.getItem(WEB_VERIFICATION_KEY)||"";
+      if(!verificationToken)throw new Error("Verification session expired. Please start again.");
+      const r=await fetch(API+"/auth/verification/verify",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+verificationToken},credentials:"include",body:JSON.stringify({channel,code})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(d.error??"Verification failed.");
-      if(d.token) localStorage.setItem(WEB_TOKEN_KEY,d.token); localStorage.removeItem(WEB_VERIFICATION_KEY); setToken(d.token??verificationToken); if(d.user?.profileSetupComplete===false){setStep("profile");setMessage("Verification complete. Choose your unique username.");}
+      setEmailVerified(d.user?.emailVerified===true);setPhoneVerified(d.user?.phoneVerified===true);
+      if(d.verificationRequired){
+        setCode("");setMessage(channel==="email"?"Email verified. Now verify your phone number.":"Phone verified. Now verify your email address.");
+        return;
+      }
+      if(d.token) localStorage.setItem(WEB_TOKEN_KEY,d.token);
+      localStorage.removeItem(WEB_VERIFICATION_KEY);setToken(d.token??verificationToken);
+      if(d.user?.profileSetupComplete===false){setStep("profile");setMessage("Verification complete. Choose your unique username.");}
       else{router.replace("/");router.refresh();}
     }catch(err){setError(err instanceof Error?err.message:"Verification failed.");}
     finally{setBusy(false);}
@@ -128,8 +152,8 @@ export default function AuthPage() {
             <button className="auth-primary" disabled={busy}>{busy?"Signing in…":"Log in"}</button>
           </>:<>
             <label>First name<input value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" placeholder="First name"/></label>
-            <div className="auth-choice-row"><button type="button" className={channel==="email"?"selected":""} onClick={()=>setChannel("email")}>✉ Email</button><button type="button" className={channel==="phone"?"selected":""} onClick={()=>setChannel("phone")}>☎ Phone</button></div>
-            {channel==="email"?<label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com"/></label>:<label>Phone number<input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} autoComplete="tel" placeholder="+233…"/></label>}
+            <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" required/></label>
+            <label>Phone number<input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} autoComplete="tel" placeholder="+233…" required/></label>
             <label>Country<select value={countryCode} onChange={e=>setCountryCode(e.target.value)}>{countries.map(([c,n])=><option key={c} value={c}>{n} ({c})</option>)}</select></label>
             <label>Date of birth<input type="date" value={dateOfBirth} onChange={e=>setDateOfBirth(e.target.value)}/></label>
             <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password" placeholder="At least 8 characters"/></label>
@@ -139,7 +163,17 @@ export default function AuthPage() {
         </form>
       </>}
 
-      {step==="verify"&&<form onSubmit={verify} className="auth-form"><div className="auth-code-icon">✓</div><label>6-digit verification code<input inputMode="numeric" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000"/></label><button className="auth-primary" disabled={busy}>{busy?"Verifying…":"Verify account"}</button><button type="button" className="auth-link" onClick={()=>{setStep("credentials");setError("");}}>Use another account</button></form>}
+      {step==="verify"&&<form onSubmit={verify} className="auth-form">
+        <div className="auth-code-icon">✓</div>
+        <p className="auth-help">Both your registered email and phone number must be verified. Choose where to receive your next OTP.</p>
+        <div className="auth-choice-row">
+          <button type="button" className={channel==="email"?"selected":""} disabled={busy||emailVerified} onClick={()=>sendVerification("email")}>✉ Email {emailVerified?"✓":"Send OTP"}</button>
+          <button type="button" className={channel==="phone"?"selected":""} disabled={busy||phoneVerified} onClick={()=>sendVerification("phone")}>☎ Phone {phoneVerified?"✓":"Send OTP"}</button>
+        </div>
+        {channel&&((channel==="email"&&!emailVerified)||(channel==="phone"&&!phoneVerified))?<label>6-digit verification code<input inputMode="numeric" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000"/></label>:null}
+        {channel&&((channel==="email"&&!emailVerified)||(channel==="phone"&&!phoneVerified))?<button className="auth-primary" disabled={busy||code.length!==6}>{busy?"Verifying…":`Verify ${channel}`}</button>:null}
+        <button type="button" className="auth-link" onClick={()=>{setStep("credentials");setError("");}}>Use another account</button>
+      </form>}
 
       {step==="profile"&&<form onSubmit={completeProfile} className="auth-form"><label>Unique username<input value={username} onChange={e=>setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g,"").slice(0,24))} placeholder="yourusername"/></label><small className="auth-help">3–24 characters. Username is required.</small><label>Nickname<input value={nickname} onChange={e=>setNickname(e.target.value.slice(0,50))} placeholder="Display name"/></label><label>Bio<textarea value={bio} onChange={e=>setBio(e.target.value.slice(0,80))} placeholder="Tell people about you"/></label><label className="auth-check"><input type="checkbox" checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/> Private account</label><button className="auth-primary" disabled={busy}>{busy?"Saving…":"Enter TwiTok"}</button></form>}
 
