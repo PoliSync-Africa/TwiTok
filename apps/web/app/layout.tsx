@@ -1,3 +1,4 @@
+import "@fontsource-variable/tiktok-sans/wght.css";
 import "./globals.css";
 import type { Metadata } from "next";
 import AuthGate from "./auth-gate";
