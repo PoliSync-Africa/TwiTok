@@ -167,9 +167,44 @@ export async function recordModerationAction(db: Db, input: {
   const caseRecord = await db.collection("moderation_cases").findOne({ _id: new ObjectId(input.caseId) });
   if (!caseRecord) throw new Error("Moderation case not found");
 
+  let reservedActionId: string | undefined;
   if (input.idempotencyKey) {
     const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
-    if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
+    if (existing) {
+      if (existing.status === "APPLIED" || existing.status === "ROLLED_BACK") {
+        return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
+      }
+      throw new Error("A moderation action with this idempotency key is already being processed");
+    }
+    const reservation = {
+      caseId: input.caseId,
+      actorId: input.actorId,
+      source: input.source,
+      action: input.action,
+      targetUserId: input.targetUserId,
+      targetContentId: input.targetContentId,
+      reason: String(input.reason).slice(0, 2000),
+      evidenceId: input.evidenceId,
+      idempotencyKey: input.idempotencyKey,
+      status: "PROCESSING",
+      reversible: true,
+      createdAt: new Date()
+    };
+    try {
+      const reserved = await db.collection("moderation_actions").insertOne(reservation);
+      reservedActionId = reserved.insertedId.toHexString();
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
+        const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
+        if (existing) {
+          if (existing.status === "APPLIED" || existing.status === "ROLLED_BACK") {
+            return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
+          }
+          throw new Error("A moderation action with this idempotency key is already being processed");
+        }
+      }
+      throw error;
+    }
   }
 
   let previousState: Record<string, unknown>;
@@ -224,7 +259,12 @@ export async function recordModerationAction(db: Db, input: {
   };
 
   try {
-    const result = await db.collection("moderation_actions").insertOne(record);
+    const result = reservedActionId
+      ? await db.collection("moderation_actions").updateOne(
+          { _id: new ObjectId(reservedActionId), status: "PROCESSING" },
+          { $set: record }
+        ).then(() => ({ insertedId: new ObjectId(reservedActionId) }))
+      : await db.collection("moderation_actions").insertOne(record);
     await db.collection("moderation_action_events").insertOne({
       actionId: result.insertedId.toHexString(),
       actorId: input.actorId,
@@ -234,9 +274,11 @@ export async function recordModerationAction(db: Db, input: {
     });
     return { ...record, actionId: result.insertedId.toHexString() };
   } catch (error) {
-    if (input.idempotencyKey && error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
-      const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
-      if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
+    if (reservedActionId) {
+      await db.collection("moderation_actions").updateOne(
+        { _id: new ObjectId(reservedActionId), status: "PROCESSING" },
+        { $set: { status: "FAILED", failedAt: new Date(), failureReason: error instanceof Error ? error.message : "Moderation action failed" } }
+      );
     }
     throw error;
   }
