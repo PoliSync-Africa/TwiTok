@@ -1,5 +1,5 @@
 import { createHash, randomInt } from "node:crypto";
-import type { Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
@@ -67,14 +67,14 @@ async function sendPhoneOtp(phone: string) {
     throw new VerificationDeliveryError(`SMS provider rejected the verification message: ${body.slice(0, 180)}`);
   }
   const data = await response.json().catch(() => ({}));
-  if (String(data?.code ?? "") && String(data.code) !== "1000") {
+  if (String(data?.code ?? "") !== "1000") {
     throw new VerificationDeliveryError("SMS provider could not start verification delivery");
   }
 }
 
 export async function sendAccountVerification(db: Db, userId: string, channel: VerificationChannel) {
   const users = db.collection("users");
-  const user = await users.findOne({ _id: new (await import("mongodb")).ObjectId(userId) });
+  const user = await users.findOne({ _id: new ObjectId(userId) });
   if (!user) throw new Error("Account not found");
 
   const now = Date.now();
@@ -91,7 +91,7 @@ export async function sendAccountVerification(db: Db, userId: string, channel: V
 
   await users.updateOne({ _id: user._id }, {
     $set: {
-      verificationOtpHash: hashCode(code),
+      ...(channel === "email" ? { verificationOtpHash: hashCode(code) } : {}),
       verificationOtpChannel: channel,
       verificationOtpExpiresAt: new Date(now + CODE_TTL_MS),
       verificationOtpSentAt: new Date(now),
@@ -108,14 +108,29 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
   if (!user) throw new Error("Account not found");
   const attempts = Number(user.verificationOtpAttempts ?? 0);
   if (attempts >= MAX_ATTEMPTS) throw new Error("Too many incorrect verification attempts. Request a new code.");
-  if (!user.verificationOtpHash || !user.verificationOtpExpiresAt || new Date(user.verificationOtpExpiresAt).getTime() <= Date.now()) {
+  if (!user.verificationOtpChannel || !user.verificationOtpExpiresAt || new Date(user.verificationOtpExpiresAt).getTime() <= Date.now()) {
     throw new Error("Verification code has expired. Request a new code.");
   }
-  if (hashCode(code.trim()) !== user.verificationOtpHash) {
+  const channel = user.verificationOtpChannel as VerificationChannel;
+  if (channel === "email" && hashCode(code.trim()) !== user.verificationOtpHash) {
     await users.updateOne({ _id: user._id }, { $inc: { verificationOtpAttempts: 1 }, $set: { updatedAt: new Date() } });
     throw new Error("Invalid verification code");
   }
-  const channel = user.verificationOtpChannel as VerificationChannel;
+  if (channel === "phone") {
+    const apiKey = process.env.ARKESEL_API_KEY?.trim();
+    const phone = String(user.phone ?? "").trim();
+    if (!apiKey || !phone) throw new VerificationDeliveryError("Phone verification is not configured");
+    const response = await fetch("https://sms.arkesel.com/api/otp/verify", {
+      method: "POST",
+      headers: { accept: "application/json", "api-key": apiKey, "content-type": "application/json" },
+      body: JSON.stringify({ code: code.trim(), number: phone.replace(/^\\+/, "") })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || String(data?.code ?? "") !== "1100") {
+      await users.updateOne({ _id: user._id }, { $inc: { verificationOtpAttempts: 1 }, $set: { updatedAt: new Date() } });
+      throw new Error("Invalid verification code");
+    }
+  }
   await users.updateOne({ _id: user._id }, {
     $set: {
       ...(channel === "email" ? { emailVerified: true } : { phoneVerified: true }),
