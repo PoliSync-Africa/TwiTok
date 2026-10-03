@@ -117,7 +117,11 @@ export async function updateAppeal(db: Db, appealId: string, input: {
     lastReviewedBy: input.reviewerId,
     updatedAt: new Date()
   };
-  await db.collection("appeals").updateOne(filter, { $set: update });
+  const result = await db.collection("appeals").updateOne(
+    { ...filter, status: currentStatus, updatedAt: existing.updatedAt },
+    { $set: update }
+  );
+  if (result.matchedCount !== 1) throw new Error("Appeal changed concurrently; refresh and retry");
   await db.collection("appeal_events").insertOne({
     appealId,
     reviewerId: input.reviewerId,
@@ -175,7 +179,11 @@ export async function updateModerationCase(db: Db, caseId: string, input: {
   if (input.assigneeId !== undefined) update.assigneeId = input.assigneeId;
   if (input.resolution !== undefined) update.resolution = String(input.resolution).slice(0, 2000);
   update.lastReviewedBy = input.reviewerId;
-  await db.collection("moderation_cases").updateOne({ _id: new ObjectId(caseId) }, { $set: update });
+  const result = await db.collection("moderation_cases").updateOne(
+    { _id: new ObjectId(caseId), status: currentStatus, updatedAt: existing.updatedAt },
+    { $set: update }
+  );
+  if (result.matchedCount !== 1) throw new Error("Moderation case changed concurrently; refresh and retry");
   await db.collection("moderation_case_events").insertOne({
     caseId,
     reviewerId: input.reviewerId,
