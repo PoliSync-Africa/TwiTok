@@ -22,6 +22,7 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_evidence").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("moderation_actions").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("moderation_actions").createIndex({ targetUserId: 1, status: 1, createdAt: -1 }),
+    db.collection("moderation_action_events").createIndex({ actionId: 1, createdAt: -1 }),
     db.collection("appeals").createIndex({ caseId: 1, userId: 1 }, { unique: true }),
     db.collection("appeals").createIndex({ status: 1, createdAt: -1 }),
     db.collection("appeal_events").createIndex({ appealId: 1, createdAt: -1 }),
@@ -67,6 +68,31 @@ export async function openHumanReview(db: Db, input: { userId:string; contentId:
 export type AppealStatus = "OPEN" | "IN_REVIEW" | "UPHELD" | "OVERTURNED" | "CLOSED";
 
 export type ModerationAction = "CONTENT_BLOCK" | "CONTENT_RESTORE" | "ACCOUNT_RESTRICT" | "ACCOUNT_RESTORE";
+
+export async function rollbackModerationAction(db: Db, input: {
+  actionId: string;
+  actorId: string;
+}) {
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(input.actionId)) throw new Error("Invalid moderation action id");
+  const filter = { _id: new ObjectId(input.actionId) };
+  const action = await db.collection("moderation_actions").findOne(filter);
+  if (!action) throw new Error("Moderation action not found");
+  if (action.reversible !== true) throw new Error("Moderation action is not reversible");
+  if (action.status !== "APPLIED") throw new Error("Moderation action is not currently applied");
+  const result = await db.collection("moderation_actions").updateOne(
+    { ...filter, status: "APPLIED" },
+    { $set: { status: "ROLLED_BACK", rolledBackBy: input.actorId, rolledBackAt: new Date() } }
+  );
+  if (result.matchedCount !== 1) throw new Error("Moderation action changed concurrently; refresh and retry");
+  await db.collection("moderation_action_events").insertOne({
+    actionId: input.actionId,
+    actorId: input.actorId,
+    event: "ROLLBACK",
+    createdAt: new Date()
+  });
+  return db.collection("moderation_actions").findOne(filter);
+}
 
 export async function recordModerationAction(db: Db, input: {
   caseId: string;
