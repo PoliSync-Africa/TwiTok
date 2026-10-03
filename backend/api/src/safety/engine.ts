@@ -123,16 +123,58 @@ export async function recordModerationAction(db: Db, input: {
   const accountAction = input.action.startsWith("ACCOUNT_");
   if (contentAction && !input.targetContentId) throw new Error("Content moderation actions require targetContentId");
   if (accountAction && !input.targetUserId) throw new Error("Account moderation actions require targetUserId");
+
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(input.caseId)) throw new Error("Invalid moderation case id");
+  if (input.targetUserId && !ObjectId.isValid(input.targetUserId)) throw new Error("Invalid target user id");
+  if (input.targetContentId && !ObjectId.isValid(input.targetContentId)) throw new Error("Invalid target content id");
+
   if (input.evidenceId) {
-    const { ObjectId } = await import("mongodb");
     if (!ObjectId.isValid(input.evidenceId)) throw new Error("Invalid evidence id");
     const evidence = await db.collection("moderation_evidence").findOne({ _id: new ObjectId(input.evidenceId), caseId: input.caseId });
     if (!evidence) throw new Error("Evidence snapshot not found for moderation case");
   }
+
+  const caseRecord = await db.collection("moderation_cases").findOne({ _id: new ObjectId(input.caseId) });
+  if (!caseRecord) throw new Error("Moderation case not found");
+
   if (input.idempotencyKey) {
     const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
     if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
   }
+
+  let previousState: Record<string, unknown>;
+  if (accountAction) {
+    const target = await db.collection("users").findOne({ _id: new ObjectId(input.targetUserId!) }, { projection: { status: 1 } });
+    if (!target) throw new Error("Target user not found");
+    previousState = { status: String(target.status ?? "ACTIVE") };
+    if (input.action === "ACCOUNT_RESTRICT") {
+      await db.collection("users").updateOne({ _id: target._id, status: previousState.status }, { $set: { status: "SUSPENDED", updatedAt: new Date() } });
+    } else {
+      if (previousState.status !== "SUSPENDED") throw new Error("Account is not currently restricted");
+      await db.collection("users").updateOne({ _id: target._id, status: "SUSPENDED" }, { $set: { status: "ACTIVE", updatedAt: new Date() } });
+    }
+  } else {
+    const target = await db.collection("videos").findOne(
+      { _id: new ObjectId(input.targetContentId!) },
+      { projection: { status: 1, visibility: 1 } }
+    );
+    if (!target) throw new Error("Target content not found");
+    previousState = { status: target.status, visibility: target.visibility };
+    if (input.action === "CONTENT_BLOCK") {
+      await db.collection("videos").updateOne(
+        { _id: target._id, status: target.status, visibility: target.visibility },
+        { $set: { status: "BLOCKED", visibility: "PRIVATE", moderationBlockedAt: new Date(), moderationBlockedBy: input.actorId } }
+      );
+    } else {
+      if (target.status !== "BLOCKED") throw new Error("Content is not currently blocked");
+      await db.collection("videos").updateOne(
+        { _id: target._id, status: "BLOCKED" },
+        { $set: { status: String(target.moderationPreviousStatus ?? "PUBLISHED"), visibility: String(target.moderationPreviousVisibility ?? "PUBLIC") }, $unset: { moderationBlockedAt: "", moderationBlockedBy: "", moderationPreviousStatus: "", moderationPreviousVisibility: "" } }
+      );
+    }
+  }
+
   const record = {
     caseId: input.caseId,
     actorId: input.actorId,
@@ -143,12 +185,21 @@ export async function recordModerationAction(db: Db, input: {
     reason: String(input.reason).slice(0, 2000),
     evidenceId: input.evidenceId,
     idempotencyKey: input.idempotencyKey,
+    previousState,
     status: "APPLIED",
     reversible: true,
     createdAt: new Date()
   };
+
   try {
     const result = await db.collection("moderation_actions").insertOne(record);
+    await db.collection("moderation_action_events").insertOne({
+      actionId: result.insertedId.toHexString(),
+      actorId: input.actorId,
+      event: "APPLY",
+      action: input.action,
+      createdAt: new Date()
+    });
     return { ...record, actionId: result.insertedId.toHexString() };
   } catch (error) {
     if (input.idempotencyKey && error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
