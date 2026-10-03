@@ -20,6 +20,8 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_cases").createIndex({ assigneeId: 1, status: 1, updatedAt: -1 }),
     db.collection("moderation_case_events").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("moderation_evidence").createIndex({ caseId: 1, createdAt: -1 }),
+    db.collection("moderation_actions").createIndex({ caseId: 1, createdAt: -1 }),
+    db.collection("moderation_actions").createIndex({ targetUserId: 1, status: 1, createdAt: -1 }),
     db.collection("appeals").createIndex({ caseId: 1, userId: 1 }, { unique: true }),
     db.collection("appeals").createIndex({ status: 1, createdAt: -1 }),
     db.collection("appeal_events").createIndex({ appealId: 1, createdAt: -1 }),
@@ -63,6 +65,35 @@ export async function openHumanReview(db: Db, input: { userId:string; contentId:
 }
 
 export type AppealStatus = "OPEN" | "IN_REVIEW" | "UPHELD" | "OVERTURNED" | "CLOSED";
+
+export type ModerationAction = "CONTENT_BLOCK" | "CONTENT_RESTORE" | "ACCOUNT_RESTRICT" | "ACCOUNT_RESTORE";
+
+export async function recordModerationAction(db: Db, input: {
+  caseId: string;
+  actorId: string;
+  source: "AUTOMATED" | "OWNER";
+  action: ModerationAction;
+  targetUserId?: string;
+  targetContentId?: string;
+  reason: string;
+  evidenceId?: string;
+}) {
+  const record = {
+    caseId: input.caseId,
+    actorId: input.actorId,
+    source: input.source,
+    action: input.action,
+    targetUserId: input.targetUserId,
+    targetContentId: input.targetContentId,
+    reason: String(input.reason).slice(0, 2000),
+    evidenceId: input.evidenceId,
+    status: "APPLIED",
+    reversible: true,
+    createdAt: new Date()
+  };
+  const result = await db.collection("moderation_actions").insertOne(record);
+  return { ...record, actionId: result.insertedId.toHexString() };
+}
 
 export async function captureModerationEvidence(db: Db, input: {
   caseId: string;
