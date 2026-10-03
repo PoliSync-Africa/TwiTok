@@ -54,7 +54,7 @@ export async function ensureUserIndexes(db: Db) {
     db.collection("users").createIndex({ phone: 1 }, { unique: true, sparse: true }),
     db.collection("users").createIndex({ phoneHash: 1 }, { sparse: true }),
     db.collection("users").createIndex({ phoneSuffixHash: 1 }, { sparse: true }),
-    db.collection("users").createIndex({ username: 1 }, { unique: true }),
+    db.collection("users").createIndex({ username: 1 }, { unique: true, sparse: true }),
     db.collection("users").createIndex({ createdAt: -1 })
   ]);
 }
@@ -101,7 +101,7 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
   if (!firstName || firstName.length > 50) throw new Error("First name is required and must be 1-50 characters");
   const username = input.username?.trim().toLowerCase();
   if (username && (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith("."))) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
-  if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
+  if (input.password.length < 12) throw new Error("Password must contain at least 12 characters");
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
   const countryCode = input.countryCode.trim().toUpperCase();
