@@ -178,7 +178,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
-      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable style={styles.createButton} onPress={() => router.push("/create")}><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
+      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><Text style={surface==="FOR_YOU"?styles.bottomIconActive:styles.bottomIcon}>⌂</Text><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => router.push("/discover")} style={styles.bottomTab}><Text style={styles.bottomIcon}>⌕</Text><Text style={styles.bottomLabel}>Discover</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/create")} accessibilityLabel="Create"><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => router.push("/messages")} style={styles.bottomTab}><Text style={styles.bottomIcon}>▢</Text><Text style={styles.bottomLabel}>Inbox</Text></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><Text style={styles.bottomIcon}>♙</Text><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
     </>
   );
 }
@@ -306,8 +306,13 @@ const styles = StyleSheet.create({
   soundDisc: { color: "#fff", fontSize: 18, fontWeight: "800", marginRight: 7 },
   soundText: { color: "#fff", fontSize: 13, fontWeight: "700", flexShrink: 1 },
   unavailable: { color: "#aaa", textAlign: "center", marginBottom: height * 0.45 },
-  bottomTabs: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 30, height: 42, alignItems: "center" },
-  createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  bottomTabs: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", height: 54, alignItems: "center", paddingHorizontal: 18 },
+  bottomTab: { alignItems: "center", justifyContent: "center", minWidth: 54, gap: 2 },
+  bottomIcon: { color: Colors.textSecondary, fontSize: 21, lineHeight: 22 },
+  bottomIconActive: { color: Colors.text, fontSize: 21, lineHeight: 22 },
+  bottomLabel: { color: Colors.textSecondary, ...Typography.captionMedium },
+  bottomLabelActive: { color: Colors.text, ...Typography.captionMedium },
+  createButton: { width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: Colors.text, ...Typography.tab },
   promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
