@@ -14,6 +14,7 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_events").createIndex({ contentId: 1, createdAt: -1 }),
     db.collection("moderation_events").createIndex({ decision: 1, createdAt: -1 }),
     db.collection("moderation_cases").createIndex({ status: 1, priority: -1, createdAt: -1 }),
+    db.collection("moderation_cases").createIndex({ reportId: 1 }, { unique: true, sparse: true }),
     db.collection("appeals").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("user_mutes").createIndex({ muterId: 1, mutedId: 1 }, { unique: true }),
     db.collection("user_mutes").createIndex({ muterId: 1, createdAt: -1 }),
@@ -109,5 +110,19 @@ export async function openUserReport(db: Db, input: {
     updatedAt: new Date()
   };
   const result = await db.collection("user_reports").insertOne(record);
-  return { ...record, reportId: result.insertedId.toHexString() };
+  const reportId = result.insertedId.toHexString();
+  await db.collection("moderation_cases").insertOne({
+    reportId,
+    source: "USER_REPORT",
+    reporterId: input.reporterId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    reason: record.reason,
+    details: record.details,
+    priority: "NORMAL",
+    status: "OPEN",
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt
+  });
+  return { ...record, reportId };
 }
