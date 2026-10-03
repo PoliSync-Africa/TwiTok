@@ -203,7 +203,24 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
-      <View style={styles.bottomTabs}><Pressable style={styles.createButton} onPress={() => router.push("/create")}><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
+      <View style={styles.topChrome}>
+        <Pressable style={styles.liveButton} onPress={() => router.push("/live")} accessibilityLabel="LIVE">
+          <Text style={styles.liveIcon}>▣</Text>
+        </Pressable>
+        <Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.topTabActive:styles.topTab}>Community</Text></Pressable>
+        <Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.topTabActive:styles.topTab}>Following</Text></Pressable>
+        <Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.topTabActive:styles.topTab}>For You</Text></Pressable>
+        <Pressable style={styles.searchButton} onPress={() => router.push("/search")} accessibilityLabel="Search">
+          <Text style={styles.searchIcon}>⌕</Text>
+        </Pressable>
+      </View>
+      <View style={styles.bottomNav}>
+        <Pressable style={styles.navItem} onPress={() => onSurface("FOR_YOU")}><Text style={styles.navIcon}>⌂</Text><Text style={styles.navLabel}>Home</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => router.push("/find-friends")}><Text style={styles.navIcon}>♧</Text><Text style={styles.navLabel}>Friends</Text></Pressable>
+        <Pressable style={styles.createButton} onPress={() => router.push("/create")} accessibilityLabel="Create"><Text style={styles.createPlus}>＋</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => router.push("/notifications")}><View><Text style={styles.navIcon}>▢</Text><View style={styles.inboxBadge}><Text style={styles.inboxBadgeText}>2</Text></View></View><Text style={styles.navLabel}>Inbox</Text></Pressable>
+        <Pressable style={styles.navItem} onPress={() => router.push("/profile")}><Text style={styles.navIcon}>♙</Text><Text style={styles.navLabel}>Profile</Text></Pressable>
+      </View>
     </>
   );
 }
@@ -311,7 +328,7 @@ const styles = StyleSheet.create({
   actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
   activeIcon: { color: "#ff2d55" },
-  meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
+  meta: { position: "absolute", left: 16, right: 82, bottom: 102 },
   usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
   feedVerified:{width:20,height:20,alignItems:"center",justifyContent:"center",marginLeft:1},feedVerifiedSeal:{position:"absolute",color:"#20B2AA",fontSize:24,fontWeight:"900",lineHeight:24,textShadowColor:"rgba(0,0,0,0.28)",textShadowOffset:{width:0,height:1},textShadowRadius:1},feedVerifiedCheck:{color:"#fff",fontSize:10,fontWeight:"900",lineHeight:12,textShadowColor:"rgba(0,0,0,0.22)",textShadowOffset:{width:0,height:1},textShadowRadius:1},
   username: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
@@ -320,10 +337,21 @@ const styles = StyleSheet.create({
   soundDisc: { color: "#fff", fontSize: 18, fontWeight: "800", marginRight: 7 },
   soundText: { color: "#fff", fontSize: 13, fontWeight: "700", flexShrink: 1 },
   unavailable: { color: "#aaa", textAlign: "center", marginBottom: height * 0.45 },
-  bottomTabs: { position: "absolute", bottom: 20, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 30 },
-  createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
-  tabActive: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  topChrome:{position:"absolute",top:48,left:12,right:10,zIndex:25,height:48,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:25},
+  liveButton:{position:"absolute",left:0,width:42,height:42,alignItems:"center",justifyContent:"center"},
+  liveIcon:{color:"#fff",fontSize:29,fontWeight:"900",textShadowColor:"#000",textShadowRadius:5},
+  searchButton:{position:"absolute",right:0,width:44,height:44,alignItems:"center",justifyContent:"center"},
+  searchIcon:{color:"#fff",fontSize:39,fontWeight:"300",lineHeight:42,textShadowColor:"#000",textShadowRadius:5},
+  topTab:{color:"rgba(255,255,255,0.62)",fontSize:16,fontWeight:"700",textShadowColor:"#000",textShadowRadius:5},
+  topTabActive:{color:"#fff",fontSize:16,fontWeight:"900",textShadowColor:"#000",textShadowRadius:5},
+  bottomNav:{position:"absolute",left:0,right:0,bottom:0,height:76,paddingBottom:7,backgroundColor:"rgba(0,0,0,0.94)",borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:"rgba(255,255,255,0.14)",flexDirection:"row",alignItems:"center",justifyContent:"space-around",zIndex:30},
+  navItem:{width:62,alignItems:"center",justifyContent:"center",gap:1},
+  navIcon:{color:"#fff",fontSize:29,fontWeight:"400",lineHeight:31},
+  navLabel:{color:"#fff",fontSize:11,fontWeight:"700"},
+  createButton:{width:52,height:36,borderRadius:10,backgroundColor:"#fff",borderLeftWidth:5,borderLeftColor:"#20D5EC",borderRightWidth:5,borderRightColor:"#FE2C55",alignItems:"center",justifyContent:"center"},
+  createPlus:{color:"#111",fontSize:27,lineHeight:29,fontWeight:"700"},
+  inboxBadge:{position:"absolute",right:-7,top:-5,minWidth:19,height:19,borderRadius:10,backgroundColor:"#FE2C55",alignItems:"center",justifyContent:"center",borderWidth:2,borderColor:"#000"},
+  inboxBadgeText:{color:"#fff",fontSize:10,fontWeight:"900"},
   productCard:{position:"absolute",left:16,right:92,bottom:175,backgroundColor:"rgba(0,0,0,0.82)",borderRadius:12,padding:9,zIndex:12},productBadge:{color:"#fff",fontSize:9,fontWeight:"900",marginBottom:5},productRow:{flexDirection:"row",alignItems:"center",gap:8},productThumb:{width:42,height:42,borderRadius:7,backgroundColor:"#222"},productInfo:{flex:1},productName:{color:"#fff",fontSize:12,fontWeight:"800"},productPrice:{color:"#fff",fontSize:11,fontWeight:"700",marginTop:2},productAction:{color:"#ff2d55",fontSize:11,fontWeight:"900"},
   shopSheet:{position:"absolute",left:0,right:0,top:0,bottom:0,zIndex:40,justifyContent:"flex-end"},
   shopSheetBackdrop:{...StyleSheet.absoluteFill,backgroundColor:"rgba(0,0,0,0.48)"},
