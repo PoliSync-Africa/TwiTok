@@ -1,4 +1,5 @@
 import type { Db } from "mongodb";
+import { createHash } from "node:crypto";
 
 export type SafetyDecision = "ALLOW" | "RESTRICT" | "WARN_EDIT" | "BLOCK" | "ESCALATE";
 export type SafetyRisk = "LOW" | "MEDIUM" | "HIGH" | "SEVERE";
@@ -18,6 +19,7 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_cases").createIndex({ reportId: 1 }, { unique: true, sparse: true }),
     db.collection("moderation_cases").createIndex({ assigneeId: 1, status: 1, updatedAt: -1 }),
     db.collection("moderation_case_events").createIndex({ caseId: 1, createdAt: -1 }),
+    db.collection("moderation_evidence").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("appeals").createIndex({ caseId: 1, userId: 1 }, { unique: true }),
     db.collection("appeals").createIndex({ status: 1, createdAt: -1 }),
     db.collection("appeal_events").createIndex({ appealId: 1, createdAt: -1 }),
@@ -61,6 +63,25 @@ export async function openHumanReview(db: Db, input: { userId:string; contentId:
 }
 
 export type AppealStatus = "OPEN" | "IN_REVIEW" | "UPHELD" | "OVERTURNED" | "CLOSED";
+
+export async function captureModerationEvidence(db: Db, input: {
+  caseId: string;
+  reviewerId: string;
+  evidence: Record<string, unknown>;
+}) {
+  const snapshot = JSON.stringify(input.evidence, Object.keys(input.evidence).sort());
+  const fingerprint = createHash("sha256").update(snapshot).digest("hex");
+  const record = {
+    caseId: input.caseId,
+    reviewerId: input.reviewerId,
+    evidence: input.evidence,
+    fingerprint,
+    capturedAt: new Date(),
+    createdAt: new Date()
+  };
+  const result = await db.collection("moderation_evidence").insertOne(record);
+  return { ...record, evidenceId: result.insertedId.toHexString() };
+}
 
 export async function createAppeal(db: Db, input: {
   caseId: string;
