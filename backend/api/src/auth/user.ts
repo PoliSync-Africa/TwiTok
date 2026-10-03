@@ -5,8 +5,13 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const USER_SECRET = () => {
-  const secret = process.env.TWITOK_USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("TWITOK_USER_SESSION_SECRET must be configured with at least 32 characters");
+  const secret =
+    process.env.TWITOK_USER_SESSION_SECRET?.trim() ||
+    process.env.USER_SESSION_SECRET?.trim() ||
+    process.env.OWNER_SESSION_SECRET?.trim();
+  if (!secret || secret.length < 32) {
+    throw new Error("TwiTok user session secret must be configured with at least 32 characters");
+  }
   return secret;
 };
 
