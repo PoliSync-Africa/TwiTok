@@ -15,7 +15,8 @@ export default function RegisterScreen() {
   const [error,setError]=useState("");
 
   async function register(){
-    if((!email.trim()&&!phone.trim())||!password||!dateOfBirth||!countryCode.trim()){setError("Enter an email address or phone number, plus all required fields.");return;}\n    if(password.length<8){setError("Password must contain at least 8 characters.");return;}
+    if((!email.trim()&&!phone.trim())||!password||!dateOfBirth||!countryCode.trim()){setError("Enter an email address or phone number, plus all required fields.");return;}
+    if(password.length<8){setError("Password must contain at least 8 characters.");return;}
     setBusy(true);setError("");
     try{
       const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:countryCode.trim().toUpperCase()})});
