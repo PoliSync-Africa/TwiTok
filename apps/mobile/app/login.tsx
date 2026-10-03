@@ -2,11 +2,14 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { saveAuthToken } from "../lib/auth";
+import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
+import { CountryPicker } from "../components/CountryPicker";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +25,7 @@ export default function LoginScreen() {
       const response = await fetch(API + "/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: identifier.trim(), password })
+        body: JSON.stringify({ identifier: identifier.trim(), password, countryCode: country.iso })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to sign in");
@@ -40,7 +43,7 @@ export default function LoginScreen() {
       <Text style={styles.logo}>TwiTok</Text>
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.subtitle}>Sign in to your TwiTok account</Text>
-      <TextInput value={identifier} onChangeText={setIdentifier} placeholder="Username, email or phone" placeholderTextColor="#777" autoCapitalize="none" style={styles.input} />
+      <View style={styles.phoneRow}><CountryPicker value={country} onChange={setCountry}/><TextInput value={identifier} onChangeText={setIdentifier} placeholder="Username, email or phone" placeholderTextColor="#777" autoCapitalize="none" style={styles.identifierInput} /></View>
       <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable style={styles.button} onPress={login} disabled={busy}>
@@ -56,6 +59,8 @@ const styles = StyleSheet.create({
   logo: { color: "#fff", fontSize: 42, fontWeight: "900", textAlign: "center", marginBottom: 32 },
   title: { color: "#fff", fontSize: 26, fontWeight: "800", textAlign: "center" },
   subtitle: { color: "#999", textAlign: "center", marginTop: 8, marginBottom: 28 },
+  phoneRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  identifierInput: { flex: 1, backgroundColor: "#171717", borderWidth: 1, borderColor: "#2d2d2d", borderRadius: 12, color: "#fff", paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
   input: { backgroundColor: "#171717", borderWidth: 1, borderColor: "#2d2d2d", borderRadius: 12, color: "#fff", paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12, fontSize: 16 },
   button: { backgroundColor: "#ff2d55", borderRadius: 12, padding: 15, alignItems: "center", marginTop: 8 },
   buttonText: { color: "#fff", fontWeight: "800", fontSize: 16 },
