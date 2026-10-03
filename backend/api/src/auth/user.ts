@@ -49,13 +49,19 @@ export function hashPhoneSuffix(value: string) {
 }
 
 export async function ensureUserIndexes(db: Db) {
+  const users = db.collection("users");
+  const existingUsernameIndexes = await users.listIndexes().toArray();
+  const usernameIndex = existingUsernameIndexes.find(index => index.name === "username_1");
+  if (usernameIndex && (usernameIndex.unique !== true || usernameIndex.sparse !== true)) {
+    await users.dropIndex("username_1");
+  }
   await Promise.all([
-    db.collection("users").createIndex({ email: 1 }, { unique: true, sparse: true }),
-    db.collection("users").createIndex({ phone: 1 }, { unique: true, sparse: true }),
-    db.collection("users").createIndex({ phoneHash: 1 }, { sparse: true }),
-    db.collection("users").createIndex({ phoneSuffixHash: 1 }, { sparse: true }),
-    db.collection("users").createIndex({ username: 1 }, { unique: true, sparse: true }),
-    db.collection("users").createIndex({ createdAt: -1 })
+    users.createIndex({ email: 1 }, { unique: true, sparse: true }),
+    users.createIndex({ phone: 1 }, { unique: true, sparse: true }),
+    users.createIndex({ phoneHash: 1 }, { sparse: true }),
+    users.createIndex({ phoneSuffixHash: 1 }, { sparse: true }),
+    users.createIndex({ username: 1 }, { unique: true, sparse: true }),
+    users.createIndex({ createdAt: -1 })
   ]);
 }
 
@@ -101,7 +107,7 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
   if (!firstName || firstName.length > 50) throw new Error("First name is required and must be 1-50 characters");
   const username = input.username?.trim().toLowerCase();
   if (username && (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith("."))) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
-  if (input.password.length < 12) throw new Error("Password must contain at least 12 characters");
+  if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
   const countryCode = input.countryCode.trim().toUpperCase();
