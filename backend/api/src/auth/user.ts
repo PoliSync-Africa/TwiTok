@@ -106,6 +106,8 @@ export async function authenticateUser(db: Db, identifier: string, password: str
     accountType: user.accountType,
     monetizationEnabled: user.monetizationEnabled === true,
     isVerified: user.isVerified === true,
+    emailVerified: user.emailVerified === true,
+    phoneVerified: user.phoneVerified === true,
     verificationType: user.verificationType ?? null,
     isPrivate: user.isPrivate === true,
     profileSetupComplete: user.profileSetupComplete === true
