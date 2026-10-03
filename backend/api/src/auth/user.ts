@@ -10,7 +10,7 @@ const USER_SECRET = () => {
   return secret;
 };
 
-export type UserToken = { sub: string; role: "USER"; username: string; sv?: number; purpose?: "AUTH" | "VERIFICATION" };
+export type UserToken = { sub: string; role: "USER"; username?: string; sv?: number; purpose?: "AUTH" | "VERIFICATION" };
 
 export function issueUserToken(user: { _id: string; username: string; sessionVersion?: number }) {
   return jwt.sign(
@@ -99,9 +99,8 @@ function isValidEmailAddress(value: string) {
 export async function createUser(db: Db, input: { firstName: string; username?: string; password: string; email?: string; phone?: string; dateOfBirth: string; countryCode: string }) {
   const firstName = input.firstName.trim().replace(/\s+/g, " ");
   if (!firstName || firstName.length > 50) throw new Error("First name is required and must be 1-50 characters");
-  const generatedUsername = `user_${new ObjectId().toHexString().slice(-12)}`;
-  const username = (input.username?.trim().toLowerCase() || generatedUsername);
-  if (!/^[a-z0-9._]{3,24}$/.test(username)) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
+  const username = input.username?.trim().toLowerCase();
+  if (username && (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith("."))) throw new Error("Username must be 3-24 characters and use letters, numbers, dots or underscores");
   if (input.password.length < 8) throw new Error("Password must contain at least 8 characters");
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
@@ -119,11 +118,11 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
   if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
   const now = new Date();
   const user = {
-    sessionVersion: 0, firstName, username, nickname: username, email: normalizedEmail, phone: normalizedPhone,
+    sessionVersion: 0, firstName, ...(username ? { username, nickname: username } : {}), email: normalizedEmail, phone: normalizedPhone,
     phoneHash: normalizedPhone ? hashPhone(normalizedPhone) : null,
     phoneSuffixHash: normalizedPhone ? hashPhoneSuffix(normalizedPhone) : null,
     dateOfBirth: dob, countryCode, accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false,
-    profileSetupComplete: Boolean(input.username?.trim()), status: "ACTIVE", emailVerified: false, phoneVerified: false,
+    profileSetupComplete: Boolean(username), status: "ACTIVE", emailVerified: false, phoneVerified: false,
     contactSyncEnabled: false, createdAt: now, updatedAt: now
   };
   const result = await db.collection("users").insertOne({ ...user, passwordHash: await bcrypt.hash(input.password, 12) });
