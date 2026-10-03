@@ -67,6 +67,12 @@ export async function ensureUserIndexes(db: Db) {
 
 
 
+const AFRICAN_COUNTRY_CODES = new Set([
+  "DZ","AO","BJ","BW","BF","BI","CV","CM","CF","TD","KM","CD","CG","CI","DJ","EG","GQ","ER",
+  "SZ","ET","GA","GM","GH","GN","GW","KE","LS","LR","LY","MG","MW","ML","MR","MU","MA","MZ",
+  "NA","NE","NG","RW","ST","SN","SC","SL","SO","ZA","SS","SD","TZ","TG","TN","UG","ZM","ZW"
+]);
+
 function isAsciiAlphaNumeric(code: number) {
   return (code >= 48 && code <= 57) || (code >= 97 && code <= 122);
 }
@@ -112,6 +118,7 @@ export async function createUser(db: Db, input: { firstName: string; username?: 
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
   const countryCode = input.countryCode.trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
+  if (!AFRICAN_COUNTRY_CODES.has(countryCode)) throw new Error("TwiTok registration is currently available only in African countries");
   const ageCutoff = new Date();
   ageCutoff.setUTCFullYear(ageCutoff.getUTCFullYear() - 13);
   if (dob > ageCutoff) throw new Error("You must be at least 13 years old to create a TwiTok account");
