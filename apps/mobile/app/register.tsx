@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput } from "react-native";
 import { router } from "expo-router";
 import { saveAuthToken } from "../lib/auth";
+import { COUNTRIES, DEFAULT_COUNTRY, type Country } from "../lib/countries";
+import { CountryPicker } from "../components/CountryPicker";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
@@ -10,7 +12,7 @@ export default function RegisterScreen() {
   const [phone,setPhone]=useState("");
   const [password,setPassword]=useState("");
   const [dateOfBirth,setDateOfBirth]=useState("");
-  const [countryCode,setCountryCode]=useState("US");
+  const [country,setCountry]=useState<Country>(DEFAULT_COUNTRY);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
 
@@ -19,7 +21,7 @@ export default function RegisterScreen() {
     if(password.length<8){setError("Password must contain at least 8 characters.");return;}
     setBusy(true);setError("");
     try{
-      const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:countryCode.trim().toUpperCase()})});
+      const r=await fetch(API+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.trim()||undefined,phone:phone.trim()||undefined,password,dateOfBirth,countryCode:country.iso})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok||!d.token) throw new Error(d.error??"Unable to create account");
       await saveAuthToken(d.token);
@@ -35,7 +37,7 @@ export default function RegisterScreen() {
     <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number (or use email)" placeholderTextColor="#777" keyboardType="phone-pad"/>
     <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password (8+ characters)" placeholderTextColor="#777" secureTextEntry/>
     <TextInput style={styles.input} value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="Date of birth (YYYY-MM-DD)" placeholderTextColor="#777"/>
-    <TextInput style={styles.input} value={countryCode} onChangeText={setCountryCode} placeholder="Country code" placeholderTextColor="#777" autoCapitalize="characters" maxLength={2}/>
+    <View style={styles.phoneRow}><CountryPicker value={country} onChange={setCountry}/><TextInput style={styles.phoneInput} value={phone} onChangeText={setPhone} placeholder="Phone number" placeholderTextColor="#777" keyboardType="phone-pad"/></View><Text style={styles.hint}>Country code is added automatically.</Text>
     {error?<Text style={styles.error}>{error}</Text>:null}
     <Pressable style={styles.button} onPress={register} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.buttonText}>Create account</Text>}</Pressable>
     <Pressable onPress={()=>router.replace("/login")}><Text style={styles.back}>Already have an account? Sign in</Text></Pressable>
