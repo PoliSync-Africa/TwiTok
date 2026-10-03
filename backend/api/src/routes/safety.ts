@@ -53,7 +53,7 @@ safetyRouter.patch("/moderation/cases/:caseId", requireOwner, safetyReviewLimit,
       status: status as any,
       assigneeId: req.body?.assigneeId === null ? null : (req.body?.assigneeId ? String(req.body.assigneeId) : undefined),
       resolution: req.body?.resolution,
-      reviewerId: req.userId!.toHexString()
+      reviewerId: req.ownerId!
     });
     return res.json({ case: result });
   } catch (error) {
