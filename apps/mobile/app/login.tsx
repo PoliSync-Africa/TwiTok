@@ -1,11 +1,26 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { saveAuthToken } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
+type LoginMode = "methods" | "credentials";
+
 export default function LoginScreen() {
+  const [mode, setMode] = useState<LoginMode>("methods");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -13,20 +28,27 @@ export default function LoginScreen() {
 
   async function login() {
     if (!identifier.trim() || !password) {
-      setError("Enter your username or email and password.");
+      setError("Enter your username, email or phone number and password.");
       return;
     }
+
     setBusy(true);
     setError("");
+
     try {
       const response = await fetch(API + "/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: identifier.trim(), password })
       });
+
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to sign in");
+      if (!response.ok || !data.token) {
+        throw new Error(data.error ?? "Unable to sign in");
+      }
+
       await saveAuthToken(data.token);
+
       if (data.verificationRequired) {
         router.replace({
           pathname: "/verify-otp",
@@ -37,7 +59,12 @@ export default function LoginScreen() {
         });
         return;
       }
-      router.replace(data.profileSetupRequired || data.user?.profileSetupComplete === false ? "/profile-setup" : "/feed");
+
+      router.replace(
+        data.profileSetupRequired || data.user?.profileSetupComplete === false
+          ? "/profile-setup"
+          : "/feed"
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in");
     } finally {
@@ -45,34 +72,475 @@ export default function LoginScreen() {
     }
   }
 
+  function unavailable(provider: string) {
+    setError(provider + " sign-in is not connected yet.");
+  }
+
+  if (mode === "credentials") {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.credentialScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.topBar}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+                hitSlop={12}
+                onPress={() => {
+                  setError("");
+                  setMode("methods");
+                }}
+                style={styles.iconButton}
+              >
+                <Ionicons name="chevron-back" size={28} color="#111" />
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Help"
+                hitSlop={12}
+                onPress={() => setError("Use your TwiTok username, email or phone number to sign in.")}
+                style={styles.helpButton}
+              >
+                <Ionicons name="help-outline" size={23} color="#111" />
+              </Pressable>
+            </View>
+
+            <View style={styles.credentialHeader}>
+              <Text style={styles.title}>Log in to TwiTok</Text>
+              <Text style={styles.subtitle}>
+                Use your phone, email or username.
+              </Text>
+            </View>
+
+            <View style={styles.form}>
+              <View style={styles.inputShell}>
+                <Ionicons name="person-outline" size={21} color="#777" />
+                <TextInput
+                  value={identifier}
+                  onChangeText={(value) => {
+                    setIdentifier(value);
+                    if (error) setError("");
+                  }}
+                  placeholder="Phone / email / username"
+                  placeholderTextColor="#8A8A8A"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  style={styles.input}
+                  autoFocus
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View style={styles.inputShell}>
+                <Ionicons name="lock-closed-outline" size={21} color="#777" />
+                <TextInput
+                  value={password}
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    if (error) setError("");
+                  }}
+                  placeholder="Password"
+                  placeholderTextColor="#8A8A8A"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={styles.input}
+                  returnKeyType="done"
+                  onSubmitEditing={login}
+                />
+              </View>
+
+              <Pressable
+                onPress={() => router.push("/forgot-password")}
+                style={styles.forgotWrap}
+              >
+                <Text style={styles.forgot}>Forgot password?</Text>
+              </Pressable>
+
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              <Pressable
+                onPress={login}
+                disabled={busy}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  busy && styles.disabled,
+                  pressed && !busy && styles.pressed
+                ]}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryText}>Log in</Text>
+                )}
+              </Pressable>
+            </View>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.or}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Pressable
+              style={styles.methodButton}
+              onPress={() => setMode("credentials")}
+            >
+              <Ionicons name="person-circle-outline" size={25} color="#111" />
+              <Text style={styles.methodText}>Use another account</Text>
+            </Pressable>
+
+            <Text style={styles.legal}>
+              By continuing with an account located in Africa, you agree to our{" "}
+              <Text style={styles.link}>Terms of Service</Text> and acknowledge that
+              you have read our <Text style={styles.link}>Privacy Policy</Text>.
+            </Text>
+          </ScrollView>
+
+          <View style={styles.bottomBar}>
+            <Text style={styles.bottomPrompt}>Don't have an account?</Text>
+            <Pressable onPress={() => router.replace("/register")}>
+              <Text style={styles.bottomAction}>Sign up</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.logo}>TwiTok</Text>
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Sign in to your TwiTok account</Text>
-      <TextInput value={identifier} onChangeText={setIdentifier} placeholder="Username or email" placeholderTextColor="#777" autoCapitalize="none" style={styles.input} />
-      <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#777" secureTextEntry style={styles.input} />
-      <Pressable onPress={() => router.push("/forgot-password")}>
-        <Text style={styles.forgot}>Forgot password?</Text>
-      </Pressable>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={styles.button} onPress={login} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
-      </Pressable>
-      <Pressable onPress={() => router.back()}><Text style={styles.back}>Back</Text></Pressable>
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.methodsScroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={12}
+            onPress={() => router.replace("/")}
+            style={styles.iconButton}
+          >
+            <Ionicons name="close" size={30} color="#111" />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Help"
+            hitSlop={12}
+            onPress={() => setError("Choose a sign-in method to continue.")}
+            style={styles.helpButton}
+          >
+            <Ionicons name="help-outline" size={23} color="#111" />
+          </Pressable>
+        </View>
+
+        <View style={styles.methodsHeader}>
+          <Text style={styles.title}>Log in to TwiTok</Text>
+          <Text style={styles.subtitle}>Welcome back.</Text>
+        </View>
+
+        <View style={styles.methodList}>
+          <Pressable
+            style={({ pressed }) => [styles.methodButtonLarge, pressed && styles.pressed]}
+            onPress={() => {
+              setError("");
+              setMode("credentials");
+            }}
+          >
+            <View style={styles.leadingIcon}>
+              <Ionicons name="person-outline" size={25} color="#111" />
+            </View>
+            <Text style={styles.methodTextLarge}>Use phone/email/username</Text>
+            <Ionicons name="chevron-forward" size={20} color="#777" />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.methodButtonLarge, pressed && styles.pressed]}
+            onPress={() => unavailable("Facebook")}
+          >
+            <View style={styles.leadingIcon}>
+              <Ionicons name="logo-facebook" size={25} color="#1877F2" />
+            </View>
+            <Text style={styles.methodTextLarge}>Continue with Facebook</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.methodButtonLarge, pressed && styles.pressed]}
+            onPress={() => unavailable("Apple")}
+          >
+            <View style={styles.leadingIcon}>
+              <Ionicons name="logo-apple" size={25} color="#111" />
+            </View>
+            <Text style={styles.methodTextLarge}>Continue with Apple</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.methodButtonLarge, pressed && styles.pressed]}
+            onPress={() => unavailable("Google")}
+          >
+            <View style={styles.leadingIcon}>
+              <Ionicons name="logo-google" size={25} color="#4285F4" />
+            </View>
+            <Text style={styles.methodTextLarge}>Continue with Google</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.or}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [styles.methodButtonLarge, pressed && styles.pressed]}
+          onPress={() => {
+            setError("");
+            setMode("credentials");
+          }}
+        >
+          <View style={styles.leadingIcon}>
+            <Ionicons name="people-outline" size={25} color="#111" />
+          </View>
+          <Text style={styles.methodTextLarge}>Select account to log in</Text>
+        </Pressable>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Text style={styles.legal}>
+          By continuing with an account located in Africa, you agree to our{" "}
+          <Text style={styles.link}>Terms of Service</Text> and acknowledge that
+          you have read our <Text style={styles.link}>Privacy Policy</Text>.
+        </Text>
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <Text style={styles.bottomPrompt}>Don't have an account?</Text>
+        <Pressable onPress={() => router.replace("/register")}>
+          <Text style={styles.bottomAction}>Sign up</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000", padding: 24, justifyContent: "center" },
-  logo: { color: "#fff", fontSize: 42, fontWeight: "900", textAlign: "center", marginBottom: 32 },
-  title: { color: "#fff", fontSize: 26, fontWeight: "800", textAlign: "center" },
-  subtitle: { color: "#999", textAlign: "center", marginTop: 8, marginBottom: 28 },
-  input: { backgroundColor: "#171717", borderWidth: 1, borderColor: "#2d2d2d", borderRadius: 12, color: "#fff", paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12, fontSize: 16 },
-  button: { backgroundColor: "#ff2d55", borderRadius: 12, padding: 15, alignItems: "center", marginTop: 8 },
-  buttonText: { color: "#fff", fontWeight: "800", fontSize: 16 },
-  forgot: { color: "#ff6b87", textAlign: "right", marginBottom: 4, fontSize: 14, fontWeight: "700" },
-  error: { color: "#ff7188", marginBottom: 8, textAlign: "center" },
-  back: { color: "#aaa", textAlign: "center", marginTop: 20, fontSize: 15 }
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F5F5F5"
+  },
+  flex: {
+    flex: 1
+  },
+  methodsScroll: {
+    flexGrow: 1,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 26
+  },
+  credentialScroll: {
+    flexGrow: 1,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 26
+  },
+  topBar: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    alignItems: "flex-start",
+    justifyContent: "center"
+  },
+  helpButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#111"
+  },
+  methodsHeader: {
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 42,
+    paddingBottom: 42
+  },
+  credentialHeader: {
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 35,
+    paddingBottom: 30
+  },
+  title: {
+    color: "#111",
+    fontSize: 34,
+    lineHeight: 39,
+    fontWeight: "900",
+    letterSpacing: -1.1,
+    textAlign: "center"
+  },
+  subtitle: {
+    color: "#737373",
+    fontSize: 16,
+    lineHeight: 22,
+    marginTop: 9,
+    textAlign: "center"
+  },
+  methodList: {
+    gap: 12
+  },
+  methodButtonLarge: {
+    minHeight: 68,
+    borderRadius: 14,
+    backgroundColor: "#EDEDED",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    gap: 12
+  },
+  leadingIcon: {
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  methodTextLarge: {
+    flex: 1,
+    color: "#111",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "700"
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 26
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#D4D4D4"
+  },
+  or: {
+    color: "#7A7A7A",
+    fontSize: 18,
+    paddingHorizontal: 17
+  },
+  form: {
+    gap: 12
+  },
+  inputShell: {
+    minHeight: 58,
+    borderRadius: 12,
+    backgroundColor: "#EFEFEF",
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11
+  },
+  input: {
+    flex: 1,
+    color: "#111",
+    fontSize: 16,
+    paddingVertical: 0
+  },
+  forgotWrap: {
+    alignSelf: "flex-start",
+    paddingVertical: 4
+  },
+  forgot: {
+    color: "#222",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  primaryButton: {
+    minHeight: 56,
+    borderRadius: 28,
+    backgroundColor: "#FE2C55",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6
+  },
+  primaryText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "800"
+  },
+  methodButton: {
+    minHeight: 58,
+    borderRadius: 12,
+    backgroundColor: "#EDEDED",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10
+  },
+  methodText: {
+    color: "#111",
+    fontSize: 16,
+    fontWeight: "700"
+  },
+  legal: {
+    color: "#818181",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    paddingHorizontal: 10,
+    marginTop: 28
+  },
+  link: {
+    color: "#2E63C7",
+    fontWeight: "600"
+  },
+  bottomBar: {
+    minHeight: 72,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#EBEBEB",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 20
+  },
+  bottomPrompt: {
+    color: "#858585",
+    fontSize: 17,
+    fontWeight: "600"
+  },
+  bottomAction: {
+    color: "#FE2C55",
+    fontSize: 17,
+    fontWeight: "800"
+  },
+  error: {
+    color: "#C62845",
+    textAlign: "center",
+    marginTop: 12,
+    paddingHorizontal: 8,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  disabled: {
+    opacity: 0.6
+  },
+  pressed: {
+    opacity: 0.78
+  }
 });
