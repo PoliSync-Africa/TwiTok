@@ -95,6 +95,16 @@ export async function rollbackModerationAction(db: Db, input: {
   return db.collection("moderation_actions").findOne(filter);
 }
 
+function canonicalizeEvidence(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(canonicalizeEvidence);
+  const record = value as Record<string, unknown>;
+  return Object.keys(record).sort().reduce<Record<string, unknown>>((result, key) => {
+    result[key] = canonicalizeEvidence(record[key]);
+    return result;
+  }, {});
+}
+
 export async function recordModerationAction(db: Db, input: {
   caseId: string;
   actorId: string;
@@ -113,6 +123,12 @@ export async function recordModerationAction(db: Db, input: {
   const accountAction = input.action.startsWith("ACCOUNT_");
   if (contentAction && !input.targetContentId) throw new Error("Content moderation actions require targetContentId");
   if (accountAction && !input.targetUserId) throw new Error("Account moderation actions require targetUserId");
+  if (input.evidenceId) {
+    const { ObjectId } = await import("mongodb");
+    if (!ObjectId.isValid(input.evidenceId)) throw new Error("Invalid evidence id");
+    const evidence = await db.collection("moderation_evidence").findOne({ _id: new ObjectId(input.evidenceId), caseId: input.caseId });
+    if (!evidence) throw new Error("Evidence snapshot not found for moderation case");
+  }
   if (input.idempotencyKey) {
     const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
     if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
@@ -131,8 +147,16 @@ export async function recordModerationAction(db: Db, input: {
     reversible: true,
     createdAt: new Date()
   };
-  const result = await db.collection("moderation_actions").insertOne(record);
-  return { ...record, actionId: result.insertedId.toHexString() };
+  try {
+    const result = await db.collection("moderation_actions").insertOne(record);
+    return { ...record, actionId: result.insertedId.toHexString() };
+  } catch (error) {
+    if (input.idempotencyKey && error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
+      const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
+      if (existing) return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
+    }
+    throw error;
+  }
 }
 
 export async function captureModerationEvidence(db: Db, input: {
@@ -140,7 +164,7 @@ export async function captureModerationEvidence(db: Db, input: {
   reviewerId: string;
   evidence: Record<string, unknown>;
 }) {
-  const snapshot = JSON.stringify(input.evidence, Object.keys(input.evidence).sort());
+  const snapshot = JSON.stringify(canonicalizeEvidence(input.evidence));
   const fingerprint = createHash("sha256").update(snapshot).digest("hex");
   const record = {
     caseId: input.caseId,
