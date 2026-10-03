@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { Typography, Colors } from "../theme/typography";
 import * as ImagePicker from "expo-image-picker";
 import { getAuthToken } from "../lib/auth";
 
@@ -69,18 +70,18 @@ export default function ProfileSetupScreen() {
 }
 const styles=StyleSheet.create({
  container:{flexGrow:1,backgroundColor:"#000",padding:24,justifyContent:"center"},
- logo:{color:"#fff",fontSize:42,fontWeight:"900",textAlign:"center",marginBottom:12},
- title:{color:"#fff",fontSize:25,fontWeight:"800",textAlign:"center",marginBottom:8},
- subtitle:{color:"#aaa",fontSize:14,textAlign:"center",lineHeight:21,marginBottom:20},
+ logo:{color:Colors.text,...Typography.display,textAlign:"center",marginBottom:12},
+ title:{color:Colors.text,...Typography.title,textAlign:"center",marginBottom:8},
+ subtitle:{color:Colors.textSecondary,...Typography.caption,textAlign:"center",marginBottom:20},
  avatar:{width:88,height:88,borderRadius:44,backgroundColor:"#222",alignSelf:"center",alignItems:"center",justifyContent:"center",marginBottom:6},
  avatarText:{color:"#fff",fontSize:34,fontWeight:"300"},
  avatarImage:{width:88,height:88,borderRadius:44},
- photoHint:{color:"#aaa",textAlign:"center",marginBottom:18},
+ photoHint:{color:Colors.textSecondary,...Typography.caption,textAlign:"center",marginBottom:18},
  input:{backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d",borderRadius:12,color:"#fff",paddingHorizontal:16,paddingVertical:14,marginBottom:12,fontSize:16},
  bio:{minHeight:80,textAlignVertical:"top"},
  privacy:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:8,marginBottom:12},
- privacyText:{color:"#fff",fontSize:16,fontWeight:"600"},
+ privacyText:{color:Colors.text,...Typography.bodySemibold},
  button:{backgroundColor:"#ff2d55",borderRadius:12,padding:15,alignItems:"center",marginTop:8},
- buttonText:{color:"#fff",fontWeight:"800",fontSize:16},
- error:{color:"#ff7188",textAlign:"center",marginBottom:10}
+ buttonText:{color:Colors.text,...Typography.button},
+ error:{color:Colors.danger,...Typography.caption,textAlign:"center",marginBottom:10}
 });

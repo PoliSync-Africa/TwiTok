@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { Typography, Colors } from "../theme/typography";
 import { saveAuthToken } from "../lib/auth";
 import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
 import { CountryPicker } from "../components/CountryPicker";
@@ -46,14 +47,14 @@ export default function RegisterScreen() {
 const styles=StyleSheet.create({
  container:{flexGrow:1,backgroundColor:"#000",padding:24,justifyContent:"center"},
  logo:{width:118,height:118,alignSelf:"center",marginBottom:14},
- title:{color:"#fff",fontSize:25,fontWeight:"800",textAlign:"center",marginBottom:10},
- subtitle:{color:"#aaa",fontSize:14,textAlign:"center",marginBottom:20},
+ title:{color:Colors.text,...Typography.title,textAlign:"center",marginBottom:10},
+ subtitle:{color:Colors.textSecondary,...Typography.caption,textAlign:"center",marginBottom:20},
  phoneRow:{flexDirection:"row",gap:8,marginBottom:2},
  phoneInput:{flex:1,backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d",borderRadius:12,color:"#fff",paddingHorizontal:16,paddingVertical:14,fontSize:16},
- hint:{color:"#777",fontSize:12,marginBottom:12,marginLeft:4},
+ hint:{color:Colors.textMuted,...Typography.caption,marginBottom:12,marginLeft:4},
  input:{backgroundColor:"#171717",borderWidth:1,borderColor:"#2d2d2d",borderRadius:12,color:"#fff",paddingHorizontal:16,paddingVertical:14,marginBottom:12,fontSize:16},
  button:{backgroundColor:"#ff2d55",borderRadius:12,padding:15,alignItems:"center",marginTop:8},
- buttonText:{color:"#fff",fontWeight:"800",fontSize:16},
- error:{color:"#ff7188",textAlign:"center",marginBottom:10},
- back:{color:"#aaa",textAlign:"center",marginTop:20}
+ buttonText:{color:Colors.text,...Typography.button},
+ error:{color:Colors.danger,...Typography.caption,textAlign:"center",marginBottom:10},
+ back:{color:Colors.textSecondary,...Typography.caption,textAlign:"center",marginTop:20}
 });

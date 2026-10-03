@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { Typography, Colors } from "../theme/typography";
 import { saveAuthToken } from "../lib/auth";
 import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
 import { CountryPicker } from "../components/CountryPicker";
