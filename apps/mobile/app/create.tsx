@@ -341,7 +341,7 @@ export default function CreateScreen() {
         <Text style={styles.title}>Create</Text>
         <Pressable onPress={() => { void publish(); }} disabled={(mode==="TEXT" ? !caption.trim() : !assets.length) || busy}><Text style={[styles.post, ((mode==="TEXT" ? !caption.trim() : !assets.length) || busy) && styles.disabled]}>Post</Text></Pressable>
       </View>
-      <View style={styles.modeRow}>{["VIDEO","PHOTO","TEXT"].map(v=><Pressable key={v} style={[styles.mode,mode===v&&styles.modeSelected]} onPress={()=>{setMode(v as any);setAssets([])}}><Text style={styles.modeText}>{v==="VIDEO"?"Video":v==="PHOTO"?"Photo":"Text"}</Text></Pressable>)}</View>
+      <View style={styles.modeRow}>{["VIDEO","PHOTO","TEXT"].map(v=><Pressable key={v} style={[styles.mode,mode===v&&styles.modeSelected]} onPress={()=>{setMode(v as any);setAssets([])}}><Text style={styles.modeText}>{v==="VIDEO"?"Video":v==="PHOTO"?"Photo":"Text"}</Text></Pressable>)}</View>\n      <Pressable style={styles.liveButton} onPress={()=>router.push("/live")} accessibilityLabel="Go LIVE"><Text style={styles.liveButtonText}>LIVE</Text><Text style={styles.liveButtonSub}>Up to 15 guests</Text></Pressable>
       {mode !== "TEXT" ? <View style={styles.modeRow}>
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?recordPhoto:recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
