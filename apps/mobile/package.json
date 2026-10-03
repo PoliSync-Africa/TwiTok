@@ -24,10 +24,7 @@
     "react-native-purchases": "^10.10.2"
   },
   "overrides": {
-    "node-forge": "1.4.0",
     "decode-uri-component": "0.5.0",
-    "uuid": "11.1.1",
-    "micromatch": "4.0.8",
-    "braces": "3.0.3"
+    "uuid": "11.1.1"
   }
 }
