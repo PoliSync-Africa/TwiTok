@@ -1,7 +1,7 @@
 import { createClient, type RedisClientType } from "redis";
 
 let client: RedisClientType | null = null;
-let connecting: Promise<void> | null = null;
+let connecting: Promise<RedisClientType> | null = null;
 
 function getRedisUrl() {
   return process.env.REDIS_URL?.trim() || "";
