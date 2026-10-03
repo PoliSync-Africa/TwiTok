@@ -54,7 +54,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const user = await authenticateUser(db, identifier, password);
     const stored = await db.collection("users").findOne(
       { _id: new (await import("mongodb")).ObjectId(user._id) },
-      { projection: { firstName: 1, emailVerified: 1, phoneVerified: 1, email: 1, phone: 1 } }
+      { projection: { firstName: 1, emailVerified: 1, phoneVerified: 1, email: 1, phone: 1, profileSetupComplete: 1 } }
     );
     let verificationChannel: OtpChannel | null = null;
     const identifierValue = String(identifier).trim().toLowerCase();
@@ -81,7 +81,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     }
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    res.json({ token, verificationRequired: false, user });
+    res.json({ token, verificationRequired: false, profileSetupRequired: user.profileSetupComplete === false, user });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
