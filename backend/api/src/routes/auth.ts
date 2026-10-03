@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
-import { requireUser } from "../auth/middleware.js";
+import { requireUser, requireContactVerificationUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 import { sendAccountVerification, verifyAccountCode, type VerificationChannel } from "../auth/account-verification.js";
 
@@ -56,7 +56,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
-authRouter.post("/verification/send", requireUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+authRouter.post("/verification/send", requireContactVerificationUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   try {
     const channel = String(req.body?.channel ?? "").trim().toLowerCase() as VerificationChannel;
     if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "Verification channel must be email or phone" });
@@ -72,7 +72,7 @@ authRouter.post("/verification/send", requireUser, rateLimit({ windowMs: 15 * 60
   }
 });
 
-authRouter.post("/verification/verify", requireUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+authRouter.post("/verification/verify", requireContactVerificationUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
   try {
     const code = String(req.body?.code ?? "").trim();
     if (!/^\\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
@@ -83,6 +83,23 @@ authRouter.post("/verification/verify", requireUser, rateLimit({ windowMs: 15 * 
     return res.json({ ...result, user, verificationRequired: remainingVerificationRequired });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Verification failed" });
+  }
+});
+
+authRouter.get("/verification/status", requireContactVerificationUser, userReadLimit, async (req, res) => {
+  try {
+    const user = await (await getDb()).collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { passwordHash: 0, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, profileSetupComplete: 1 } }
+    );
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    return res.json({
+      user,
+      verificationRequired: user.emailVerified !== true || user.phoneVerified !== true,
+      verificationChannels: ["email", "phone"]
+    });
+  } catch {
+    return res.status(401).json({ error: "Unable to load verification status" });
   }
 });
 
