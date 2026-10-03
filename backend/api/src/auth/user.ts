@@ -142,7 +142,7 @@ export async function createUser(
   };
 }
 
-export async function authenticateUser(db: Db, identifier: string, password: string) {
+export async function authenticateUser(db: Db, identifier: string, password: string, countryCode?: string) {
   const rawIdentifier = identifier.trim();
   const normalized = rawIdentifier.toLowerCase();
   const phone = rawIdentifier.replace(/[\s().-]/g, "");
