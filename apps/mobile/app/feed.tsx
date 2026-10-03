@@ -5,6 +5,7 @@ import { getAuthToken } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
 import { Typography, Colors } from "../theme/typography";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Video = {
   id: string;
@@ -27,6 +28,7 @@ const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api
 const { height, width } = Dimensions.get("window");
 
 function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onNotInterested: () => void }) {
+  const insets = useSafeAreaInsets();
   const [engagement, setEngagement] = useState<Engagement | null>(null);
   const [busy, setBusy] = useState(false);
   const [heartBurst, setHeartBurst] = useState(false);
@@ -160,7 +162,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
   return (
     <>
       <View style={styles.scrim} />
-      <View style={styles.rightRail}>
+      <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
@@ -169,18 +171,19 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
-      <View style={styles.meta}>
+      <View style={[styles.meta, { bottom: 92 + insets.bottom }]}>
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
         <Pressable onPress={() => item.owner?.username && router.push({ pathname: "/profile", params: { username: item.owner.username } })}><View style={styles.usernameRow}><Text style={styles.username}>@{item.owner?.username || "twitok"}</Text>{item.owner?.isVerified&&<View style={styles.feedVerified}><Text style={styles.feedVerifiedSeal}>✺</Text><Text style={styles.feedVerifiedCheck}>✓</Text></View>}</View></Pressable>
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
-      <View style={styles.bottomTabs}><Pressable style={styles.createButton} onPress={() => router.push("/create")}><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
+      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable style={styles.createButton} onPress={() => router.push("/create")}><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => onSurface("FOR_YOU")}><Text style={surface==="FOR_YOU"?styles.tabActive:styles.tab}>You</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")}><Text style={surface==="FOLLOWING"?styles.tabActive:styles.tab}>Following</Text></Pressable><Pressable onPress={() => onSurface("AFRICA")}><Text style={surface==="AFRICA"?styles.tabActive:styles.tab}>Explore Africa</Text></Pressable></View>
     </>
   );
 }
 
 export default function FeedScreen() {
+  const insets = useSafeAreaInsets();
   const { videoId: requestedVideoId } = useLocalSearchParams<{ videoId?: string }>();
   const [videos, setVideos] = useState<Video[]>([]);
   const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"AFRICA">("FOR_YOU");
@@ -303,7 +306,7 @@ const styles = StyleSheet.create({
   soundDisc: { color: "#fff", fontSize: 18, fontWeight: "800", marginRight: 7 },
   soundText: { color: "#fff", fontSize: 13, fontWeight: "700", flexShrink: 1 },
   unavailable: { color: "#aaa", textAlign: "center", marginBottom: height * 0.45 },
-  bottomTabs: { position: "absolute", bottom: 20, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 30 },
+  bottomTabs: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 30, height: 42, alignItems: "center" },
   createButton: { position: "absolute", bottom: -6, alignSelf: "center", width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
   tabActive: { color: Colors.text, ...Typography.tab },
