@@ -71,6 +71,7 @@ export async function createAppeal(db: Db, input: {
   if (!ObjectId.isValid(input.caseId)) throw new Error("Invalid moderation case id");
   const caseRecord = await db.collection("moderation_cases").findOne({ _id: new ObjectId(input.caseId) });
   if (!caseRecord) throw new Error("Moderation case not found");
+  if (String(caseRecord.subjectUserId ?? "") !== input.userId) throw new Error("You are not authorized to appeal this moderation case");
   if (caseRecord.status !== "RESOLVED" && caseRecord.status !== "DISMISSED") throw new Error("Case is not appealable");
   const record = {
     caseId: input.caseId,
@@ -256,6 +257,7 @@ export async function openUserReport(db: Db, input: {
     reporterId: input.reporterId,
     targetType: input.targetType,
     targetId: input.targetId,
+    subjectUserId: input.targetType === "USER" ? input.targetId : undefined,
     reason: record.reason,
     details: record.details,
     priority: "NORMAL",
