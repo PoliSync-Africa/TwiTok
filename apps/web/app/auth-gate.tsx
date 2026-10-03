@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+const WEB_TOKEN_KEY = "twitok_web_session";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -19,11 +20,20 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    fetch(API + "/auth/me", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
+    fetch(API + "/auth/me", {
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        ...(typeof window !== "undefined" && localStorage.getItem(WEB_TOKEN_KEY)
+          ? { Authorization: "Bearer " + localStorage.getItem(WEB_TOKEN_KEY) }
+          : {})
+      }
+    })
       .then(response => {
         if (cancelled) return;
         if (response.ok) setState("authenticated");
-        else router.replace("/auth");
+        else { localStorage.removeItem(WEB_TOKEN_KEY); router.replace("/auth"); }
       })
       .catch(() => {
         if (!cancelled) router.replace("/auth");
