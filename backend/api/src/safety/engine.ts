@@ -81,6 +81,7 @@ export async function rollbackModerationAction(db: Db, input: {
   if (!action) throw new Error("Moderation action not found");
   if (action.reversible !== true) throw new Error("Moderation action is not reversible");
   if (action.status === "ROLLING_BACK") throw new Error("Moderation action rollback is already in progress; manual reconciliation is required");
+  if (action.status === "AUDIT_PENDING") throw new Error("Moderation action audit is incomplete; manual reconciliation is required");
   if (action.status !== "APPLIED") throw new Error("Moderation action is not currently applied");
   const targetUserId = action.targetUserId ? String(action.targetUserId) : undefined;
   const targetContentId = action.targetContentId ? String(action.targetContentId) : undefined;
@@ -314,13 +315,21 @@ export async function recordModerationAction(db: Db, input: {
           return { insertedId: new ObjectId(reservedActionId) };
         })
       : await db.collection("moderation_actions").insertOne(record);
-    await db.collection("moderation_action_events").insertOne({
-      actionId: result.insertedId.toHexString(),
-      actorId: input.actorId,
-      event: "APPLY",
-      action: input.action,
-      createdAt: new Date()
-    });
+    try {
+      await db.collection("moderation_action_events").insertOne({
+        actionId: result.insertedId.toHexString(),
+        actorId: input.actorId,
+        event: "APPLY",
+        action: input.action,
+        createdAt: new Date()
+      });
+    } catch (error) {
+      await db.collection("moderation_actions").updateOne(
+        { _id: result.insertedId, status: "APPLIED" },
+        { $set: { status: "AUDIT_PENDING", auditFailureReason: error instanceof Error ? error.message : "Moderation action audit failed", auditFailureAt: new Date() } }
+      );
+      throw new Error("Moderation action applied but audit finalization failed; manual reconciliation is required");
+    }
     return { ...record, actionId: result.insertedId.toHexString() };
   } catch (error) {
     if (reservedActionId) {
