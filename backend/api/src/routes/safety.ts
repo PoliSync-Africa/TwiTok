@@ -69,7 +69,7 @@ safetyRouter.post("/mutes/:userId", safetyReviewLimit, requireUser, async (req, 
   try {
     const db = await getDb();
     const result = await muteUser(db, req.userId!.toHexString(), String(req.params.userId));
-    await Promise.all(["FOR_YOU", "FOLLOWING", "AFRICA"].map(surface => cacheDelete("feed:v1:" + req.userId!.toHexString() + ":" + surface + ":" + String(req.user?.countryCode ?? "") + ":20")));
+    await Promise.all(["FOR_YOU", "FOLLOWING", "AFRICA"].map(surface => cacheDelete("feed:v1:" + req.userId!.toHexString() + ":" + surface + "::20")));
     return res.status(201).json(result);
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to mute user" });
