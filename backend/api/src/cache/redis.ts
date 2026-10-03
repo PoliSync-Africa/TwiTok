@@ -68,3 +68,19 @@ export async function cacheDelete(key: string) {
     return false;
   }
 }
+
+export async function cacheDeletePrefix(prefix: string) {
+  try {
+    const redis = await getClient();
+    if (!redis) return false;
+    const keys: string[] = [];
+    for await (const key of redis.scanIterator({ MATCH: prefix + "*", COUNT: 100 })) {
+      keys.push(String(key));
+    }
+    if (keys.length > 0) await redis.del(keys);
+    return true;
+  } catch (error) {
+    console.warn("Redis cache prefix delete skipped:", error instanceof Error ? error.message : "unknown error");
+    return false;
+  }
+}
