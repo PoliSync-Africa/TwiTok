@@ -120,7 +120,8 @@ function TwiTokSplash() {
 
 export default function RootLayout() {
   useFonts({
-    TikTokSans: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@5.3.0/latin-400-normal.ttf"
+    TikTokSans: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@5.3.0/latin-400-normal.ttf",
+    TikTokSansBold: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@5.3.0/latin-700-normal.ttf"
   });
 
   return (
@@ -174,15 +175,15 @@ const styles = StyleSheet.create({
   statusText: {
     marginTop: 14,
     color: "#F5F5F5",
-    fontSize: 18,
-    fontWeight: "500",
+    fontSize: 16,
+    fontFamily: "TikTokSans",
     letterSpacing: 0.2
   },
   connectingText: {
     marginTop: -18,
     color: "#F5F5F5",
-    fontSize: 17,
-    fontWeight: "400",
+    fontSize: 15,
+    fontFamily: "TikTokSans",
     letterSpacing: 3.2
   },
   waveLayer: {
