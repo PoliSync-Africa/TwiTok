@@ -16,18 +16,41 @@ async function getPublicVideo(db: Db, videoId: ObjectId) {
   return video;
 }
 
+async function ensureUniqueEngagementIndex(
+  db: Db,
+  collectionName: string,
+  key: Record<string, 1 | -1>,
+  indexName: string
+) {
+  const collection = db.collection(collectionName);
+  const indexes = await collection.listIndexes().toArray();
+  const sameKey = indexes.filter((index) => JSON.stringify(index.key) === JSON.stringify(key));
+  const existingDesired = sameKey.find((index) => index.name === indexName);
+
+  if (existingDesired?.unique === true) return;
+
+  const replacementName = existingDesired ? indexName + "_unique" : indexName;
+  if (!sameKey.some((index) => index.name === replacementName && index.unique === true)) {
+    await collection.createIndex(key, { unique: true, name: replacementName });
+  }
+
+  if (existingDesired && existingDesired.name !== replacementName) {
+    await collection.dropIndex(existingDesired.name);
+  }
+}
+
 export async function initializeEngagementIndexes(db: Db) {
   await Promise.all([
-    db.collection("video_likes").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "video_likes", { videoId: 1, userId: 1 }, "videoId_1_userId_1"),
     db.collection("video_likes").createIndex({ videoId: 1, createdAt: -1 }),
-    db.collection("video_saves").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "video_saves", { videoId: 1, userId: 1 }, "videoId_1_userId_1"),
     db.collection("video_saves").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ videoId: 1, createdAt: -1 }),
     db.collection("video_comments").createIndex({ userId: 1, createdAt: -1 }),
-    db.collection("comment_likes").createIndex({ commentId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "comment_likes", { commentId: 1, userId: 1 }, "commentId_1_userId_1"),
     db.collection("comment_likes").createIndex({ commentId: 1, createdAt: -1 }),
     db.collection("video_shares").createIndex({ videoId: 1, createdAt: -1 }),
-    db.collection("video_reposts").createIndex({ videoId: 1, userId: 1 }, { unique: true }),
+    ensureUniqueEngagementIndex(db, "video_reposts", { videoId: 1, userId: 1 }, "videoId_1_userId_1"),
     db.collection("video_reposts").createIndex({ videoId: 1, createdAt: -1 })
   ]);
 }
