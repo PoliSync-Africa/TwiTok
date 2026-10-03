@@ -63,7 +63,7 @@ export default function AuthPage() {
     e.preventDefault(); setBusy(true); setError(""); setMessage("");
     try{
       if(mode==="login"){
-        if(!identifier.trim()||!password)throw new Error("Enter your username or email and password.");
+        if(!identifier.trim()||!password)throw new Error("Enter your email or phone number and password.");
         const r=await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({identifier:identifier.trim(),password})});
         const d=await r.json().catch(()=>({}));
         if(!r.ok)throw new Error(d.error??"Unable to sign in.");
@@ -123,7 +123,7 @@ export default function AuthPage() {
         <div className="auth-tabs"><button className={mode==="login"?"active":""} onClick={()=>switchMode("login")}>Log in</button><button className={mode==="signup"?"active":""} onClick={()=>switchMode("signup")}>Sign up</button></div>
         <form onSubmit={submit} className="auth-form">
           {mode==="login"?<>
-            <label>Username or email<input value={identifier} onChange={e=>setIdentifier(e.target.value)} autoComplete="username" placeholder="@username or email"/></label>
+            <label>Email or phone number<input value={identifier} onChange={e=>setIdentifier(e.target.value)} autoComplete="email tel" placeholder="Email address or phone number"/></label>
             <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Your password"/></label>
             <button className="auth-primary" disabled={busy}>{busy?"Signing in…":"Log in"}</button>
           </>:<>
