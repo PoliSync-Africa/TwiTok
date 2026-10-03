@@ -2,6 +2,7 @@ import type { Db } from "mongodb";
 
 export type SafetyDecision = "ALLOW" | "RESTRICT" | "WARN_EDIT" | "BLOCK" | "ESCALATE";
 export type SafetyRisk = "LOW" | "MEDIUM" | "HIGH" | "SEVERE";
+export type ModerationCaseStatus = "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
 
 const blockedPatterns = [
   /\bkill yourself\b/i,
@@ -15,6 +16,8 @@ export async function initializeSafetyIndexes(db: Db) {
     db.collection("moderation_events").createIndex({ decision: 1, createdAt: -1 }),
     db.collection("moderation_cases").createIndex({ status: 1, priority: -1, createdAt: -1 }),
     db.collection("moderation_cases").createIndex({ reportId: 1 }, { unique: true, sparse: true }),
+    db.collection("moderation_cases").createIndex({ assigneeId: 1, status: 1, updatedAt: -1 }),
+    db.collection("moderation_case_events").createIndex({ caseId: 1, createdAt: -1 }),
     db.collection("appeals").createIndex({ userId: 1, createdAt: -1 }),
     db.collection("user_mutes").createIndex({ muterId: 1, mutedId: 1 }, { unique: true }),
     db.collection("user_mutes").createIndex({ muterId: 1, createdAt: -1 }),
@@ -52,6 +55,41 @@ export async function openHumanReview(db: Db, input: { userId:string; contentId:
   };
   const result = await db.collection("moderation_cases").insertOne(caseRecord);
   return { ...caseRecord, caseId: String(result.insertedId) };
+}
+
+export async function listModerationCases(db: Db, input: { status?: ModerationCaseStatus; limit?: number }) {
+  const limit = Math.min(Math.max(Number(input.limit ?? 50), 1), 100);
+  const filter = input.status ? { status: input.status } : {};
+  return db.collection("moderation_cases")
+    .find(filter)
+    .sort({ priority: -1, createdAt: -1 })
+    .limit(limit)
+    .toArray();
+}
+
+export async function updateModerationCase(db: Db, caseId: string, input: {
+  status?: ModerationCaseStatus;
+  assigneeId?: string | null;
+  resolution?: string;
+  reviewerId: string;
+}) {
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(caseId)) throw new Error("Invalid moderation case id");
+  const existing = await db.collection("moderation_cases").findOne({ _id: new ObjectId(caseId) });
+  if (!existing) throw new Error("Moderation case not found");
+  const update: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.status) update.status = input.status;
+  if (input.assigneeId !== undefined) update.assigneeId = input.assigneeId;
+  if (input.resolution !== undefined) update.resolution = String(input.resolution).slice(0, 2000);
+  update.lastReviewedBy = input.reviewerId;
+  await db.collection("moderation_cases").updateOne({ _id: new ObjectId(caseId) }, { $set: update });
+  await db.collection("moderation_case_events").insertOne({
+    caseId,
+    reviewerId: input.reviewerId,
+    changes: update,
+    createdAt: new Date()
+  });
+  return db.collection("moderation_cases").findOne({ _id: new ObjectId(caseId) });
 }
 
 export type SafetyReportTarget = "USER" | "VIDEO" | "COMMENT" | "LIVE";
