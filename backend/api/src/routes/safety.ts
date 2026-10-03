@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { cacheDelete } from "../cache/redis.js";
-import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase, rollbackModerationAction } from "../safety/engine.js";
+import { evaluateText, listModerationCases, createAppeal, listAppeals, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser, updateAppeal, updateModerationCase, recordModerationAction, rollbackModerationAction } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
 import { requireOwner } from "../auth/admin-middleware.js";
@@ -109,6 +109,31 @@ safetyRouter.patch("/moderation/appeals/:appealId", requireOwner, safetyReviewLi
   }
 });
 
+
+safetyRouter.post("/moderation/actions", requireOwner, safetyReviewLimit, async (req, res) => {
+  try {
+    const action = String(req.body?.action ?? "").toUpperCase();
+    if (!["CONTENT_BLOCK", "CONTENT_RESTORE", "ACCOUNT_RESTRICT", "ACCOUNT_RESTORE"].includes(action)) {
+      return res.status(400).json({ error: "Invalid moderation action" });
+    }
+    const source = String(req.body?.source ?? "OWNER").toUpperCase();
+    if (source !== "OWNER") return res.status(400).json({ error: "Owner action endpoint requires OWNER source" });
+    const result = await recordModerationAction(await getDb(), {
+      caseId: String(req.body?.caseId ?? ""),
+      actorId: req.ownerId!,
+      source: "OWNER",
+      action: action as any,
+      targetUserId: req.body?.targetUserId ? String(req.body.targetUserId) : undefined,
+      targetContentId: req.body?.targetContentId ? String(req.body.targetContentId) : undefined,
+      reason: String(req.body?.reason ?? ""),
+      evidenceId: req.body?.evidenceId ? String(req.body.evidenceId) : undefined,
+      idempotencyKey: req.body?.idempotencyKey ? String(req.body.idempotencyKey).slice(0, 128) : undefined
+    });
+    return res.status(201).json({ action: result });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to apply moderation action" });
+  }
+});
 
 safetyRouter.post("/moderation/actions/:actionId/rollback", requireOwner, safetyReviewLimit, async (req, res) => {
   try {
