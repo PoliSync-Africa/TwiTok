@@ -174,7 +174,23 @@ export async function recordModerationAction(db: Db, input: {
       if (existing.status === "APPLIED" || existing.status === "ROLLED_BACK") {
         return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
       }
-      throw new Error("A moderation action with this idempotency key is already being processed");
+      if (existing.status === "PROCESSING") {
+        const expiresAt = existing.processingExpiresAt instanceof Date
+          ? existing.processingExpiresAt
+          : new Date(0);
+        if (expiresAt > new Date()) {
+          throw new Error("A moderation action with this idempotency key is already being processed");
+        }
+        const recovered = await db.collection("moderation_actions").updateOne(
+          { _id: existing._id, status: "PROCESSING", processingExpiresAt: existing.processingExpiresAt },
+          { $set: { status: "FAILED", failedAt: new Date(), failureReason: "Processing lease expired; action requires retry" } }
+        );
+        if (recovered.matchedCount !== 1) {
+          throw new Error("A moderation action with this idempotency key is already being processed");
+        }
+      } else {
+        throw new Error("A moderation action with this idempotency key cannot be retried automatically");
+      }
     }
     const reservation = {
       caseId: input.caseId,
@@ -188,6 +204,8 @@ export async function recordModerationAction(db: Db, input: {
       idempotencyKey: input.idempotencyKey,
       status: "PROCESSING",
       reversible: true,
+      processingStartedAt: new Date(),
+      processingExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
       createdAt: new Date()
     };
     try {
@@ -200,7 +218,10 @@ export async function recordModerationAction(db: Db, input: {
           if (existing.status === "APPLIED" || existing.status === "ROLLED_BACK") {
             return { ...existing, actionId: existing._id.toHexString(), duplicate: true };
           }
-          throw new Error("A moderation action with this idempotency key is already being processed");
+          if (existing.status === "PROCESSING") {
+            throw new Error("A moderation action with this idempotency key is already being processed");
+          }
+          throw new Error("A moderation action with this idempotency key cannot be retried automatically");
         }
       }
       throw error;
