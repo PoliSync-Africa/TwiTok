@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { registerGlobals } from "@livekit/react-native";
 
@@ -118,6 +119,10 @@ function TwiTokSplash() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    TikTokSans: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@5.3.0/latin-400-normal.ttf"
+  });
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
