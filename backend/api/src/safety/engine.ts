@@ -208,6 +208,7 @@ export async function recordModerationAction(db: Db, input: {
   }
 
   let previousState: Record<string, unknown>;
+  try {
   if (accountAction) {
     const target = await db.collection("users").findOne({ _id: new ObjectId(input.targetUserId!) }, { projection: { status: 1 } });
     if (!target) throw new Error("Target user not found");
@@ -240,6 +241,17 @@ export async function recordModerationAction(db: Db, input: {
         { $set: { status: String(target.moderationPreviousStatus), visibility: String(target.moderationPreviousVisibility) }, $unset: { moderationBlockedAt: "", moderationBlockedBy: "", moderationPreviousStatus: "", moderationPreviousVisibility: "" } }
       );
     }
+  }
+
+  }
+  } catch (error) {
+    if (reservedActionId) {
+      await db.collection("moderation_actions").updateOne(
+        { _id: new ObjectId(reservedActionId), status: "PROCESSING" },
+        { $set: { status: "FAILED", failedAt: new Date(), failureReason: error instanceof Error ? error.message : "Moderation action failed" } }
+      );
+    }
+    throw error;
   }
 
   const record = {
