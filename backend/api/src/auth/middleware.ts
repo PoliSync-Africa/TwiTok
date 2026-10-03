@@ -18,91 +18,68 @@ function readCookie(req: Request, name: string) {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
 }
 
-export async function requireUser(req: Request, res: Response, next: NextFunction) {
-  try {
-    const header = req.headers.authorization;
-    const token = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
-    if (!token) return res.status(401).json({ error: "Authorization required" });
-    const claims = verifyUserToken(token);
-    const userId = new ObjectId(claims.sub);
-    const db = await getDb();
-    const user = await db.collection("users").findOne({ _id: userId }, { projection: { status: 1, sessionVersion: 1 } });
-    if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
-    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
-    if (user.emailVerified !== true || user.phoneVerified !== true) return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
-    req.userId = userId;
-    req.userToken = claims;
-    next();
-  } catch {
-    res.status(401).json({ error: "Invalid or expired session" });
-  }
+async function authenticateRequest(req: Request, res: Response) {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
+  if (!token) return { error: "Authorization required" as const };
+  const claims = verifyUserToken(token);
+  const userId = new ObjectId(claims.sub);
+  const db = await getDb();
+  const user = await db.collection("users").findOne(
+    { _id: userId },
+    { projection: { status: 1, sessionVersion: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, dateOfBirth: 1, monetizationEnabled: 1 } }
+  );
+  if (!user || user.status !== "ACTIVE") return { error: "Account is unavailable" as const };
+  if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return { error: "Session has been revoked" as const };
+  return { claims, userId, user };
 }
 
-
+export async function requireUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authenticateRequest(req, res);
+    if ("error" in result) return res.status(result.error === "Authorization required" ? 401 : 401).json({ error: result.error });
+    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) {
+      return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
+    }
+    req.userId = result.userId; req.userToken = result.claims; next();
+  } catch { res.status(401).json({ error: "Invalid or expired session" }); }
+}
 
 export async function requireContactVerificationUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const header = req.headers.authorization;
-    const token = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
-    if (!token) return res.status(401).json({ error: "Authorization required" });
-    const claims = verifyUserToken(token);
-    const userId = new ObjectId(claims.sub);
-    const db = await getDb();
-    const user = await db.collection("users").findOne(
-      { _id: userId },
-      { projection: { status: 1, sessionVersion: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, profileSetupComplete: 1 } }
-    );
-    if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
-    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
-    if (!user.email || !user.phone) return res.status(403).json({ error: "Both email address and phone number are required", code: "CONTACTS_REQUIRED" });
-    if (user.emailVerified === true && user.phoneVerified === true) return res.status(409).json({ error: "Account contacts are already verified" });
-    req.userId = userId;
-    req.userToken = claims;
-    next();
-  } catch {
-    res.status(401).json({ error: "Invalid or expired session" });
-  }
+    const result = await authenticateRequest(req, res);
+    if ("error" in result) return res.status(401).json({ error: result.error });
+    if (!result.user.email || !result.user.phone) return res.status(403).json({ error: "Both email address and phone number are required", code: "CONTACTS_REQUIRED" });
+    if (result.user.emailVerified === true && result.user.phoneVerified === true) {
+      req.userId = result.userId; req.userToken = result.claims; return next();
+    }
+    req.userId = result.userId; req.userToken = result.claims; next();
+  } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }
 
 export async function requireAdultUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const header = req.headers.authorization;
-    const tokenValue = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
-    if (!tokenValue) return res.status(401).json({ error: "Authorization required" });
-    const claims = verifyUserToken(tokenValue);
-    const userId = new ObjectId(claims.sub);
-    const db = await getDb();
-    const user = await db.collection("users").findOne({ _id: userId }, { projection: { status: 1, sessionVersion: 1, dateOfBirth: 1 } });
-    if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
-    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
-    const dob = user.dateOfBirth ? new Date(user.dateOfBirth) : null;
+    const result = await authenticateRequest(req, res);
+    if ("error" in result) return res.status(401).json({ error: result.error });
+    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
+    const dob = result.user.dateOfBirth ? new Date(result.user.dateOfBirth) : null;
     if (!dob || Number.isNaN(dob.getTime())) return res.status(403).json({ error: "Date of birth is required for Coin, Gift and Cash-out features" });
     const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
     if (dob > cutoff) return res.status(403).json({ error: "This wallet feature requires an adult account" });
-    req.userId = userId; req.userToken = claims; next();
+    req.userId = result.userId; req.userToken = result.claims; next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }
 
-
 export async function requireMonetizationUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const header = req.headers.authorization;
-    const tokenValue = header?.startsWith("Bearer ") ? header.slice(7) : readCookie(req, "twitok_user_session");
-    if (!tokenValue) return res.status(401).json({ error: "Authorization required" });
-    const claims = verifyUserToken(tokenValue);
-    const userId = new ObjectId(claims.sub);
-    const db = await getDb();
-    const user = await db.collection("users").findOne(
-      { _id: userId },
-      { projection: { status: 1, sessionVersion: 1, dateOfBirth: 1, monetizationEnabled: 1 } }
-    );
-    if (!user || user.status !== "ACTIVE") return res.status(401).json({ error: "Account is unavailable" });
-    if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return res.status(401).json({ error: "Session has been revoked" });
-    const dob = user.dateOfBirth ? new Date(user.dateOfBirth) : null;
+    const result = await authenticateRequest(req, res);
+    if ("error" in result) return res.status(401).json({ error: result.error });
+    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
+    const dob = result.user.dateOfBirth ? new Date(result.user.dateOfBirth) : null;
     if (!dob || Number.isNaN(dob.getTime())) return res.status(403).json({ error: "Date of birth is required for creator monetization" });
     const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
     if (dob > cutoff) return res.status(403).json({ error: "Creator monetization requires an adult account" });
-    if (user.monetizationEnabled !== true) return res.status(403).json({ error: "Creator monetization is turned off. Enable Monetization in Creator settings first." });
-    req.userId = userId; req.userToken = claims; next();
+    if (result.user.monetizationEnabled !== true) return res.status(403).json({ error: "Creator monetization is turned off. Enable Monetization in Creator settings first." });
+    req.userId = result.userId; req.userToken = result.claims; next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }
