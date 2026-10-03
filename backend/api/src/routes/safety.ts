@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
+import { cacheDelete } from "../cache/redis.js";
 import { evaluateText, listMutedUsers, muteUser, openHumanReview, openUserReport, unmuteUser } from "../safety/engine.js";
 import { requireUser } from "../auth/middleware.js";
 import { requireInternalService } from "../security/internal.js";
@@ -66,7 +67,10 @@ safetyRouter.get("/mutes", safetyReviewLimit, requireUser, async (req, res) => {
 
 safetyRouter.post("/mutes/:userId", safetyReviewLimit, requireUser, async (req, res) => {
   try {
-    return res.status(201).json(await muteUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
+    const db = await getDb();
+    const result = await muteUser(db, req.userId!.toHexString(), String(req.params.userId));
+    await Promise.all(["FOR_YOU", "FOLLOWING", "AFRICA"].map(surface => cacheDelete("feed:v1:" + req.userId!.toHexString() + ":" + surface + ":" + String(req.user?.countryCode ?? "") + ":20")));
+    return res.status(201).json(result);
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to mute user" });
   }
@@ -74,7 +78,10 @@ safetyRouter.post("/mutes/:userId", safetyReviewLimit, requireUser, async (req, 
 
 safetyRouter.delete("/mutes/:userId", safetyReviewLimit, requireUser, async (req, res) => {
   try {
-    return res.json(await unmuteUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
+    const db = await getDb();
+    const result = await unmuteUser(db, req.userId!.toHexString(), String(req.params.userId));
+    await Promise.all(["FOR_YOU", "FOLLOWING", "AFRICA"].map(surface => cacheDelete("feed:v1:" + req.userId!.toHexString() + ":" + surface + ":20")));
+    return res.json(result);
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to unmute user" });
   }
