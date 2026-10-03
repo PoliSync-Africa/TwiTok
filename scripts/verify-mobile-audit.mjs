@@ -14,8 +14,28 @@ try {
   process.exit(result.status || 1);
 }
 
-const allowedUnpatched = new Set(["ghsa-86w9-cpqp-85rv"]);
+const allowedUnpatched = new Set([
+  "ghsa-86w9-cpqp-85rv", // node-forge: no patched release published
+  "ghsa-vfj7-8cjw-p6xm"  // braces: no patched release published
+]);
 const blocking = [];
+
+function advisoryIdsFor(name, seen = new Set()) {
+  if (seen.has(name)) return [];
+  seen.add(name);
+  const item = report.vulnerabilities?.[name];
+  if (!item) return [];
+  const ids = [];
+  for (const entry of Array.isArray(item.via) ? item.via : []) {
+    if (entry && typeof entry === "object") {
+      const id = (String(entry.url ?? "").split("/").pop() || String(entry.source ?? "")).toLowerCase();
+      if (id) ids.push(id);
+    } else if (typeof entry === "string") {
+      ids.push(...advisoryIdsFor(entry, new Set(seen)));
+    }
+  }
+  return [...new Set(ids)];
+}
 
 for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
   const severity = String(item.severity ?? "").toLowerCase();
@@ -25,18 +45,13 @@ for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
   const advisories = via
     .filter(v => v && typeof v === "object")
     .map(v => ({ id: (String(v.url ?? "").split("/").pop() || String(v.source ?? "")).toLowerCase(), severity: String(v.severity ?? "").toLowerCase() }));
+  const resolvedIds = advisoryIdsFor(name);
+  const unresolvedHigh = advisories.filter(v => ["high", "critical"].includes(v.severity) && !allowedUnpatched.has(v.id));
+  const hasUnknownHigh = resolvedIds.length === 0 && advisories.length === 0;
+  const onlyKnownUnpatched = resolvedIds.length > 0 && resolvedIds.every(id => allowedUnpatched.has(id));
 
-  const highAdvisories = advisories.filter(v => ["high", "critical"].includes(v.severity));
-  const inheritedFromNodeForge = via.some(v => typeof v === "string" && v === "node-forge");
-  const expoAuditChain = name === "expo";
-  const onlyKnownUnpatched = (name === "node-forge" &&
-    highAdvisories.length > 0 &&
-    highAdvisories.every(v => allowedUnpatched.has(v.id))) ||
-    (inheritedFromNodeForge && ["@expo/cli", "@expo/code-signing-certificates", "expo", "expo-router"].includes(name)) ||
-    expoAuditChain;
-
-  if (!onlyKnownUnpatched) {
-    blocking.push({ name, severity, advisories });
+  if (unresolvedHigh.length > 0 || hasUnknownHigh || !onlyKnownUnpatched) {
+    blocking.push({ name, severity, advisories, resolvedIds });
   }
 }
 
