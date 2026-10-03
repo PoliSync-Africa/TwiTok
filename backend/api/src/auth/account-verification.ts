@@ -101,7 +101,6 @@ export async function sendAccountVerification(db: Db, userId: string, channel: V
       updatedAt: new Date()
     },
     ...(channel === "phone" ? { $unset: { verificationOtpHash: "" } } : {})
-    }
   });
   return { channel, maskedDestination: channel === "email" ? destination.replace(/^(.{2}).*(@.*)$/, "$1***$2") : destination.replace(/\d(?=\d{4})/g, "*") };
 }
