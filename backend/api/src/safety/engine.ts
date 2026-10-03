@@ -183,11 +183,16 @@ export async function recordModerationAction(db: Db, input: {
         }
         const recovered = await db.collection("moderation_actions").updateOne(
           { _id: existing._id, status: "PROCESSING", processingExpiresAt: existing.processingExpiresAt },
-          { $set: { status: "FAILED", failedAt: new Date(), failureReason: "Processing lease expired; action requires retry" } }
+          { $set: {
+            status: "PROCESSING",
+            processingStartedAt: new Date(),
+            processingExpiresAt: new Date(Date.now() + 15 * 60 * 1000)
+          } }
         );
         if (recovered.matchedCount !== 1) {
           throw new Error("A moderation action with this idempotency key is already being processed");
         }
+        reservedActionId = existing._id.toHexString();
       } else {
         throw new Error("A moderation action with this idempotency key cannot be retried automatically");
       }
@@ -208,10 +213,11 @@ export async function recordModerationAction(db: Db, input: {
       processingExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
       createdAt: new Date()
     };
-    try {
-      const reserved = await db.collection("moderation_actions").insertOne(reservation);
-      reservedActionId = reserved.insertedId.toHexString();
-    } catch (error) {
+    if (!reservedActionId) {
+      try {
+        const reserved = await db.collection("moderation_actions").insertOne(reservation);
+        reservedActionId = reserved.insertedId.toHexString();
+      } catch (error) {
       if (error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
         const existing = await db.collection("moderation_actions").findOne({ idempotencyKey: input.idempotencyKey });
         if (existing) {
@@ -224,7 +230,8 @@ export async function recordModerationAction(db: Db, input: {
           throw new Error("A moderation action with this idempotency key cannot be retried automatically");
         }
       }
-      throw error;
+        throw error;
+      }
     }
   }
 
