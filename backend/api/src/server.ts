@@ -43,16 +43,29 @@ app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
 app.use(helmet());
 const allowedOrigins = (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean);
 if (!allowedOrigins.length) throw new Error("ALLOWED_WEB_ORIGINS or ADMIN_WEB_ORIGIN must be configured");
-app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error("CORS origin denied")), credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error("CORS origin denied")),
+  credentials: true
+}));
+
 app.use((req, res, next) => {
   const stateChanging = !["GET", "HEAD", "OPTIONS"].includes(req.method);
   if (!stateChanging) return next();
+
   const origin = req.get("Origin");
-  if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: "Origin not allowed" });
-  const site = req.get("Sec-Fetch-Site");
-  if (site === "cross-site") return res.status(403).json({ error: "Cross-site state-changing request blocked" });
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
+
+  // TwiTok's web app and API are intentionally hosted on different sites
+  // (for example, twitokapp.com -> twitok-api-sfig.onrender.com). A trusted
+  // CORS origin is therefore expected to be reported as "cross-site" by the
+  // browser. CORS origin allowlisting above is the CSRF boundary; do not
+  // reject an otherwise allowlisted browser request solely because of
+  // Sec-Fetch-Site: cross-site.
   next();
 });
+
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
 app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { (req as any).rawBody = Buffer.from(buf); } }));
 
