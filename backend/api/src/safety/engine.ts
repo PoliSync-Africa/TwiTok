@@ -109,6 +109,8 @@ export async function updateAppeal(db: Db, appealId: string, input: {
   const filter = { _id: new ObjectId(appealId) };
   const existing = await db.collection("appeals").findOne(filter);
   if (!existing) throw new Error("Appeal not found");
+  const currentStatus = String(existing.status ?? "OPEN") as AppealStatus;
+  if (!validAppealTransition(currentStatus, input.status)) throw new Error(`Invalid appeal transition: ${currentStatus} -> ${input.status}`);
   const update = {
     status: input.status,
     resolution: input.resolution ? String(input.resolution).slice(0, 2000) : existing.resolution,
@@ -135,6 +137,27 @@ export async function listModerationCases(db: Db, input: { status?: ModerationCa
     .toArray();
 }
 
+function validModerationTransition(from: ModerationCaseStatus, to: ModerationCaseStatus) {
+  const allowed: Record<ModerationCaseStatus, ModerationCaseStatus[]> = {
+    OPEN: ["IN_REVIEW", "DISMISSED"],
+    IN_REVIEW: ["RESOLVED", "DISMISSED"],
+    RESOLVED: [],
+    DISMISSED: []
+  };
+  return from === to || allowed[from].includes(to);
+}
+
+function validAppealTransition(from: AppealStatus, to: AppealStatus) {
+  const allowed: Record<AppealStatus, AppealStatus[]> = {
+    OPEN: ["IN_REVIEW", "CLOSED"],
+    IN_REVIEW: ["UPHELD", "OVERTURNED", "CLOSED"],
+    UPHELD: ["CLOSED"],
+    OVERTURNED: ["CLOSED"],
+    CLOSED: []
+  };
+  return from === to || allowed[from].includes(to);
+}
+
 export async function updateModerationCase(db: Db, caseId: string, input: {
   status?: ModerationCaseStatus;
   assigneeId?: string | null;
@@ -145,6 +168,8 @@ export async function updateModerationCase(db: Db, caseId: string, input: {
   if (!ObjectId.isValid(caseId)) throw new Error("Invalid moderation case id");
   const existing = await db.collection("moderation_cases").findOne({ _id: new ObjectId(caseId) });
   if (!existing) throw new Error("Moderation case not found");
+  const currentStatus = String(existing.status ?? "OPEN") as ModerationCaseStatus;
+  if (input.status && !validModerationTransition(currentStatus, input.status)) throw new Error(`Invalid moderation case transition: ${currentStatus} -> ${input.status}`);
   const update: Record<string, unknown> = { updatedAt: new Date() };
   if (input.status) update.status = input.status;
   if (input.assigneeId !== undefined) update.assigneeId = input.assigneeId;
