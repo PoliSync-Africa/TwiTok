@@ -2,8 +2,9 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
-import { requireUser } from "../auth/middleware.js";
+import { requireUser, requireContactVerificationUser } from "../auth/middleware.js";
 import { rateLimit, authRateLimit } from "../security/rate-limit.js";
+import { sendAccountVerification, verifyAccountCode, type VerificationChannel } from "../auth/account-verification.js";
 
 const WEB_SESSION_COOKIE = "twitok_user_session";
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
@@ -20,7 +21,13 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    res.status(201).json({ token, user });
+    res.status(201).json({
+      token,
+      user,
+      verificationRequired: true,
+      verificationChannels: ["email", "phone"],
+      verificationDelivery: "choose"
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
     res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
@@ -31,11 +38,69 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
   try {
     const { identifier, password, countryCode } = req.body ?? {};
     if (!identifier || !password) return res.status(400).json({ error: "identifier and password are required" });
-    const user = await authenticateUser(await getDb(), identifier, password, countryCode);
+    const db = await getDb();
+    const user = await authenticateUser(db, identifier, password, countryCode);
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    res.json({ token, user });
+    const verificationRequired = user.emailVerified !== true || user.phoneVerified !== true;
+    if (verificationRequired) {
+      return res.json({
+        token,
+        user,
+        verificationRequired: true,
+        verificationChannels: ["email", "phone"],
+        verificationDelivery: "choose"
+      });
+    }
+    res.json({ token, user, verificationRequired: false, verificationDelivery: "not_required" });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
+});
+
+authRouter.post("/verification/send", requireContactVerificationUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    const channel = String(req.body?.channel ?? "").trim().toLowerCase() as VerificationChannel;
+    if (channel !== "email" && channel !== "phone") return res.status(400).json({ error: "Verification channel must be email or phone" });
+    const db = await getDb();
+    const current = await db.collection("users").findOne({ _id: req.userId! }, { projection: { email: 1, phone: 1, emailVerified: 1, phoneVerified: 1 } });
+    if (!current?.email || !current?.phone) return res.status(400).json({ error: "Both email address and phone number are required for verification" });
+    if (channel === "email" && current.emailVerified === true) return res.status(400).json({ error: "This email address is already verified" });
+    if (channel === "phone" && current.phoneVerified === true) return res.status(400).json({ error: "This phone number is already verified" });
+    const result = await sendAccountVerification(db, req.userId!.toHexString(), channel);
+    return res.json({ verificationRequired: true, ...result });
+  } catch (error) {
+    return res.status(503).json({ error: error instanceof Error ? error.message : "Verification delivery is temporarily unavailable", verificationDeliveryUnavailable: true });
+  }
+});
+
+authRouter.post("/verification/verify", requireContactVerificationUser, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    const code = String(req.body?.code ?? "").trim();
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit verification code" });
+    const db = await getDb();
+    const result = await verifyAccountCode(db, req.userId!.toHexString(), code);
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
+    const remainingVerificationRequired = user?.emailVerified !== true || user?.phoneVerified !== true;
+    return res.json({ ...result, user, verificationRequired: remainingVerificationRequired });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Verification failed" });
+  }
+});
+
+authRouter.get("/verification/status", requireContactVerificationUser, userReadLimit, async (req, res) => {
+  try {
+    const user = await (await getDb()).collection("users").findOne(
+      { _id: req.userId! },
+      { projection: { passwordHash: 0, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, profileSetupComplete: 1 } }
+    );
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    return res.json({
+      user,
+      verificationRequired: user.emailVerified !== true || user.phoneVerified !== true,
+      verificationChannels: ["email", "phone"]
+    });
+  } catch {
+    return res.status(401).json({ error: "Unable to load verification status" });
+  }
 });
 
 authRouter.post("/logout", requireUser, userWriteLimit, async (req, res) => {
