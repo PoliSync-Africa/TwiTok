@@ -342,6 +342,54 @@ export async function recordModerationAction(db: Db, input: {
   }
 }
 
+export async function reconcileModerationAction(db: Db, input: {
+  actionId: string;
+  actorId: string;
+  resolution: "MARK_FAILED" | "MARK_ROLLED_BACK" | "MARK_APPLIED";
+  reason: string;
+}) {
+  const { ObjectId } = await import("mongodb");
+  if (!ObjectId.isValid(input.actionId)) throw new Error("Invalid moderation action id");
+  if (!input.actorId || !input.reason) throw new Error("actorId and reason are required");
+  const allowed = new Set(["FAILED", "AUDIT_PENDING", "ROLLING_BACK"]);
+  const action = await db.collection("moderation_actions").findOne({ _id: new ObjectId(input.actionId) });
+  if (!action) throw new Error("Moderation action not found");
+  if (!allowed.has(String(action.status))) throw new Error("Moderation action is not in a reconciliable state");
+
+  const nextStatus = input.resolution === "MARK_APPLIED" ? "APPLIED"
+    : input.resolution === "MARK_ROLLED_BACK" ? "ROLLED_BACK"
+    : "FAILED";
+
+  const result = await db.collection("moderation_actions").updateOne(
+    { _id: action._id, status: action.status },
+    {
+      $set: {
+        status: nextStatus,
+        reconciledBy: input.actorId,
+        reconciledAt: new Date(),
+        reconciliationReason: String(input.reason).slice(0, 2000)
+      },
+      $unset: { rollbackStartedAt: "", rollbackStartedBy: "", auditFailureAt: "", auditFailureReason: "" }
+    }
+  );
+  if (result.matchedCount !== 1) throw new Error("Moderation action changed concurrently; refresh and retry");
+
+  try {
+    await db.collection("moderation_action_events").insertOne({
+      actionId: input.actionId,
+      actorId: input.actorId,
+      event: "RECONCILE",
+      resolution: nextStatus,
+      reason: String(input.reason).slice(0, 2000),
+      createdAt: new Date()
+    });
+  } catch (error) {
+    throw new Error("Reconciliation state saved but audit finalization failed; manual reconciliation is required");
+  }
+
+  return db.collection("moderation_actions").findOne({ _id: action._id });
+}
+
 export async function captureModerationEvidence(db: Db, input: {
   caseId: string;
   reviewerId: string;
