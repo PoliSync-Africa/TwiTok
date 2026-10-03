@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 35,
     fontWeight: "700",
-    fontFamily: "TikTokSans",
+    fontFamily: "TikTokSansBold",
     letterSpacing: -1.1,
     textAlign: "center"
   },
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "700",
-    fontFamily: "TikTokSans"
+    fontFamily: "TikTokSansBold"
   },
   divider: {
     flexDirection: "row",
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     color: "#222",
     fontSize: 13,
     fontWeight: "700",
-    fontFamily: "TikTokSans"
+    fontFamily: "TikTokSansBold"
   },
   primaryButton: {
     minHeight: 56,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
-    fontFamily: "TikTokSans"
+    fontFamily: "TikTokSansBold"
   },
   methodButton: {
     minHeight: 58,
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     color: "#111",
     fontSize: 15,
     fontWeight: "700",
-    fontFamily: "TikTokSans"
+    fontFamily: "TikTokSansBold"
   },
   legal: {
     color: "#818181",
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     color: "#FE2C55",
     fontSize: 15,
     fontWeight: "700",
-    fontFamily: "TikTokSans"
+    fontFamily: "TikTokSansBold"
   },
   error: {
     color: "#C62845",
