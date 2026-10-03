@@ -1,7 +1,7 @@
 import { ObjectId, type Db } from "mongodb";
 import { redisGetJson, redisSetJson } from "../cache/redis.js";
 
-export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
+export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "DISCOVER";
 
 function redisKey(userId: ObjectId, surface: FeedSurface) {
   return `feed:v1:${surface}:${userId.toHexString()}`;
