@@ -81,6 +81,35 @@ export async function rollbackModerationAction(db: Db, input: {
   if (!action) throw new Error("Moderation action not found");
   if (action.reversible !== true) throw new Error("Moderation action is not reversible");
   if (action.status !== "APPLIED") throw new Error("Moderation action is not currently applied");
+  const targetUserId = action.targetUserId ? String(action.targetUserId) : undefined;
+  const targetContentId = action.targetContentId ? String(action.targetContentId) : undefined;
+  const previousState = (action.previousState ?? {}) as Record<string, unknown>;
+  if (action.action === "ACCOUNT_RESTRICT" || action.action === "ACCOUNT_RESTORE") {
+    if (!targetUserId || !ObjectId.isValid(targetUserId)) throw new Error("Moderation action has invalid target user");
+    const expected = action.action === "ACCOUNT_RESTRICT" ? "SUSPENDED" : "ACTIVE";
+    const restoreStatus = String(previousState.status ?? "");
+    if (!restoreStatus) throw new Error("Moderation action has no preserved account state");
+    const updated = await db.collection("users").updateOne(
+      { _id: new ObjectId(targetUserId), status: expected },
+      { $set: { status: restoreStatus, updatedAt: new Date() } }
+    );
+    if (updated.matchedCount !== 1) throw new Error("Target account changed concurrently; refresh and retry");
+  } else {
+    if (!targetContentId || !ObjectId.isValid(targetContentId)) throw new Error("Moderation action has invalid target content");
+    if (action.action === "CONTENT_BLOCK") {
+      const updated = await db.collection("videos").updateOne(
+        { _id: new ObjectId(targetContentId), status: "BLOCKED" },
+        { $set: { status: String(previousState.status ?? "PUBLISHED"), visibility: String(previousState.visibility ?? "PUBLIC") }, $unset: { moderationBlockedAt: "", moderationBlockedBy: "", moderationPreviousStatus: "", moderationPreviousVisibility: "" } }
+      );
+      if (updated.matchedCount !== 1) throw new Error("Target content changed concurrently; refresh and retry");
+    } else {
+      const updated = await db.collection("videos").updateOne(
+        { _id: new ObjectId(targetContentId), status: String(previousState.status ?? "PUBLISHED"), visibility: String(previousState.visibility ?? "PUBLIC") },
+        { $set: { status: "BLOCKED", visibility: "PRIVATE", moderationPreviousStatus: String(previousState.status ?? "PUBLISHED"), moderationPreviousVisibility: String(previousState.visibility ?? "PUBLIC"), moderationBlockedAt: new Date(), moderationBlockedBy: input.actorId } }
+      );
+      if (updated.matchedCount !== 1) throw new Error("Target content changed concurrently; refresh and retry");
+    }
+  }
   const result = await db.collection("moderation_actions").updateOne(
     { ...filter, status: "APPLIED" },
     { $set: { status: "ROLLED_BACK", rolledBackBy: input.actorId, rolledBackAt: new Date() } }
@@ -168,9 +197,12 @@ export async function recordModerationAction(db: Db, input: {
       );
     } else {
       if (target.status !== "BLOCKED") throw new Error("Content is not currently blocked");
+      if (target.moderationPreviousStatus === undefined || target.moderationPreviousVisibility === undefined) {
+        throw new Error("Blocked content has no preserved moderation state");
+      }
       await db.collection("videos").updateOne(
         { _id: target._id, status: "BLOCKED" },
-        { $set: { status: String(target.moderationPreviousStatus ?? "PUBLISHED"), visibility: String(target.moderationPreviousVisibility ?? "PUBLIC") }, $unset: { moderationBlockedAt: "", moderationBlockedBy: "", moderationPreviousStatus: "", moderationPreviousVisibility: "" } }
+        { $set: { status: String(target.moderationPreviousStatus), visibility: String(target.moderationPreviousVisibility) }, $unset: { moderationBlockedAt: "", moderationBlockedBy: "", moderationPreviousStatus: "", moderationPreviousVisibility: "" } }
       );
     }
   }
