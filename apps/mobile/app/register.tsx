@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { saveAuthToken } from "../lib/auth";
 import { COUNTRIES, DEFAULT_COUNTRY, type Country } from "../lib/countries";
@@ -17,7 +17,7 @@ export default function RegisterScreen() {
   const [error,setError]=useState("");
 
   async function register(){
-    if((!email.trim()&&!phone.trim())||!password||!dateOfBirth||!countryCode.trim()){setError("Enter an email address or phone number, plus all required fields.");return;}
+    if((!email.trim()&&!phone.trim())||!password||!dateOfBirth){setError("Enter an email address or phone number, plus all required fields.");return;}
     if(password.length<8){setError("Password must contain at least 8 characters.");return;}
     setBusy(true);setError("");
     try{
@@ -34,7 +34,6 @@ export default function RegisterScreen() {
     <Text style={styles.title}>Create your account</Text>
     <Text style={styles.subtitle}>Sign up with your email or phone number.</Text>
     <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email address (or use phone)" placeholderTextColor="#777" autoCapitalize="none" keyboardType="email-address"/>
-    <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number (or use email)" placeholderTextColor="#777" keyboardType="phone-pad"/>
     <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password (8+ characters)" placeholderTextColor="#777" secureTextEntry/>
     <TextInput style={styles.input} value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="Date of birth (YYYY-MM-DD)" placeholderTextColor="#777"/>
     <View style={styles.phoneRow}><CountryPicker value={country} onChange={setCountry}/><TextInput style={styles.phoneInput} value={phone} onChangeText={setPhone} placeholder="Phone number" placeholderTextColor="#777" keyboardType="phone-pad"/></View><Text style={styles.hint}>Country code is added automatically.</Text>
