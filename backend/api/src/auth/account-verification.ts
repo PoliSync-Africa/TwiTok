@@ -40,7 +40,6 @@ async function sendEmailOtp(email: string, code: string) {
     })
   });
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
     throw new VerificationDeliveryError("Email provider rejected the verification message");
   }
 }
@@ -60,10 +59,10 @@ async function sendPhoneOtp(phone: string) {
       number: phone.replace(/^\+/, ""),
       sender_id: senderId,
       type: "numeric"
-    })
+    }),
+    signal: AbortSignal.timeout(8000)
   });
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
     throw new VerificationDeliveryError("SMS provider rejected the verification message");
   }
   const data = await response.json().catch(() => ({}));
