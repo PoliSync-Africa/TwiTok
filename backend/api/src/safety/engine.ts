@@ -242,12 +242,10 @@ export async function recordModerationAction(db: Db, input: {
       );
     }
   }
-
-  }
   } catch (error) {
     if (reservedActionId) {
       await db.collection("moderation_actions").updateOne(
-        { _id: new ObjectId(reservedActionId), status: "PROCESSING" },
+        { _id: new ObjectId(reservedActionId), status: { $in: ["PROCESSING", "APPLIED"] } },
         { $set: { status: "FAILED", failedAt: new Date(), failureReason: error instanceof Error ? error.message : "Moderation action failed" } }
       );
     }
@@ -275,7 +273,10 @@ export async function recordModerationAction(db: Db, input: {
       ? await db.collection("moderation_actions").updateOne(
           { _id: new ObjectId(reservedActionId), status: "PROCESSING" },
           { $set: record }
-        ).then(() => ({ insertedId: new ObjectId(reservedActionId) }))
+        ).then(result => {
+          if (result.matchedCount !== 1) throw new Error("Moderation action reservation changed concurrently; retry");
+          return { insertedId: new ObjectId(reservedActionId) };
+        })
       : await db.collection("moderation_actions").insertOne(record);
     await db.collection("moderation_action_events").insertOne({
       actionId: result.insertedId.toHexString(),
