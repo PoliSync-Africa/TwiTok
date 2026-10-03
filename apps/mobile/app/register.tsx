@@ -26,7 +26,7 @@ export default function RegisterScreen() {
       const d=await r.json().catch(()=>({}));
       if(!r.ok||!d.token) throw new Error(d.error??"Unable to create account");
       await saveAuthToken(d.token);
-      router.replace("/profile-setup");
+      router.replace(d.verificationRequired ? { pathname: "/verify-account", params: { channel: d.user?.email ? "email" : "phone" } } : "/profile-setup");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create account");}finally{setBusy(false);}
   }
 
