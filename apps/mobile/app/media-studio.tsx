@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
@@ -10,9 +10,41 @@ export default function MediaStudioScreen() {
   const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mode?: string; duration?: string }>();
   const mode = String(params.mode ?? "VIDEO").toUpperCase() === "PHOTO" ? "PHOTO" : "VIDEO";
   const [plan, setPlan] = useState<StudioPlan>(DEFAULT_STUDIO_PLAN);
+  const [capabilities, setCapabilities] = useState<Set<string> | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const token = await getAuthToken();
+      if (!token) return;
+      try {
+        const response = await fetch(API + "/ai-media/capabilities", { headers: { Authorization: "Bearer " + token } });
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && data.providerBacked) {
+          const operations = data.operations ?? {};
+          const backgrounds = data.backgrounds ?? {};
+          const qualityProfiles = data.qualityProfiles ?? {};
+          setCapabilities(new Set([
+            ...Object.entries(operations).filter(([, enabled]) => enabled).map(([name]) => name),
+            ...Object.entries(backgrounds).filter(([, enabled]) => enabled).map(([name]) => name),
+            ...Object.entries(qualityProfiles).filter(([, enabled]) => enabled).map(([name]) => name),
+          ]));
+        }
+      } catch {
+        // Keep the full local Studio surface when capability discovery is unavailable.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function runAI() {
     const uri = String(params.uri ?? "");
+    const capabilityFor = (id: string) => ({REPLACE:"BACKGROUND_REPLACE",REMOVE:"BACKGROUND_REMOVE",BLUR:"AI_BLUR",STUDIO:"STUDIO",GREEN:"GREEN_SCREEN",RESTORE:"RESTORE",RELIGHT:"RELIGHT",DETAIL:"SUPER_DETAIL",COLORIZE:"COLORIZE",AI_ART:"AI_ART",AI_EXPAND:"AI_EXPAND",OBJECT_REMOVE:"REMOVE_OBJECT",FACE_REPAIR:"FACE_REPAIR",CLEAN:"CLEAN",HD:"HD","4K":"4K","8K":"8K","12K_AI":"12K_AI"} as Record<string,string>)[id];
+    const required = [plan.quality, plan.aiTool, plan.background].map(capabilityFor).filter(Boolean) as string[];
+    if (capabilities && capabilities.size && required.some(name => !capabilities.has(name))) {
+      Alert.alert("AI Studio", "One or more selected AI tools are not available from the configured provider yet.");
+      return;
+    }
     if (!uri) { Alert.alert("Media Studio", "Add a photo or video first."); return; }
     const token = await getAuthToken();
     if (!token) { Alert.alert("Media Studio", "Please sign in again."); return; }
@@ -49,5 +81,5 @@ export default function MediaStudioScreen() {
     } catch(e) { Alert.alert("AI Studio",e instanceof Error?e.message:"Unable to process media."); }
   }
 
-  return <UnifiedMediaStudio visible mode={mode} value={plan} onChange={setPlan} onClose={()=>router.back()} onRunAI={()=>void runAI()} />;
+  return <UnifiedMediaStudio visible mode={mode} value={plan} onChange={setPlan} onClose={()=>router.back()} onRunAI={()=>void runAI()} capabilities={capabilities} />;
 }
