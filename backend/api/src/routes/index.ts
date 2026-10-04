@@ -23,6 +23,7 @@ import { paymentRoutingRouter } from "./payment-routing.js";
 import { analyticsRouter } from "./analytics.js";
 import { verificationRouter } from "./verification.js";
 import { requireCompletedProfileIfAuthenticated } from "../auth/middleware.js";
+import { aiMediaRouter } from "./ai-media.js";
 
 export const apiRouter = Router();
 
@@ -32,6 +33,7 @@ apiRouter.use("/profile", profileRouter);
 apiRouter.use("/video", videoRouter);
 apiRouter.use("/feed", feedRouter);
 apiRouter.use("/media", mediaRouter);
+apiRouter.use("/ai-media", aiMediaRouter);
 apiRouter.use("/music", musicRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/money", moneyRouter);
