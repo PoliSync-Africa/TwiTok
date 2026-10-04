@@ -87,7 +87,12 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
     }
     if (!upload.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
 
-    const completionLeaseMs = 10 * 60 * 1000;
+    const partSizeBytes = 10 * 1024 * 1024;
+    const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({ partNumber: Number(part.partNumber), etag: String(part.etag).trim() })) : [];
+    const maxParts = Math.ceil(Number(upload.sizeBytes) / partSizeBytes);
+    if (!parts.length || !Number.isFinite(maxParts) || maxParts < 1 || parts.length > maxParts) return res.status(400).json({ error: "Invalid multipart part count" });
+    const sortedPartNumbers = [...parts].sort((a, b) => a.partNumber - b.partNumber).map(part => part.partNumber);
+    if (sortedPartNumbers.some((partNumber, index) => partNumber !== index + 1)) return res.status(400).json({ error: "Multipart parts must be sequential" });    const completionLeaseMs = 10 * 60 * 1000;
     const now = new Date();
     const claimed = await db.collection("video_uploads").findOneAndUpdate(
       {
@@ -112,12 +117,7 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
       }
       return res.status(409).json({ error: "Multipart upload completion is already in progress" });
     }
-    const partSizeBytes = 10 * 1024 * 1024;
-    const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({ partNumber: Number(part.partNumber), etag: String(part.etag).trim() })) : [];
-    const maxParts = Math.ceil(Number(upload.sizeBytes) / partSizeBytes);
-    if (!parts.length || !Number.isFinite(maxParts) || maxParts < 1 || parts.length > maxParts) return res.status(400).json({ error: "Invalid multipart part count" });
-    const sortedPartNumbers = [...parts].sort((a, b) => a.partNumber - b.partNumber).map(part => part.partNumber);
-    if (sortedPartNumbers.some((partNumber, index) => partNumber !== index + 1)) return res.status(400).json({ error: "Multipart parts must be sequential" });
+
     const result = await completeMultipartUpload({ objectKey: upload.objectKey, uploadId: upload.multipartUploadId, parts });
     const verified = await verifyMediaObject(upload.objectKey, String(upload.mimeType), 500 * 1024 * 1024);
     if (verified.sizeBytes !== Number(upload.sizeBytes)) {
