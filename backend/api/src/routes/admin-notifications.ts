@@ -21,12 +21,22 @@ const CATEGORIES: SystemNotificationCategory[] = [
   "SAFETY",
   "CREATOR"
 ];
-const AUDIENCES: SystemNotificationAudience[] = ["ALL", "CREATORS", "VERIFIED", "COUNTRY"];
+const AUDIENCES: SystemNotificationAudience[] = ["ALL", "CREATORS", "VERIFIED", "COUNTRY", "INDIVIDUALS"];
 
 adminNotificationsRouter.get("/", requireOwner, readLimit, async (req, res) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
     const db = await getDb();
+    let targetUserIds: ObjectId[] = [];
+    if (audience === "INDIVIDUALS") {
+      const usernames = [...new Set(targetUsernames.map((value: unknown) => String(value).trim().replace(/^@/, "").toLowerCase()).filter(Boolean))];
+      if (usernames.length > 100) return res.status(400).json({ error: "A maximum of 100 individuals can be targeted per announcement" });
+      const users = await db.collection("users").find({ username: { $in: usernames } }, { projection: { _id: 1, username: 1 } }).toArray();
+      const found = new Set(users.map(user => String(user.username).toLowerCase()));
+      const missing = usernames.filter(username => !found.has(username));
+      if (missing.length) return res.status(404).json({ error: "Some usernames were not found", missingUsernames: missing });
+      targetUserIds = users.map(user => user._id);
+    }
     const rows = await db.collection("system_announcements")
       .find({})
       .sort({ createdAt: -1 })
@@ -42,6 +52,7 @@ adminNotificationsRouter.get("/", requireOwner, readLimit, async (req, res) => {
         actionUrl: row.actionUrl ?? null,
         audience: row.audience,
         targetCountryCode: row.targetCountryCode ?? null,
+        targetUserCount: Array.isArray(row.targetUserIds) ? row.targetUserIds.length : 0,
         priority: row.priority ?? 0,
         status: row.status,
         startsAt: row.startsAt,
@@ -68,6 +79,7 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
     const actionLabel = typeof body.actionLabel === "string" ? body.actionLabel.trim() : "";
     const actionUrl = typeof body.actionUrl === "string" ? body.actionUrl.trim() : "";
     const targetCountryCode = typeof body.targetCountryCode === "string" ? body.targetCountryCode.trim().toUpperCase() : null;
+    const targetUsernames = Array.isArray(body.targetUsernames) ? body.targetUsernames : [];
     const priority = Math.min(100, Math.max(0, Number(body.priority ?? 0)));
     const startsAt = body.startsAt ? new Date(body.startsAt) : new Date();
     const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
@@ -83,6 +95,9 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
     if (audience === "COUNTRY" && (!targetCountryCode || !/^[A-Z]{2}$/.test(targetCountryCode))) {
       return res.status(400).json({ error: "A two-letter target country code is required" });
     }
+    if (audience === "INDIVIDUALS" && (!targetUsernames.length || targetUsernames.length > 100)) {
+      return res.status(400).json({ error: "Add between 1 and 100 individual usernames" });
+    }
     if (Number.isNaN(startsAt.getTime()) || (expiresAt && Number.isNaN(expiresAt.getTime()))) {
       return res.status(400).json({ error: "Invalid notification date" });
     }
@@ -97,6 +112,7 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
       actionUrl: actionUrl || null,
       audience,
       targetCountryCode: audience === "COUNTRY" ? targetCountryCode : null,
+      targetUserIds: audience === "INDIVIDUALS" ? targetUserIds : [],
       priority,
       status: publish ? "PUBLISHED" : "DRAFT",
       startsAt,
