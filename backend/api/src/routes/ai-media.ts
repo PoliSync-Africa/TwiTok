@@ -206,9 +206,11 @@ function validateOutputDimensions(value: unknown, mode: string, qualityProfile: 
 
 function providerStatusEndpoint(jobId: string) {
   const template = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
-  if (!template) return null;
+  const providerEndpoint = safeUrl(process.env.TWITOK_AI_MEDIA_ENDPOINT, []);
+  if (!template || !providerEndpoint) return null;
   const encoded = encodeURIComponent(jobId);
-  return safeUrl(template.replaceAll("{jobId}", encoded), []);
+  const providerHost = new URL(providerEndpoint).hostname.toLowerCase();
+  return safeUrl(template.replaceAll("{jobId}", encoded), [providerHost]);
 }
 
 function normalizeProviderResponse(value: unknown) {
