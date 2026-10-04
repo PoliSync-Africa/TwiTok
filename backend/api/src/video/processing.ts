@@ -73,10 +73,79 @@ export async function recoverStaleVideoUploads(db: Db) {
 
 export async function recoverExpiredVideoJobs(db: Db) {
   const now = new Date();
-  await db.collection("video_processing_jobs").updateMany(
-    { status: "RUNNING", leaseExpiresAt: { $lt: now } },
-    { $set: { status: "QUEUED", nextAttemptAt: now, updatedAt: now }, $unset: { workerId: "", leaseExpiresAt: "" } }
+  const jobs = db.collection("video_processing_jobs");
+
+  // A worker that loses its lease must not silently bypass maxAttempts.
+  // Terminal jobs are moved directly to DEAD_LETTER; only retryable jobs
+  // return to the queue.
+  const terminal = await jobs.find({
+    status: "RUNNING",
+    leaseExpiresAt: { $lt: now },
+    $expr: { $gte: ["$attempts", { $ifNull: ["$maxAttempts", 5] }] }
+  }).toArray();
+
+  if (terminal.length > 0) {
+    const terminalIds = terminal.map((job) => job._id);
+    await jobs.updateMany(
+      {
+        _id: { $in: terminalIds },
+        status: "RUNNING",
+        leaseExpiresAt: { $lt: now },
+        $expr: { $gte: ["$attempts", { $ifNull: ["$maxAttempts", 5] }] }
+      },
+      {
+        $set: {
+          status: "DEAD_LETTER",
+          lastError: "Processing worker lease expired after maximum retry attempts",
+          nextAttemptAt: null,
+          updatedAt: now,
+          finishedAt: now
+        },
+        $unset: { workerId: "", leaseExpiresAt: "" }
+      }
+    );
+
+    await Promise.all(
+      terminal.map((job) =>
+        Promise.all([
+          db.collection("video_uploads").updateOne(
+            { uploadId: job.uploadId },
+            {
+              $set: {
+                status: "FAILED",
+                updatedAt: now,
+                processingError: "Processing worker lease expired after maximum retry attempts"
+              }
+            }
+          ),
+          db.collection("videos").updateOne(
+            { uploadId: job.uploadId },
+            {
+              $set: {
+                status: "FAILED",
+                updatedAt: now,
+                processingError: "Processing worker lease expired after maximum retry attempts"
+              }
+            }
+          )
+        ])
+      )
+    );
+  }
+
+  await jobs.updateMany(
+    {
+      status: "RUNNING",
+      leaseExpiresAt: { $lt: now },
+      $expr: { $lt: ["$attempts", { $ifNull: ["$maxAttempts", 5] }] }
+    },
+    {
+      $set: { status: "QUEUED", nextAttemptAt: now, updatedAt: now },
+      $unset: { workerId: "", leaseExpiresAt: "" }
+    }
   );
+
+  return terminal.length;
 }
 
 export async function claimNextVideoJob(db: Db, workerId: string) {
