@@ -526,6 +526,7 @@ export default function CreateScreen() {
         {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
         {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
       </ScrollView>
+      <UnifiedMediaStudio visible={studioVisible} mode={mode === "PHOTO" ? "PHOTO" : "VIDEO"} value={studioPlan} onChange={setStudioPlan} onClose={() => setStudioVisible(false)} onRunAI={() => { const uri = assets[selectedClip]?.uri; if (uri) { setStudioVisible(false); router.push({ pathname: "/media-studio", params: { uri, mimeType: assets[selectedClip]?.mimeType ?? "", mode, duration: String(assets[selectedClip]?.duration ?? "") } }); } }} />
     </View>
   );
 }
