@@ -10,7 +10,7 @@ const USER_SECRET = () => {
   return secret;
 };
 
-export type UserToken = { sub: string; role: "USER"; username: string; sv: number; iat?: number; exp?: number };
+export type UserToken = { sub: string; role: "USER"; username: string; sv: number; typ: "user_session"; iat?: number; exp?: number };
 
 export function issueUserToken(user: { _id: string; username?: string | null; sessionVersion?: number }) {
   return jwt.sign(
@@ -21,8 +21,8 @@ export function issueUserToken(user: { _id: string; username?: string | null; se
 }
 
 export function verifyUserToken(token: string): UserToken {
-  const decoded = jwt.verify(token, USER_SECRET(), { issuer: "twitok", audience: "twitok-api" }) as UserToken;
-  if (decoded.role !== "USER" || !decoded.sub || !ObjectId.isValid(decoded.sub)) throw new Error("Invalid user token");
+  const decoded = jwt.verify(token, USER_SECRET(), { issuer: "twitok", audience: "twitok-api", algorithms: ["HS256"] }) as UserToken;
+  if (decoded.typ !== "user_session" || decoded.role !== "USER" || !decoded.sub || !ObjectId.isValid(decoded.sub) || !Number.isInteger(decoded.sv) || decoded.sv < 0) throw new Error("Invalid user token");
   return decoded;
 }
 
