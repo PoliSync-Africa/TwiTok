@@ -216,13 +216,16 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       if (!json || typeof json !== "object" || Array.isArray(json)) {
         throw new Error("provider invalid response");
       }
-      const normalized = normalizeProviderResponse(json);\n      if (!normalized) throw new Error("provider invalid response");\n      provider = normalized;
+      const normalized = normalizeProviderResponse(json);
+      if (!normalized) throw new Error("provider invalid response");
+      provider = normalized;
     } finally {
       clearTimeout(timer);
     }
 
     const outputUrl = validMediaOutput(provider.outputUrl);
     const providerJobId = safeJobId(provider.jobId);
+    const providerStatus = String(provider.status ?? "").toUpperCase();
     if (providerStatus && PROVIDER_TERMINAL_FAILURES.has(providerStatus) && !outputUrl && !providerJobId) {
       return res.status(502).json({ error: "AI provider rejected the media job", code: "AI_MEDIA_PROVIDER_FAILED" });
     }
@@ -247,6 +250,8 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       providerJobId,
       outputUrl,
       status: outputUrl ? "READY" : "PROCESSING",
+      retryCount: 0,
+      maxRetries: AI_JOB_MAX_RETRIES,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -271,7 +276,15 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
   if (!job) return res.status(404).json({ error: "AI media job not found" });
 
   let outputUrl = safeUrl(job.outputUrl, allowedHosts());
-  let status = outputUrl ? "READY" : String(job.status ?? "PROCESSING");\n\n  if (!outputUrl && jobIsStalled(job)) {\n    status = "FAILED";\n    await (await getDb()).collection("ai_media_jobs").updateOne(\n      { _id: job._id, userId: req.userId, status: "PROCESSING" },\n      { $set: { status, failureCode: "AI_MEDIA_JOB_TIMEOUT", updatedAt: new Date() } },\n    );\n  }
+  let status = outputUrl ? "READY" : String(job.status ?? "PROCESSING");
+
+  if (!outputUrl && jobIsStalled(job)) {
+    status = "FAILED";
+    await (await getDb()).collection("ai_media_jobs").updateOne(
+      { _id: job._id, userId: req.userId, status: "PROCESSING" },
+      { $set: { status, failureCode: "AI_MEDIA_JOB_TIMEOUT", updatedAt: new Date() } },
+    );
+  }
 
   if (!outputUrl && status === "PROCESSING" && job.providerJobId) {
     const endpoint = providerStatusEndpoint(String(job.providerJobId));
