@@ -19,6 +19,8 @@ const BACKGROUNDS = new Set(["ORIGINAL", "AI_BLUR", "REPLACE", "REMOVE", "STUDIO
 const PROVIDER_TERMINAL_FAILURES = new Set(["FAILED", "ERROR", "CANCELLED"]);
 const AI_JOB_TIMEOUT_MS = 10 * 60 * 1000;
 const AI_JOB_MAX_RETRIES = 2;
+const AI_OUTPUT_MAX_BYTES = 512 * 1024 * 1024;
+const AI_OUTPUT_FETCH_TIMEOUT_MS = 15_000;
 const AI_RETRY_BASE_DELAY_MS = 2_000;
 const AI_RETRY_MAX_DELAY_MS = 15_000;
 
@@ -114,6 +116,25 @@ const OUTPUT_CONTENT_TYPES = {
     "video/mpeg", "video/mp2t", "video/3gpp", "video/3gpp2",
   ]),
 };
+
+async function validateOutputContent(url: string, mode: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_OUTPUT_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { method: "GET", headers: { Range: "bytes=0-15" }, signal: controller.signal });
+    if (!response.ok && response.status !== 206) return false;
+    const contentType = response.headers.get("content-type")?.toLowerCase().split(";")[0].trim();
+    const expectedTypes = OUTPUT_CONTENT_TYPES[mode as "IMAGE" | "VIDEO"];
+    if (contentType && !expectedTypes.has(contentType)) return false;
+    const contentLength = Number(response.headers.get("content-length") ?? "0");
+    if (Number.isFinite(contentLength) && contentLength > AI_OUTPUT_MAX_BYTES) return false;
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function validateProviderOutputMetadata(value: unknown, mode: string) {
   const extracted = extractProviderOutput(value);
@@ -367,6 +388,9 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
     }
 
     const outputUrl = validateProviderOutputMetadata(provider, mode);
+    if (outputUrl && !(await validateOutputContent(outputUrl, mode))) {
+      return res.status(502).json({ error: "AI provider returned invalid output content", code: "AI_MEDIA_INVALID_OUTPUT" });
+    }
     if (outputUrl && !validateOutputDimensions(provider, mode, qualityProfile)) {
       return res.status(502).json({ error: "AI provider returned invalid output dimensions", code: "AI_MEDIA_INVALID_OUTPUT" });
     }
@@ -450,7 +474,8 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
           if (json && typeof json === "object" && !Array.isArray(json)) {
             const provider = json as Record<string, unknown>;
             const candidate = validateProviderOutputMetadata(provider, String(job.mode ?? "VIDEO").toUpperCase());
-            if (candidate && validateOutputDimensions(provider, String(job.mode ?? "VIDEO").toUpperCase(), String(job.qualityProfile ?? "ORIGINAL").toUpperCase())) {
+            if (candidate && await validateOutputContent(candidate, String(job.mode ?? "VIDEO").toUpperCase()) &&
+                validateOutputDimensions(provider, String(job.mode ?? "VIDEO").toUpperCase(), String(job.qualityProfile ?? "ORIGINAL").toUpperCase())) {
               outputUrl = candidate;
               status = "READY";
               await (await getDb()).collection("ai_media_jobs").updateOne(
