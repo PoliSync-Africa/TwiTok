@@ -6,6 +6,7 @@ import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
 import { Typography, Colors } from "../theme/typography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { v4 as uuidv4 } from "uuid";
 
 type Video = {
   id: string;
@@ -192,7 +193,7 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const sessionId = useRef(`mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`).current;
+  const sessionId = useRef(`mobile-${uuidv4()}`).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80, minimumViewTime: 120 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
     const firstVisible = viewableItems.find(item => item.index !== null);
