@@ -265,15 +265,41 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
 }
 
 export async function publishVideo(db: Db, userId: ObjectId, videoId: ObjectId) {
-  const video = await db.collection("videos").findOne({ _id: videoId, ownerId: userId });
-  if (!video) throw new Error("Video not found");
-  if (video.status !== "READY") throw new Error("Video is not ready for publication");
-  if (!video.playback) throw new Error("Video processing has not produced playback assets");
   const now = new Date();
-  await db.collection("videos").updateOne({ _id: videoId }, {
-    $set: { status: "PUBLISHED", publishedAt: now, updatedAt: now }
-  });
-  return { videoId: videoId.toHexString(), status: "PUBLISHED", publishedAt: now };
+
+  // Publishing is idempotent: a mobile retry after a timeout must not create
+  // another publication timestamp or move an already-published post backwards.
+  const existing = await db.collection("videos").findOne(
+    { _id: videoId, ownerId: userId },
+    { projection: { status: 1, publishedAt: 1, playback: 1 } }
+  );
+  if (!existing) throw new Error("Video not found");
+  if (existing.status === "PUBLISHED") {
+    if (!existing.playback) throw new Error("Published video is missing playback assets");
+    return {
+      videoId: videoId.toHexString(),
+      status: "PUBLISHED",
+      publishedAt: existing.publishedAt ?? null,
+      idempotent: true
+    };
+  }
+  if (existing.status !== "READY") throw new Error("Video is not ready for publication");
+  const hlsUrl = String(existing.playback?.hlsUrl ?? "").trim();
+  if (!hlsUrl) throw new Error("Video processing has not produced playback assets");
+
+  const result = await db.collection("videos").findOneAndUpdate(
+    { _id: videoId, ownerId: userId, status: "READY", "playback.hlsUrl": hlsUrl },
+    { $set: { status: "PUBLISHED", publishedAt: now, updatedAt: now } },
+    { returnDocument: "after", projection: { publishedAt: 1, status: 1 } }
+  );
+  if (!result) {
+    const raced = await db.collection("videos").findOne({ _id: videoId, ownerId: userId }, { projection: { status: 1, publishedAt: 1 } });
+    if (raced?.status === "PUBLISHED") {
+      return { videoId: videoId.toHexString(), status: "PUBLISHED", publishedAt: raced.publishedAt ?? null, idempotent: true };
+    }
+    throw new Error("Video changed before publication; please retry");
+  }
+  return { videoId: videoId.toHexString(), status: "PUBLISHED", publishedAt: result.publishedAt ?? now };
 }
 
 export async function createVideoRemix(db: Db, userId: ObjectId, sourceVideoId: string, mode: "DUET" | "STITCH") {
