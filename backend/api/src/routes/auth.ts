@@ -68,7 +68,9 @@ authRouter.post("/verification/send", requireContactVerificationUser, rateLimit(
     const result = await sendAccountVerification(db, req.userId!.toHexString(), channel);
     return res.json({ verificationRequired: true, ...result });
   } catch (error) {
-    return res.status(503).json({ error: error instanceof Error ? error.message : "Verification delivery is temporarily unavailable", verificationDeliveryUnavailable: true });
+    const message = error instanceof Error ? error.message : "Verification delivery is temporarily unavailable";
+    const status = /wait before requesting|already verified|not configured|no (email|phone) contact/i.test(message) ? 400 : 503;
+    return res.status(status).json({ error: message, verificationDeliveryUnavailable: status === 503 });
   }
 });
 
@@ -82,7 +84,9 @@ authRouter.post("/verification/verify", requireContactVerificationUser, rateLimi
     const remainingVerificationRequired = user?.emailVerified !== true || user?.phoneVerified !== true;
     return res.json({ ...result, user, verificationRequired: remainingVerificationRequired });
   } catch (error) {
-    return res.status(400).json({ error: error instanceof Error ? error.message : "Verification failed" });
+    const message = error instanceof Error ? error.message : "Verification failed";
+    const status = /too many incorrect/i.test(message) ? 429 : /temporarily unavailable|not configured/i.test(message) ? 503 : 400;
+    return res.status(status).json({ error: message });
   }
 });
 
