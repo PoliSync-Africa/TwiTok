@@ -78,7 +78,7 @@ export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadI
   await db.collection("videos").insertOne({
     _id: postId, ownerId: userId, mediaType: "PHOTO", photoObjectKeys: uploads.map(x => x.objectKey),
     photoMimeTypes: uploads.map(x => x.mimeType), caption, hashtags: normalizeHashtags(input.hashtags), mentions: normalizeMentions(input.mentions), location: String(input.location ?? "").trim().slice(0, 120) || null,
-    editPlan,\n    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
+    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
     status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
   });
   return { postId: postId.toHexString(), status: "PUBLISHED", mediaType: "PHOTO", photoCount: uploads.length };
