@@ -78,9 +78,15 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
     const db = await getDb();
     const uploadId = String(req.params.uploadId);
     const upload = await db.collection("video_uploads").findOne({ uploadId, userId: req.userId });
-    if (!upload?.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
+    if (!upload) return res.status(404).json({ error: "Upload session not found" });
+    // Completion is intentionally idempotent: mobile clients may retry after a
+    // network timeout even though object storage already completed the upload.
+    if (upload.multipartCompletedAt) {
+      return res.json({ uploadId, completed: true, etag: upload.etag ?? null, idempotent: true });
+    }
+    if (!upload.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
     const partSizeBytes = 10 * 1024 * 1024;
-    const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({ partNumber: Number(part.partNumber), etag: String(part.etag) })) : [];
+    const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({ partNumber: Number(part.partNumber), etag: String(part.etag).trim() })) : [];
     const maxParts = Math.ceil(Number(upload.sizeBytes) / partSizeBytes);
     if (!parts.length || !Number.isFinite(maxParts) || maxParts < 1 || parts.length > maxParts) return res.status(400).json({ error: "Invalid multipart part count" });
     const sortedPartNumbers = [...parts].sort((a, b) => a.partNumber - b.partNumber).map(part => part.partNumber);
