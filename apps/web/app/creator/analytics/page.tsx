@@ -9,8 +9,9 @@ type Analytics = {
   daily: Array<{date:string;views:number;completedViews:number;likes:number;comments:number;shares:number;saves:number;follows:number}>;
   topVideos: Array<{id:string;views:number;completedViews:number;likes:number;comments:number;shares:number;saves:number;caption:string;mediaType:string;publishedAt?:string|null}>;
   audienceCountries: Array<{countryCode:string;viewers:number;views:number}>;
+  audience: { followerTotal:number; newFollowers:number; dailyFollowerGrowth:Array<{date:string;newFollowers:number}>; followerCountries:Array<{countryCode:string;followers:number}> };
   live: {streams:number;endedStreams:number;totalDurationMs:number;giftsUsd:number;peakViewerCount:number};
-  trafficSources: Array<{source:string;views:number;tracked:boolean}>;
+  trafficSources: Array<{source:string;views:number;impressions?:number;tracked:boolean}>;
   earnings: {grossCreatorEarningsUsd:number;cashCreditedUsd:number;diamonds:number};
 };
 
@@ -38,7 +39,9 @@ export default function CreatorAnalytics() {
   const maxViews = Math.max(1,...(data?.daily??[]).map(x=>x.views));
   const maxTop = Math.max(1,...(data?.topVideos??[]).map(x=>x.views));
   const maxCountry = Math.max(1,...(data?.audienceCountries??[]).map(x=>x.viewers));
+  const maxFollowerCountry = Math.max(1,...(data?.audience?.followerCountries??[]).map(x=>x.followers));
   const topCountries = useMemo(()=>data?.audienceCountries.slice(0,8)??[],[data]);
+  const topFollowerCountries = useMemo(()=>data?.audience?.followerCountries.slice(0,8)??[],[data]);
 
   return <main className="studio creator-analytics">
     <header className="studio-top">
@@ -52,7 +55,7 @@ export default function CreatorAnalytics() {
       <article><span>VIEWS</span><strong>{compact(data?.summary.views??0)}</strong><small>{nf.format(data?.summary.uniqueViewers??0)} unique viewers</small></article>
       <article><span>WATCH TIME</span><strong>{hours(data?.summary.watchTimeMs??0)}</strong><small>Avg {duration(data?.summary.averageWatchTimeMs??0)} per view</small></article>
       <article><span>COMPLETION</span><strong>{(data?.summary.completionRate??0).toFixed(1)}%</strong><small>{compact(data?.summary.completedViews??0)} completed views</small></article>
-      <article><span>FOLLOWERS GAINED</span><strong>+{compact(data?.summary.followsGained??0)}</strong><small>{(data?.summary.engagementRate??0).toFixed(1)}% engagement rate</small></article>
+      <article><span>FOLLOWERS GAINED</span><strong>+{compact(data?.audience?.newFollowers??data?.summary.followsGained??0)}</strong><small>{compact(data?.audience?.followerTotal??0)} total followers</small></article>
     </section>
 
     <section className="analytics-stat-grid">
@@ -81,8 +84,17 @@ export default function CreatorAnalytics() {
       </article>
 
       <article className="studio-panel">
-        <span>AUDIENCE</span><h2>Top countries</h2>
-        {topCountries.length ? <div className="country-list">{topCountries.map(c=><div className="country-row" key={c.countryCode}><div><strong>{c.countryCode}</strong><small>{compact(c.views)} views</small></div><b>{compact(c.viewers)}</b><i><em style={{width:Math.max(4,(c.viewers/maxCountry)*100)+"%"}}/></i></div>)}</div> : <p>No audience country data yet.</p>}
+        <span>AUDIENCE</span><h2>Top viewer countries</h2>
+        {topCountries.length ? <div className="country-list">{topCountries.map(c=><div className="country-row" key={c.countryCode}><div><strong>{c.countryCode}</strong><small>{compact(c.views)} views</small></div><b>{compact(c.viewers)}</b><i><em style={{width:Math.max(4,(c.viewers/maxCountry)*100)+"%"}}/></i></div>)}</div> : <p>No viewer country data yet.</p>}
+      </article>
+
+      <article className="studio-panel">
+        <span>FOLLOWERS</span><h2>Audience growth</h2>
+        <div className="wallet-lines">
+          <div><span>Total followers</span><strong>{compact(data?.audience?.followerTotal??0)}</strong></div>
+          <div><span>New in period</span><strong>+{compact(data?.audience?.newFollowers??0)}</strong></div>
+        </div>
+        {topFollowerCountries.length ? <div className="country-list">{topFollowerCountries.map(c=><div className="country-row" key={c.countryCode}><div><strong>{c.countryCode}</strong><small>followers</small></div><b>{compact(c.followers)}</b><i><em style={{width:Math.max(4,(c.followers/maxFollowerCountry)*100)+"%"}}/></i></div>)}</div> : <p>No follower country data yet.</p>}
       </article>
 
       <article className="studio-panel">
@@ -107,7 +119,7 @@ export default function CreatorAnalytics() {
 
       <article className="studio-panel">
         <span>TRAFFIC SOURCES</span><h2>Where views come from</h2>
-        <div className="source-placeholder"><strong>Tracking is being added</strong><p>TwiTok currently records the engagement event, but not yet the exact source surface. We will add For You, Following, Search, Profile and other sources to this section.</p></div>
+        {data?.trafficSources?.length ? <div className="country-list">{data.trafficSources.map(s=><div className="country-row" key={s.source}><div><strong>{s.source.replace(/_/g," ")}</strong><small>{compact(s.impressions ?? 0)} impressions</small></div><b>{compact(s.views)}</b><i><em style={{width:Math.max(4,(s.views/Math.max(1,data.summary.views))*100)+"%"}}/></i></div>)}</div> : <p>No traffic-source data yet.</p>}
       </article>
     </section>
   </main>;
