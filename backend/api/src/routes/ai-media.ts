@@ -209,8 +209,14 @@ function providerStatusEndpoint(jobId: string) {
   const providerEndpoint = safeUrl(process.env.TWITOK_AI_MEDIA_ENDPOINT, []);
   if (!template || !providerEndpoint) return null;
   const encoded = encodeURIComponent(jobId);
-  const providerHost = new URL(providerEndpoint).hostname.toLowerCase();
-  return safeUrl(template.replaceAll("{jobId}", encoded), [providerHost]);
+  const providerUrl = new URL(providerEndpoint);
+  const providerHost = providerUrl.hostname.toLowerCase();
+  const statusUrl = safeUrl(template.replaceAll("{jobId}", encoded), [providerHost]);
+  if (!statusUrl) return null;
+  const status = new URL(statusUrl);
+  // The status endpoint may vary by path/query, but never by scheme, port, or host.
+  if (status.protocol !== providerUrl.protocol || status.port !== providerUrl.port) return null;
+  return statusUrl;
 }
 
 function normalizeProviderResponse(value: unknown) {
