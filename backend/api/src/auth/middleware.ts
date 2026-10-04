@@ -37,10 +37,9 @@ async function authenticateRequest(req: Request, res: Response) {
 export async function requireUser(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authenticateRequest(req, res);
-    if ("error" in result) return res.status(result.error === "Authorization required" ? 401 : 401).json({ error: result.error });
-    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) {
-      return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
-    }
+    if ("error" in result) return res.status(401).json({ error: result.error });
+    // Temporary rollout: contact verification is not required to use the main app.
+    // OTP verification endpoints remain available and can be re-enabled later.
     req.userId = result.userId; req.userToken = result.claims; next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }
@@ -83,7 +82,6 @@ export async function requireMonetizationUser(req: Request, res: Response, next:
     req.userId = result.userId; req.userToken = result.claims; next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }
-
 
 /**
  * Blocks authenticated users from entering the main application until the mandatory
