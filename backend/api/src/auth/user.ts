@@ -57,7 +57,8 @@ export async function createUser(db: Db, input: { username?: string; password: s
   const countryCode = String(input.countryCode ?? "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error("A valid two-letter country code is required");
   const phone = normalizeInternationalPhone(input.phone, countryCode);
-  if (!email && !phone) throw new Error("Enter an email address or phone number");
+  if (!email) throw new Error("Email address is required");
+  if (!phone) throw new Error("Phone number is required");
 
   const dob = new Date(input.dateOfBirth);
   if (Number.isNaN(dob.getTime()) || dob >= new Date()) throw new Error("Invalid date of birth");
