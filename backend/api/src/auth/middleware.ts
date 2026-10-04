@@ -38,8 +38,8 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
   try {
     const result = await authenticateRequest(req, res);
     if ("error" in result) return res.status(result.error === "Authorization required" ? 401 : 401).json({ error: result.error });
-    if (result.user.emailVerified !== true && result.user.phoneVerified !== true) {
-      return res.status(403).json({ error: "Email or phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
+    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) {
+      return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
     }
     req.userId = result.userId; req.userToken = result.claims; next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
@@ -61,7 +61,7 @@ export async function requireAdultUser(req: Request, res: Response, next: NextFu
   try {
     const result = await authenticateRequest(req, res);
     if ("error" in result) return res.status(401).json({ error: result.error });
-    if (result.user.emailVerified !== true && result.user.phoneVerified !== true) return res.status(403).json({ error: "Email or phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
+    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
     const dob = result.user.dateOfBirth ? new Date(result.user.dateOfBirth) : null;
     if (!dob || Number.isNaN(dob.getTime())) return res.status(403).json({ error: "Date of birth is required for Coin, Gift and Cash-out features" });
     const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
@@ -74,7 +74,7 @@ export async function requireMonetizationUser(req: Request, res: Response, next:
   try {
     const result = await authenticateRequest(req, res);
     if ("error" in result) return res.status(401).json({ error: result.error });
-    if (result.user.emailVerified !== true && result.user.phoneVerified !== true) return res.status(403).json({ error: "Email or phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
+    if (result.user.emailVerified !== true || result.user.phoneVerified !== true) return res.status(403).json({ error: "Email and phone verification required", code: "CONTACT_VERIFICATION_REQUIRED" });
     const dob = result.user.dateOfBirth ? new Date(result.user.dateOfBirth) : null;
     if (!dob || Number.isNaN(dob.getTime())) return res.status(403).json({ error: "Date of birth is required for creator monetization" });
     const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 18);
