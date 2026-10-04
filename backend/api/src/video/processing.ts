@@ -76,8 +76,8 @@ export async function recoverExpiredVideoJobs(db: Db) {
   const jobs = db.collection("video_processing_jobs");
 
   // Recovery is ownership-safe: each expired job is atomically claimed for
-  // terminalization or requeue, so a concurrent worker cannot cause stale
-  // recovery code to mark the wrong upload/video as failed.
+  // terminalization or requeue, so concurrent recovery cannot mark a stale
+  // candidate's upload/video as failed.
   const terminalCandidates = await jobs.find({
     status: "RUNNING",
     leaseExpiresAt: { $lt: now },
@@ -112,27 +112,14 @@ export async function recoverExpiredVideoJobs(db: Db) {
     await Promise.all([
       db.collection("video_uploads").updateOne(
         { uploadId: transitioned.uploadId },
-        {
-          $set: {
-            status: "FAILED",
-            updatedAt: now,
-            processingError: "Processing worker lease expired after maximum retry attempts"
-          }
-        }
+        { $set: { status: "FAILED", updatedAt: now, processingError: "Processing worker lease expired after maximum retry attempts" } }
       ),
       db.collection("videos").updateOne(
         { uploadId: transitioned.uploadId },
-        {
-          $set: {
-            status: "FAILED",
-            updatedAt: now,
-            processingError: "Processing worker lease expired after maximum retry attempts"
-          }
-        }
+        { $set: { status: "FAILED", updatedAt: now, processingError: "Processing worker lease expired after maximum retry attempts" } }
       )
     ]);
   }
-
   await jobs.updateMany(
     {
       status: "RUNNING",
@@ -155,7 +142,6 @@ export async function claimNextVideoJob(db: Db, workerId: string) {
     {
       status: "QUEUED",
       $or: [{ nextAttemptAt: { $lte: now } }, { nextAttemptAt: { $exists: false } }],
-      // Never start a job that has already exhausted its retry budget.
       $expr: { $lt: ["$attempts", { $ifNull: ["$maxAttempts", 5] }] }
     },
     {
@@ -217,3 +203,44 @@ export async function markVideoProcessingSucceeded(
 export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMessage: string, workerId?: string) {
   const job = await db.collection("video_processing_jobs").findOne({ _id: jobId });
   if (!job) throw new Error("Processing job not found");
+
+  const attempts = Number(job.attempts ?? 0);
+  const terminal = attempts >= Number(job.maxAttempts ?? 5);
+  const now = new Date();
+  const backoffMs = Math.min(60 * 60 * 1000, 2 ** attempts * 1000);
+  const nextAttemptAt = new Date(now.getTime() + backoffMs);
+
+  const ownership = {
+    _id: jobId,
+    status: "RUNNING",
+    ...(workerId ? { workerId } : {})
+  };
+  const result = await db.collection("video_processing_jobs").updateOne(
+    ownership,
+    {
+      $set: {
+        status: terminal ? "DEAD_LETTER" : "QUEUED",
+        lastError: errorMessage,
+        nextAttemptAt: terminal ? null : nextAttemptAt,
+        updatedAt: now
+      },
+      $unset: { leaseExpiresAt: "", workerId: "" }
+    }
+  );
+
+  if (result.modifiedCount !== 1) {
+    return false;
+  }
+
+  if (terminal) {
+    await db.collection("video_uploads").updateOne(
+      { uploadId: job.uploadId },
+      { $set: { status: "FAILED", updatedAt: now, processingError: errorMessage } }
+    );
+    await db.collection("videos").updateOne(
+      { uploadId: job.uploadId },
+      { $set: { status: "FAILED", updatedAt: now, processingError: errorMessage } }
+    );
+  }
+  return true;
+}
