@@ -26,19 +26,19 @@ export default function RegisterScreen() {
       const d=await r.json().catch(()=>({}));
       if(!r.ok||!d.token) throw new Error(d.error??"Unable to create account");
       await saveAuthToken(d.token);
-      router.replace(d.verificationRequired ? "/verify-account" : "/profile-setup");
+      router.replace("/profile-setup");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create account");}finally{setBusy(false);}
   }
 
   return <ScrollView contentContainerStyle={styles.container}>
     <Image source={require("../assets/images/twitok-logo.png")} style={styles.logo} resizeMode="contain" accessibilityLabel="TwiTok official logo" />
     <Text style={styles.title}>Create your account</Text>
-    <Text style={styles.subtitle}>Email address and phone number are required. You will choose where to receive each OTP.</Text>
+    <Text style={styles.subtitle}>Email address and phone number are required.</Text>
     <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email address (required)" placeholderTextColor="#777" autoCapitalize="none" keyboardType="email-address"/>
     <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password (8+ characters)" placeholderTextColor="#777" secureTextEntry/>
     <TextInput style={styles.input} value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="Date of birth (YYYY-MM-DD)" placeholderTextColor="#777"/>
     <View style={styles.phoneRow}><CountryPicker value={country} onChange={setCountry}/><TextInput style={styles.phoneInput} value={phone} onChangeText={setPhone} placeholder="Phone number (required)" placeholderTextColor="#777" keyboardType="phone-pad"/></View>
-    <Text style={styles.hint}>Both contacts must be verified before you can enter the main app. You can choose email or phone for each OTP.</Text>
+    <Text style={styles.hint}>Account verification is currently optional. You can verify your email or phone later.</Text>
     {error?<Text style={styles.error}>{error}</Text>:null}
     <Pressable style={styles.button} onPress={register} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.buttonText}>Create account</Text>}</Pressable>
     <Pressable onPress={()=>router.replace("/login")}><Text style={styles.back}>Already have an account? Sign in</Text></Pressable>
