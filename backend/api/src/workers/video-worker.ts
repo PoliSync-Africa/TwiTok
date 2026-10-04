@@ -129,9 +129,10 @@ async function runFfmpeg(
     captions: Array<{ text: string; startMs: number; endMs: number }>;
     effect: string;
     stickers: Array<{ stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number }>;
+    editPlan?: { quality?: string; filter?: string; faceFilter?: string; background?: string; crop?: string; rotate?: number; mirror?: boolean };
   }
 ) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers } = options;
+  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers, editPlan } = options;
   const inputArgs = [
     ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
     ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
@@ -139,11 +140,18 @@ async function runFfmpeg(
   ];
   if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
 
+  const plan=editPlan ?? {};
+  const polish=String(plan.quality)==="12K_AI"||String(plan.quality)==="8K"||String(plan.quality)==="4K" ? "hqdn3d=0.8:0.8:3:3,eq=contrast=1.06:saturation=1.05:brightness=0.015,gblur=sigma=0.05,unsharp=5:5:0.35:5:5:0" : String(plan.quality)==="HD"||String(plan.quality)==="CLEAN" ? "hqdn3d=0.9:0.9:4:4,eq=contrast=1.04:saturation=1.04:brightness=0.01,unsharp=5:5:0.3:5:5:0" : "null";
+  const look:Record<string,string>={VIVID:"eq=contrast=1.08:saturation=1.22",CINEMATIC:"eq=contrast=1.1:saturation=1.06:gamma=1.03",WARM:"colorbalance=rs=.06:gs=.02:bs=-.02",COOL:"colorbalance=rs=-.02:gs=.02:bs=.06",NOIR:"hue=s=0,eq=contrast=1.14",VINTAGE:"eq=contrast=.96:saturation=.82",NATURAL:"eq=contrast=1.02:saturation=1.02",PORTRAIT:"eq=contrast=1.04:saturation=1.03"};
+  const face:Record<string,string>={SMOOTH:"hqdn3d=1.1:1.1:5:5",GLOW:"eq=brightness=.025:gamma=1.04",FACE_LIGHT:"eq=brightness=.045:gamma=1.06",BEAUTY:"hqdn3d=.9:.9:4:4,eq=brightness=.018:contrast=1.03"};
+  const bg=String(plan.background)==="BLUR"?"boxblur=2:1":"null";
+  const crop:Record<string,string>={"9:16":"crop=min(iw\,ih*0.5625):min(ih\,iw*1.7778)","1:1":"crop=min(iw\,ih):min(iw\,ih)","4:5":"crop=min(iw\,ih*0.8):min(ih\,iw*1.25)","16:9":"crop=min(iw\,ih*1.7778):min(ih\,iw*0.5625)"};
+  const geometry=[crop[String(plan.crop??"ORIGINAL")]??"null",plan.mirror?"hflip":"null",Number(plan.rotate)===90?"transpose=1":Number(plan.rotate)===180?"transpose=1,transpose=1":Number(plan.rotate)===270?"transpose=2":"null"].filter(Boolean).filter(x=>x!=="null").join(",")||"null";
   const filters = [
     "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v360base]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,setpts=PTS/${speed}[v720base]`
+    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v360base]`,
+    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v540base]`,
+    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v720base]`
   ];
 
   const overlayInputs: string[] = [];
@@ -363,7 +371,8 @@ async function processJob(db: Db, job: any) {
       textOverlays: Array.isArray(video.textOverlays) ? video.textOverlays : [],
       captions: Array.isArray(video.captions) ? video.captions : [],
       effect: String(video.effect ?? "NONE"),
-      stickers: Array.isArray(video.stickers) ? video.stickers : []
+      stickers: Array.isArray(video.stickers) ? video.stickers : [],
+      editPlan: video.editPlan ?? undefined
     });
 
     await createThumbnail(input, thumbnail, Number(video.coverTimeMs ?? 0));

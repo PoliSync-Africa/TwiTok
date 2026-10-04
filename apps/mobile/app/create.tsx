@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, St
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
+import UnifiedMediaStudio, { DEFAULT_STUDIO_PLAN, type StudioPlan } from "../components/unified-media-studio"; // TwiTok Studio
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
@@ -21,6 +22,8 @@ const EMOJI_STICKERS = EMOJI_CATALOG.map((emoji,i) => [emojiStickerId(emoji), em
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [studioVisible, setStudioVisible] = useState(false);
+  const [studioPlan, setStudioPlan] = useState<StudioPlan>(DEFAULT_STUDIO_PLAN);
   const [selectedClip, setSelectedClip] = useState(0);
   const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
@@ -43,7 +46,7 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, aiOutputUri, aiOutputMimeType, aiOutputDuration } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; aiOutputUri?: string; aiOutputMimeType?: string; aiOutputDuration?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   useEffect(() => {
@@ -306,7 +309,8 @@ export default function CreateScreen() {
           clipSettings,
           autoCaptions,
           captionLanguage,
-          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
+          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : [],
+          editPlan: studioPlan
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
@@ -346,7 +350,7 @@ export default function CreateScreen() {
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?recordPhoto:recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
       </View> : null}
-      <ScrollView contentContainerStyle={styles.content}>
+      {mode !== "TEXT" && assets.length ? <Pressable style={styles.studioButton} onPress={() => setStudioVisible(true)}><Text style={styles.studioButtonTitle}>✦ Open TwiTok Studio</Text><Text style={styles.studioButtonSub}>Free AI enhancement • face filters • backgrounds • effects • transitions • pro quality</Text></Pressable> : null}\n      <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
@@ -523,10 +527,12 @@ export default function CreateScreen() {
         {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
         {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
       </ScrollView>
+      <UnifiedMediaStudio visible={studioVisible} mode={mode === "PHOTO" ? "PHOTO" : "VIDEO"} value={studioPlan} onChange={setStudioPlan} onClose={() => setStudioVisible(false)} onRunAI={() => { const uri = assets[selectedClip]?.uri; if (uri) { setStudioVisible(false); router.push({ pathname: "/media-studio", params: { uri, mimeType: assets[selectedClip]?.mimeType ?? "", mode, duration: String(assets[selectedClip]?.duration ?? "") } }); } }} />
     </View>
   );
 }
 const styles=StyleSheet.create({
+ studioButton:{marginHorizontal:16,marginTop:8,borderRadius:16,borderWidth:1,borderColor:"#24576b",backgroundColor:"#10242d",padding:14},studioButtonTitle:{color:"#fff",fontSize:16,fontWeight:"900"},studioButtonSub:{color:"#8fa6b3",fontSize:11,lineHeight:17,marginTop:4},
  screen:{flex:1,backgroundColor:"#000",paddingTop:48},clipActions:{position:"absolute",bottom:4,left:8,right:8,flexDirection:"row",justifyContent:"space-between",alignItems:"center"},action:{color:"#fff",fontSize:24,fontWeight:"900"},transitionRow:{paddingHorizontal:16,paddingVertical:4},transitionChoices:{gap:6},perClip:{paddingHorizontal:16,paddingVertical:4},helper:{color:"#777",fontSize:12,paddingHorizontal:16,paddingTop:4},trimInput:{flex:1,minWidth:130,marginHorizontal:0},draftButton:{marginHorizontal:16,marginTop:14,borderWidth:1,borderColor:"#444",borderRadius:12,padding:14,alignItems:"center"},draftText:{color:"#fff",fontWeight:"800"},content:{paddingBottom:80},section:{color:"#fff",fontSize:17,fontWeight:"900",paddingHorizontal:16,paddingTop:12,paddingBottom:8},row:{flexDirection:"row",flexWrap:"wrap",gap:8,paddingHorizontal:16,paddingVertical:6},choice:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:12,paddingVertical:9,backgroundColor:"#111"},selected:{borderColor:"#ff2d55",backgroundColor:"#241017"},choiceText:{color:"#fff",fontWeight:"700"},label:{color:"#aaa",paddingVertical:9},small:{borderWidth:1,borderColor:"#333",borderRadius:10,paddingHorizontal:10,paddingVertical:8},input:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",color:"#fff",padding:12,fontSize:15},header:{height:54,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:"#222"},close:{color:"#fff",fontSize:34,fontWeight:"300"},title:{color:"#fff",fontSize:18,fontWeight:"800"},post:{color:"#ff2d55",fontSize:16,fontWeight:"900"},disabled:{color:"#555"},modeRow:{flexDirection:"row",justifyContent:"center",gap:30,paddingVertical:22},mode:{alignItems:"center",gap:6},modeIcon:{color:"#fff",fontSize:28},modeText:{color:"#fff",fontWeight:"700"},liveButton:{marginHorizontal:16,marginBottom:4,borderWidth:1,borderColor:"#333",borderRadius:12,backgroundColor:"#111",padding:12,alignItems:"center"},liveButtonText:{color:"#fff",fontSize:15,fontWeight:"900"},liveButtonSub:{color:"#777",fontSize:11,marginTop:2},caption:{margin:16,minHeight:100,borderRadius:14,backgroundColor:"#151515",color:"#fff",padding:14,fontSize:16,textAlignVertical:"top"},assets:{paddingHorizontal:16,gap:10},clip:{width:110,height:145,borderRadius:12,backgroundColor:"#181818",alignItems:"center",justifyContent:"center",position:"relative"},clipSelected:{borderWidth:2,borderColor:"#ff2d55"},timelineBox:{marginHorizontal:16,marginTop:8,borderRadius:14,backgroundColor:"#0d0d0d",paddingVertical:10},timelineHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},timelineMeta:{color:"#777",fontSize:12,paddingHorizontal:16},timelineRow:{flexDirection:"row",gap:6,paddingHorizontal:12,paddingVertical:10,alignItems:"center"},timelineClip:{height:48,borderRadius:8,backgroundColor:"#1b1b1b",padding:7,justifyContent:"space-between",borderWidth:1,borderColor:"#292929"},timelineClipSelected:{borderColor:"#ff2d55"},timelineClipText:{color:"#fff",fontSize:12,fontWeight:"800"},timelineRange:{height:5,borderRadius:3,backgroundColor:"#333",position:"relative",overflow:"hidden"},timelinePlayhead:{position:"absolute",top:0,bottom:0,width:3,backgroundColor:"#ff2d55"},timelineControls:{flexDirection:"row",alignItems:"center",gap:6,paddingHorizontal:12,paddingBottom:4},clipIcon:{color:"#fff",fontSize:30},clipText:{color:"#aaa",marginTop:8},remove:{position:"absolute",right:6,top:3,color:"#fff",fontSize:25},empty:{alignItems:"center",justifyContent:"center",padding:40},emptyIcon:{color:"#777",fontSize:60},emptyText:{color:"#888",textAlign:"center",fontSize:15},modeSelected:{borderBottomWidth:2,borderBottomColor:"#ff2d55"},progress:{alignItems:"center",gap:10,padding:20},status:{color:"#aaa"},soundButton:{marginHorizontal:16,marginVertical:6,borderRadius:12,backgroundColor:"#151515",borderWidth:1,borderColor:"#333",padding:14},clearSound:{color:"#ff2d55",fontWeight:"800",marginHorizontal:16,marginTop:4},effectOverlay:{position:"absolute",top:0,bottom:0,left:0,right:0},effectVibrant:{backgroundColor:"rgba(255,180,80,0.12)"},effectWarm:{backgroundColor:"rgba(255,140,40,0.18)"},effectCool:{backgroundColor:"rgba(60,150,255,0.16)"},effectNoir:{backgroundColor:"rgba(0,0,0,0.42)"},effectVintage:{backgroundColor:"rgba(150,90,40,0.20)"},
   previewCard:{marginHorizontal:16,marginTop:10,borderRadius:14,backgroundColor:"#0d0d0d",overflow:"hidden"},
   previewStage:{height:360,backgroundColor:"#000",position:"relative"},
