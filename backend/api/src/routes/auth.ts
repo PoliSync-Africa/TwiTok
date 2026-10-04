@@ -24,7 +24,7 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     res.status(201).json({
       token,
       user,
-      verificationRequired: user.emailVerified !== true && user.phoneVerified !== true,
+      verificationRequired: user.emailVerified !== true || user.phoneVerified !== true,
       verificationChannels: [ ...(user.email ? ["email"] : []), ...(user.phone ? ["phone"] : []) ],
       verificationDelivery: "user_selected"
     });
@@ -42,7 +42,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const user = await authenticateUser(db, identifier, password, countryCode);
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    const verificationRequired = user.emailVerified !== true && user.phoneVerified !== true;
+    const verificationRequired = user.emailVerified !== true || user.phoneVerified !== true;
     if (verificationRequired) {
       return res.json({
         token,
@@ -81,7 +81,7 @@ authRouter.post("/verification/verify", requireContactVerificationUser, rateLimi
     const db = await getDb();
     const result = await verifyAccountCode(db, req.userId!.toHexString(), code);
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
-    const remainingVerificationRequired = user?.emailVerified !== true && user?.phoneVerified !== true;
+    const remainingVerificationRequired = user?.emailVerified !== true || user?.phoneVerified !== true;
     return res.json({ ...result, user, verificationRequired: remainingVerificationRequired });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Verification failed";
@@ -99,7 +99,7 @@ authRouter.get("/verification/status", requireContactVerificationUser, userReadL
     if (!user) return res.status(404).json({ error: "Account not found" });
     return res.json({
       user,
-      verificationRequired: user.emailVerified !== true && user.phoneVerified !== true,
+      verificationRequired: user.emailVerified !== true || user.phoneVerified !== true,
       verificationChannels: [ ...(user.email && user.emailVerified !== true ? ["email"] : []), ...(user.phone && user.phoneVerified !== true ? ["phone"] : []) ]
     });
   } catch {
