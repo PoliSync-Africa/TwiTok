@@ -119,7 +119,10 @@ function validateProviderOutputMetadata(value: unknown, mode: string) {
   const extracted = extractProviderOutput(value);
   if (!extracted) return null;
   const normalized = normalizeProviderResponse(extracted.root);
-  if (!normalized?.outputUrl) return null;
+  if (!normalized?.outputUrl) {
+    const nested = normalizeProviderResponse(extracted.output);
+    if (!nested?.outputUrl) return null;
+  }
   const url = validateOutputForMode(normalized.outputUrl, mode);
   if (!url) return null;
   const contentType = [
@@ -140,10 +143,13 @@ function extractProviderOutput(value: unknown) {
   const result = root.result && typeof root.result === "object" && !Array.isArray(root.result)
     ? root.result as Record<string, unknown>
     : null;
+  const output = result?.output && typeof result.output === "object" && !Array.isArray(result.output)
+    ? result.output as Record<string, unknown>
+    : result ?? root;
   return {
     root,
     result,
-    output: result ?? root,
+    output,
   };
 }
 
