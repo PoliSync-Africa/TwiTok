@@ -145,18 +145,24 @@ function validateProviderOutputMetadata(value: unknown, mode: string) {
   const normalized = normalizeProviderResponse(extracted.root);
   const normalizedOutput = normalized?.outputUrl ? normalized : normalizeProviderResponse(extracted.output);
   if (!normalizedOutput?.outputUrl) return null;
-  const url = validateOutputForMode(normalizedOutput.outputUrl, mode);
-  if (!url) return null;
   const contentType = [
     extracted.root.contentType, extracted.root.content_type, extracted.root.mimeType, extracted.root.mime_type,
     extracted.result?.contentType, extracted.result?.content_type, extracted.result?.mimeType, extracted.result?.mime_type,
   ].find(item => typeof item === "string");
-  if (contentType) {
-    const normalizedType = contentType.toLowerCase().split(";")[0].trim();
-    const allowed = OUTPUT_CONTENT_TYPES[mode as "IMAGE" | "VIDEO"];
-    if (!allowed?.has(normalizedType)) return null;
+  const normalizedType = typeof contentType === "string"
+    ? contentType.toLowerCase().split(";")[0].trim()
+    : "";
+  const allowed = OUTPUT_CONTENT_TYPES[mode as "IMAGE" | "VIDEO"];
+  const url = validateOutputForMode(normalizedOutput.outputUrl, mode);
+  if (url) {
+    if (normalizedType && !allowed?.has(normalizedType)) return null;
+    return url;
   }
-  return url;
+  // Some providers return signed CDN URLs without file extensions. Accept those only
+  // when the provider explicitly supplies a mode-compatible MIME type.
+  if (!normalizedType || !allowed?.has(normalizedType)) return null;
+  const fallbackUrl = safeUrl(normalizedOutput.outputUrl, allowedHosts());
+  return fallbackUrl;
 }
 
 function extractProviderOutput(value: unknown) {
