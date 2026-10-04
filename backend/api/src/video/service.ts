@@ -10,6 +10,7 @@ export type VideoStatus = "UPLOADING" | "PROCESSING" | "READY" | "PUBLISHED" | "
 
 const ALLOWED_MIME = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 const MAX_BYTES = 500 * 1024 * 1024;
+const MAX_DURATION_MS = 60 * 60 * 1000;
 const PHOTO_MAX_BYTES = 20 * 1024 * 1024;
 const PHOTO_MIME = new Set(["image/jpeg","image/png","image/webp"]);
 
@@ -27,10 +28,14 @@ export async function initializeVideoIndexes(db: Db) {
   ]);
 }
 
-function validateUpload(input: { mimeType: string; sizeBytes: number }) {
+function validateUpload(input: { mimeType: string; sizeBytes: number; durationMs?: number }) {
   if (!ALLOWED_MIME.has(input.mimeType)) throw new Error("Unsupported video format");
   if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0 || input.sizeBytes > MAX_BYTES) {
     throw new Error("Video size is outside the allowed range");
+  }
+  if (input.durationMs !== undefined &&
+      (!Number.isFinite(input.durationMs) || input.durationMs <= 0 || input.durationMs > MAX_DURATION_MS)) {
+    throw new Error("Video duration is outside the allowed range");
   }
 }
 
