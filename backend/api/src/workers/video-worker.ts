@@ -431,7 +431,7 @@ async function loop() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown processing error";
       console.error(`failed ${job.uploadId}: ${message}`);
-      await markVideoProcessingFailed(db, job._id, message);
+      await markVideoProcessingFailed(db, job._id, message, workerId);
     }
   }
 }
