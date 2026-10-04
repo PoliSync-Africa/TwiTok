@@ -23,14 +23,14 @@ export const DEFAULT_STUDIO_PLAN: StudioPlan = {
 
 type Props = { visible: boolean; mode: "VIDEO" | "PHOTO"; value: StudioPlan; onChange: (value: StudioPlan) => void; onClose: () => void; onRunAI: () => void };
 
-const sections = [
+const sections = (mode: "VIDEO" | "PHOTO") => [
   { title: "Pro Quality", items: [["CLEAN","Clean & Restore"],["HD","HD Enhance"],["4K","4K Pro"],["8K","8K Pro"],["12K_AI","12K AI Master"]] },
   { title: "Color & Look", items: [["VIVID","Vivid"],["CINEMATIC","Cinematic"],["PORTRAIT","Portrait Pro"],["WARM","Warm"],["COOL","Cool"],["NOIR","Noir"],["VINTAGE","Vintage"],["NATURAL","Natural Skin"]] },
   { title: "Face Filters", items: [["SMOOTH","Natural Smooth"],["GLOW","Soft Glow"],["MAKEUP","Studio Makeup"],["FACE_LIGHT","Face Light"],["BEAUTY","Beauty"],["NONE","Original Face"]] },
   { title: "Background Studio", items: [["BLUR","AI Blur"],["REPLACE","Replace Background"],["REMOVE","Remove Background"],["STUDIO","Studio Background"],["GREEN","Green Screen"],["ORIGINAL","Keep Original"]] },
   { title: "AI Studio — Free", items: [["RESTORE","Restore"],["RELIGHT","AI Relight"],["DETAIL","Super Detail"],["DENOISE","AI Denoise"],["COLORIZE","Colorize"],["AI_ART","AI Art"],["AI_EXPAND","AI Expand"],["OBJECT_REMOVE","Remove Object"],["SKY","AI Sky"],["FACE_REPAIR","Face Repair"]] },
   { title: "Frame & Motion", items: [["9:16","9:16"],["1:1","1:1"],["4:5","4:5"],["16:9","16:9"],["MIRROR","Mirror"],["ROTATE","Rotate"],["0.5","0.5×"],["0.75","0.75×"],["1","1×"],["1.5","1.5×"],["2","2×"]] },
-  ...(true ? [{ title: "Transitions", items: [["NONE","None"],["FADE","Fade"],["DISSOLVE","Dissolve"],["WIPELEFT","Wipe Left"],["WIPERIGHT","Wipe Right"],["SLIDELEFT","Slide Left"],["SLIDERIGHT","Slide Right"]] }] : [])
+  ...(mode === "VIDEO" ? [{ title: "Transitions", items: [["NONE","None"],["FADE","Fade"],["DISSOLVE","Dissolve"],["WIPELEFT","Wipe Left"],["WIPERIGHT","Wipe Right"],["SLIDELEFT","Slide Left"],["SLIDERIGHT","Slide Right"]] }] : [])
 ] as const;
 
 const aiIds = new Set(["12K_AI","RESTORE","RELIGHT","DETAIL","DENOISE","COLORIZE","AI_ART","AI_EXPAND","OBJECT_REMOVE","SKY","FACE_REPAIR","REPLACE","REMOVE","STUDIO","GREEN","BLUR","SMOOTH","GLOW","MAKEUP","FACE_LIGHT","BEAUTY","PORTRAIT"]);
@@ -38,7 +38,7 @@ const aiIds = new Set(["12K_AI","RESTORE","RELIGHT","DETAIL","DENOISE","COLORIZE
 export default function UnifiedMediaStudio({ visible, mode, value, onChange, onClose, onRunAI }: Props) {
   const [search, setSearch] = useState("");
   const update = (patch: Partial<StudioPlan>) => onChange({ ...value, ...patch });
-  const filtered = useMemo(() => sections.map(section => ({ ...section, items: section.items.filter(item => !search.trim() || item[1].toLowerCase().includes(search.toLowerCase())) })).filter(section => section.items.length), [search]);
+  const filtered = useMemo(() => sections(mode).map(section => ({ ...section, items: section.items.filter(item => !search.trim() || item[1].toLowerCase().includes(search.toLowerCase())) })).filter(section => section.items.length), [mode, search]);
   const active = (id: string) =>
     value.quality === id || value.filter === id || value.faceFilter === id || value.background === id ||
     value.transition === id || value.crop === id || (id === "MIRROR" && value.mirror) ||
