@@ -426,8 +426,10 @@ async function processJob(db: Db, job: any) {
       durationMs: Math.round(outputDurationSec * 1000)
     });
   } finally {
+    clearInterval(heartbeat);
     await fs.promises.rm(workDir, { recursive: true, force: true });
   }
+}
   } finally {
     clearInterval(heartbeat);
 
