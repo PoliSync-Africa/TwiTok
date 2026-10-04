@@ -41,4 +41,5 @@ router.post("/videos/:videoId/sound", requireUser, async (req, res) => {
   }
 });
 
+export const musicRouter = router;
 export default router;
