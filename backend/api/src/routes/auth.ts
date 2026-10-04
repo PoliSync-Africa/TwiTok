@@ -188,7 +188,7 @@ authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res)
 
 authRouter.patch("/comment-settings", requireUser, userWriteLimit, async (req, res) => {
   try {
-    const settings = { allowComments: req.body?.allowComments !== false, filterAll: Boolean(req.body?.filterAll), filterSpam: req.body?.filterSpam !== false, filterKeywords: Array.isArray(req.body?.filterKeywords) ? [...new Set(req.body.filterKeywords.map((x: unknown) => String(x).trim().toLowerCase()).filter(Boolean)).slice(0, 100) : [] };
+    const settings = { allowComments: req.body?.allowComments !== false, filterAll: Boolean(req.body?.filterAll), filterSpam: req.body?.filterSpam !== false, filterKeywords: Array.isArray(req.body?.filterKeywords) ? [...new Set(req.body.filterKeywords.map((x: unknown) => String(x).trim().toLowerCase()).filter(Boolean))].slice(0, 100) : [] };
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $set: { commentSettings: settings, updatedAt: new Date() } });
     res.json({ commentSettings: settings });
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update comment settings" }); }
