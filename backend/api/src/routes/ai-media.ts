@@ -35,7 +35,7 @@ function safeJobId(value: unknown) {
   if (typeof value !== "string" || value.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(value)) return null;
   return value;
 }
-function allowedHosts() {
+function providerStatusEndpoint(jobId: string) {\n  const template = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;\n  if (!template) return null;\n  const encoded = encodeURIComponent(jobId);\n  return safeUrl(template.replaceAll("{jobId}", encoded), []);\n}\n\nfunction allowedHosts() {
   return (process.env.TWITOK_AI_MEDIA_ALLOWED_HOSTS ?? "")
     .split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
 }
