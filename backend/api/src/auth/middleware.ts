@@ -27,7 +27,7 @@ async function authenticateRequest(req: Request, res: Response) {
   const db = await getDb();
   const user = await db.collection("users").findOne(
     { _id: userId },
-    { projection: { status: 1, sessionVersion: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, dateOfBirth: 1, monetizationEnabled: 1 } }
+    { projection: { status: 1, sessionVersion: 1, email: 1, phone: 1, emailVerified: 1, phoneVerified: 1, dateOfBirth: 1, monetizationEnabled: 1, profileSetupComplete: 1 } }
   );
   if (!user || user.status !== "ACTIVE") return { error: "Account is unavailable" as const };
   if (Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return { error: "Session has been revoked" as const };
@@ -82,4 +82,38 @@ export async function requireMonetizationUser(req: Request, res: Response, next:
     if (result.user.monetizationEnabled !== true) return res.status(403).json({ error: "Creator monetization is turned off. Enable Monetization in Creator settings first." });
     req.userId = result.userId; req.userToken = result.claims; next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
+}
+
+
+/**
+ * Blocks authenticated users from entering the main application until the mandatory
+ * profile setup is complete. Requests without authentication remain public.
+ * Auth routes (registration, verification and profile setup) are mounted before this guard.
+ */
+export async function requireCompletedProfileIfAuthenticated(req: Request, res: Response, next: NextFunction) {
+  try {
+    const header = req.headers.authorization;
+    const cookie = readCookie(req, "twitok_user_session");
+    const token = header?.startsWith("Bearer ") ? header.slice(7) : cookie;
+    if (!token) return next();
+
+    let claims: ReturnType<typeof verifyUserToken>;
+    try { claims = verifyUserToken(token); } catch { return next(); }
+    const db = await getDb();
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(claims.sub) },
+      { projection: { status: 1, sessionVersion: 1, profileSetupComplete: 1, username: 1 } }
+    );
+    if (!user || user.status !== "ACTIVE" || Number(user.sessionVersion ?? 0) !== Number(claims.sv ?? 0)) return next();
+    if (user.profileSetupComplete !== true || typeof user.username !== "string" || !user.username) {
+      return res.status(403).json({
+        error: "Profile setup required",
+        code: "PROFILE_SETUP_REQUIRED",
+        next: "/profile-setup"
+      });
+    }
+    return next();
+  } catch {
+    return next();
+  }
 }
