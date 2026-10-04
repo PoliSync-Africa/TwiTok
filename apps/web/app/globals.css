@@ -111,3 +111,5 @@ button{-webkit-tap-highlight-color:transparent}
   .discover-page,.playlist-page,.shared-video-page,.remix-editor{padding-bottom:86px}
 }
 @media (max-width:380px){.mobile-logo{min-width:54px;font-size:16px}.tabs{gap:9px}.tabs button{font-size:11px}.top-actions{min-width:60px}.video-copy h2{font-size:16px}}
+
+.notification-category{display:block;color:#d9b45a;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}.comment-item a{display:inline-block;color:#d9b45a;font-size:11px;margin:3px 0 4px}
