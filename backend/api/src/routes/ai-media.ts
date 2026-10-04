@@ -13,7 +13,7 @@ const STYLES = new Set(["CLEAN", "CINEMATIC", "VIBRANT", "PORTRAIT_PRO", "REALIS
 const RESOLUTIONS = new Set(["ORIGINAL", "CLEAN", "HD", "4K", "8K", "12K_AI"]);
 const AI_TOOLS = new Set([
   "NONE", "RESTORE", "RELIGHT", "SUPER_DETAIL", "COLORIZE", "AI_ART", "AI_EXPAND",
-  "REMOVE_OBJECT", "BACKGROUND_REPLACE", "BACKGROUND_REMOVE", "FACE_REPAIR",
+  "REMOVE_OBJECT", "BACKGROUND_REPLACE", "BACKGROUND_REMOVE", "FACE_REPAIR", "DENOISE", "SKY",
 ]);
 const BACKGROUNDS = new Set(["ORIGINAL", "AI_BLUR", "REPLACE", "REMOVE", "STUDIO", "GREEN_SCREEN"]);
 const PROVIDER_TERMINAL_FAILURES = new Set(["FAILED", "ERROR", "CANCELLED"]);
@@ -77,6 +77,8 @@ aiMediaRouter.get("/capabilities", requireUser, (_req, res) => {
       BACKGROUND_REPLACE: supports("BACKGROUND_REPLACE"),
       BACKGROUND_REMOVE: supports("BACKGROUND_REMOVE"),
       FACE_REPAIR: supports("FACE_REPAIR"),
+      DENOISE: supports("DENOISE"),
+      SKY: supports("SKY"),
     },
     backgrounds: {
       AI_BLUR: supports("AI_BLUR"),
@@ -85,6 +87,7 @@ aiMediaRouter.get("/capabilities", requireUser, (_req, res) => {
       STUDIO: supports("STUDIO"),
       GREEN_SCREEN: supports("GREEN_SCREEN"),
     },
+    faceFilters: Object.fromEntries(["SMOOTH","GLOW","MAKEUP","FACE_LIGHT","BEAUTY"].map(name => [name, supports(`FACE_FILTER_${name}`)])),
     qualityProfiles: Object.fromEntries(
       Object.keys(QUALITY_PROFILES).map(name => [name, supports(name)]),
     ),
@@ -164,6 +167,8 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
           objectRemoval: aiTool === "REMOVE_OBJECT",
           backgroundReplacement: aiTool === "BACKGROUND_REPLACE",
           backgroundRemoval: aiTool === "BACKGROUND_REMOVE",
+          denoise: aiTool === "DENOISE",
+          skyReplacement: aiTool === "SKY",
           preserveSubject: true,
           preserveIdentity: true,
           enhanceQuality: true,
