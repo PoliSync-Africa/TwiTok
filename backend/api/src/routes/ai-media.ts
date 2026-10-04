@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import crypto from "node:crypto";
 import { Router } from "express";
 import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { requireUser } from "../auth/middleware.js";
@@ -49,6 +50,105 @@ function jobIsStalled(job: { status?: unknown; updatedAt?: Date | string } | Rec
   if (String(job.status ?? "PROCESSING").toUpperCase() !== "PROCESSING") return false;
   const updated = job.updatedAt instanceof Date ? job.updatedAt.getTime() : Date.parse(String(job.updatedAt ?? ""));
   return Number.isFinite(updated) && Date.now() - updated > AI_JOB_TIMEOUT_MS;
+}
+
+async function retryStalledJob(job: Record<string, any>, userId: any) {
+  const db = await getDb();
+  const claimed = await db.collection("ai_media_jobs").findOneAndUpdate(
+    { _id: job._id, userId, status: "PROCESSING", retryCount: { $lt: AI_JOB_MAX_RETRIES } },
+    { $set: { status: "RETRYING", updatedAt: new Date() } },
+    { returnDocument: "after" },
+  );
+  const current = claimed;
+  if (!current) return null;
+
+  const endpoint = safeUrl(process.env.TWITOK_AI_MEDIA_ENDPOINT, []);
+  const apiKey = process.env.TWITOK_AI_MEDIA_API_KEY;
+  if (!endpoint || !apiKey) {
+    await db.collection("ai_media_jobs").updateOne(
+      { _id: current._id, userId, status: "RETRYING" },
+      { $set: { status: "FAILED", failureCode: "AI_MEDIA_NOT_CONFIGURED", updatedAt: new Date() } },
+    );
+    return null;
+  }
+
+  try {
+    const sourceUrl = (await createPresignedPlayback(String(current.sourceObjectKey), 600)).url;
+    const retryCount = Number(current.retryCount ?? 0) + 1;
+    const idempotencyKey = crypto.randomUUID();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${apiKey}`,
+          "idempotency-key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          mode: current.mode,
+          style: current.style,
+          prompt: current.prompt ?? "",
+          sourceUrl,
+          targetResolution: current.targetResolution,
+          qualityProfile: current.qualityProfile,
+          enhanceLevel: QUALITY_PROFILES[String(current.qualityProfile)]?.enhanceLevel ?? 0,
+          aiTool: current.aiTool ?? "NONE",
+          faceFilter: current.faceFilter ?? "NONE",
+          background: current.background ?? "ORIGINAL",
+          operation: current.aiTool ?? "NONE",
+          backgroundOperation: current.background ?? "ORIGINAL",
+          preserveSubject: true,
+          preserveIdentity: true,
+          enhanceQuality: true,
+          autoPolish: true,
+          naturalSkinTexture: true,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`provider HTTP ${response.status}`);
+      const json: unknown = await response.json();
+      const outputUrl = validateProviderOutputMetadata(json, String(current.mode).toUpperCase());
+      const providerJobId = safeJobId(normalizeProviderResponse(json)?.jobId);
+      if (outputUrl && !(await validateOutputContent(outputUrl, String(current.mode).toUpperCase()))) {
+        throw new Error("invalid provider output");
+      }
+      if (outputUrl && !validateOutputDimensions(json, String(current.mode).toUpperCase(), String(current.qualityProfile).toUpperCase())) {
+        throw new Error("invalid provider dimensions");
+      }
+      const providerStatus = providerOutputStatus(json);
+      if (!outputUrl && !providerJobId && PROVIDER_TERMINAL_FAILURES.has(providerStatus)) {
+        throw new Error("provider rejected retry");
+      }
+      await db.collection("ai_media_jobs").updateOne(
+        { _id: current._id, userId, status: "RETRYING" },
+        { $set: {
+          status: outputUrl ? "READY" : "PROCESSING",
+          outputUrl: outputUrl ?? null,
+          providerJobId: providerJobId ?? null,
+          retryCount,
+          idempotencyKey,
+          providerRequestId: idempotencyKey,
+          updatedAt: new Date(),
+        } },
+      );
+      return outputUrl ?? null;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    await db.collection("ai_media_jobs").updateOne(
+      { _id: current._id, userId, status: "RETRYING" },
+      { $set: {
+        status: retryCount >= AI_JOB_MAX_RETRIES ? "FAILED" : "PROCESSING",
+        failureCode: retryCount >= AI_JOB_MAX_RETRIES ? "AI_MEDIA_RETRY_EXHAUSTED" : "AI_MEDIA_RETRY_FAILED",
+        retryCount,
+        updatedAt: new Date(),
+      } },
+    );
+    return null;
+  }
 }
 
 function safeUrl(value: unknown, hosts: string[]) {
@@ -469,11 +569,18 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
   let status = outputUrl ? "READY" : String(job.status ?? "PROCESSING");
 
   if (!outputUrl && jobIsStalled(job)) {
-    status = "FAILED";
-    await (await getDb()).collection("ai_media_jobs").updateOne(
-      { _id: job._id, userId: req.userId, status: "PROCESSING" },
-      { $set: { status, failureCode: "AI_MEDIA_JOB_TIMEOUT", updatedAt: new Date() } },
-    );
+    const recovered = await retryStalledJob(job as Record<string, any>, req.userId);
+    if (recovered) {
+      outputUrl = recovered;
+      status = "READY";
+    } else {
+      const refreshed = await (await getDb()).collection("ai_media_jobs").findOne(
+        { _id: job._id, userId: req.userId },
+        { projection: { status: 1, outputUrl: 1 } },
+      );
+      outputUrl = safeUrl(refreshed?.outputUrl, allowedHosts());
+      status = outputUrl ? "READY" : String(refreshed?.status ?? "FAILED");
+    }
   }
 
   if (!outputUrl && status === "PROCESSING" && job.providerJobId) {
