@@ -133,7 +133,7 @@ export async function recoverExpiredVideoJobs(db: Db) {
     ]);
   }
 
-  await jobs.updateMany
+  await jobs.updateMany(
     {
       status: "RUNNING",
       leaseExpiresAt: { $lt: now },
@@ -217,44 +217,3 @@ export async function markVideoProcessingSucceeded(
 export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMessage: string, workerId?: string) {
   const job = await db.collection("video_processing_jobs").findOne({ _id: jobId });
   if (!job) throw new Error("Processing job not found");
-
-  const attempts = Number(job.attempts ?? 0);
-  const terminal = attempts >= Number(job.maxAttempts ?? 5);
-  const now = new Date();
-  const backoffMs = Math.min(60 * 60 * 1000, 2 ** attempts * 1000);
-  const nextAttemptAt = new Date(now.getTime() + backoffMs);
-
-  const ownership = {
-    _id: jobId,
-    status: "RUNNING",
-    ...(workerId ? { workerId } : {})
-  };
-  const result = await db.collection("video_processing_jobs").updateOne(
-    ownership,
-    {
-      $set: {
-        status: terminal ? "DEAD_LETTER" : "QUEUED",
-        lastError: errorMessage,
-        nextAttemptAt: terminal ? null : nextAttemptAt,
-        updatedAt: now
-      },
-      $unset: { leaseExpiresAt: "", workerId: "" }
-    }
-  );
-
-  if (result.modifiedCount !== 1) {
-    return false;
-  }
-
-  if (terminal) {
-    await db.collection("video_uploads").updateOne(
-      { uploadId: job.uploadId },
-      { $set: { status: "FAILED", updatedAt: now, processingError: errorMessage } }
-    );
-    await db.collection("videos").updateOne(
-      { uploadId: job.uploadId },
-      { $set: { status: "FAILED", updatedAt: now, processingError: errorMessage } }
-    );
-  }
-  return true;
-}
