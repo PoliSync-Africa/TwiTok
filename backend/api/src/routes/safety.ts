@@ -165,7 +165,7 @@ safetyRouter.post("/moderation/actions/:actionId/rollback", requireOwner, safety
   }
 });
 
-safetyRouter.get("/blocks", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.get("/blocks", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     const blocks = await listBlocks(await getDb(), req.userId!.toHexString());
     return res.json({ blocks: blocks.map(block => ({
@@ -177,7 +177,7 @@ safetyRouter.get("/blocks", safetyReviewLimit, requireUser, async (req, res) => 
   }
 });
 
-safetyRouter.post("/blocks/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.post("/blocks/:userId", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     return res.status(201).json(await blockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
   } catch (error) {
@@ -185,7 +185,7 @@ safetyRouter.post("/blocks/:userId", safetyReviewLimit, requireUser, async (req,
   }
 });
 
-safetyRouter.delete("/blocks/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.delete("/blocks/:userId", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     return res.json(await unblockUser(await getDb(), req.userId!.toHexString(), String(req.params.userId)));
   } catch (error) {
@@ -194,7 +194,7 @@ safetyRouter.delete("/blocks/:userId", safetyReviewLimit, requireUser, async (re
 });
 
 
-safetyRouter.get("/mutes", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.get("/mutes", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     return res.json({ mutes: await listMutedUsers(await getDb(), req.userId!.toHexString()) });
   } catch (error) {
@@ -202,7 +202,7 @@ safetyRouter.get("/mutes", safetyReviewLimit, requireUser, async (req, res) => {
   }
 });
 
-safetyRouter.post("/mutes/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.post("/mutes/:userId", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     const db = await getDb();
     const result = await muteUser(db, req.userId!.toHexString(), String(req.params.userId));
@@ -213,7 +213,7 @@ safetyRouter.post("/mutes/:userId", safetyReviewLimit, requireUser, async (req, 
   }
 });
 
-safetyRouter.delete("/mutes/:userId", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.delete("/mutes/:userId", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     const db = await getDb();
     const result = await unmuteUser(db, req.userId!.toHexString(), String(req.params.userId));
@@ -224,7 +224,7 @@ safetyRouter.delete("/mutes/:userId", safetyReviewLimit, requireUser, async (req
   }
 });
 
-safetyRouter.post("/reports", safetyReviewLimit, requireUser, async (req, res) => {
+safetyRouter.post("/reports", requireUser, safetyReviewLimit, async (req, res) => {
   try {
     const targetType = String(req.body?.targetType ?? "").toUpperCase();
     if (!["USER", "VIDEO", "COMMENT", "LIVE"].includes(targetType)) return res.status(400).json({ error: "Invalid report target type" });
