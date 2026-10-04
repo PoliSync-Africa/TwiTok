@@ -486,8 +486,8 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
                 { $set: { outputUrl: candidate, status, updatedAt: new Date() } },
               );
             } else {
-              const providerStatus = String(provider.status ?? "PROCESSING").toUpperCase();
-              status = PROVIDER_TERMINAL_FAILURES.has(providerStatus) ? providerStatus : providerStatus;
+              const providerStatus = providerOutputStatus(provider) || "PROCESSING";
+              status = providerStatus;
               if (PROVIDER_TERMINAL_FAILURES.has(providerStatus)) {
                 await (await getDb()).collection("ai_media_jobs").updateOne(
                   { _id: job._id, userId: req.userId },
