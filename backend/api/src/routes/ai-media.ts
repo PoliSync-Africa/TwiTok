@@ -422,7 +422,8 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
     }
 
     const jobId = crypto.randomUUID();
-    await (await getDb()).collection("ai_media_jobs").insertOne({
+    const db = await getDb();
+    await db.collection("ai_media_jobs").insertOne({
       jobId,
       userId: req.userId!,
       mode,
