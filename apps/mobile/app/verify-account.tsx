@@ -36,7 +36,7 @@ export default function VerifyAccountScreen() {
 
   useEffect(()=>{ loadAccount().catch(e=>setError(e instanceof Error?e.message:"Unable to load your account")); },[]);
 
-  const remaining = useMemo(()=>Boolean(account && (account.emailVerified !== true || account.phoneVerified !== true)),[account]);
+  const remaining = useMemo(()=>Boolean(account && account.emailVerified !== true && account.phoneVerified !== true),[account]);
 
   async function send(channelToSend: Channel) {
     if(!account) return;
@@ -86,7 +86,7 @@ export default function VerifyAccountScreen() {
 
   return <View style={styles.root}>
     <Text style={styles.title}>Verify your account</Text>
-    <Text style={styles.subtitle}>Your TwiTok account requires both your registered email and phone number to be verified. Choose where you want to receive your next OTP.</Text>
+    <Text style={styles.subtitle}>Choose one contact method to receive your OTP. You only need to verify one method to continue.</Text>
 
     <View style={styles.optionGroup}>
       <Text style={styles.section}>Send OTP to</Text>
@@ -106,7 +106,7 @@ export default function VerifyAccountScreen() {
     {message?<Text style={styles.message}>{message}</Text>:null}
     {channel?<Pressable style={[styles.button,busy&&styles.disabled]} onPress={verify} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.buttonText}>Verify {channel==="email"?"email":"phone"}</Text>}</Pressable>:null}
     {channel?<Pressable onPress={()=>send(channel)} disabled={busy}><Text style={styles.resend}>Resend to this {channel==="email"?"email":"phone"}</Text></Pressable>:null}
-    {remaining?<Text style={styles.required}>Both contact methods must be verified before you can enter TwiTok.</Text>:null}
+    {remaining?<Text style={styles.required}>Select either email or phone. You do not need to verify both.</Text>:null}
     <Pressable onPress={()=>router.replace("/login")}><Text style={styles.back}>Back to login</Text></Pressable>
   </View>;
 }

@@ -153,7 +153,7 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
   await users.updateOne({ _id: user._id }, {
     $set: {
       ...(channel === "email" ? { emailVerified: true } : { phoneVerified: true }),
-      verificationStatus: nextEmailVerified && nextPhoneVerified ? "VERIFIED" : "PARTIALLY_VERIFIED",
+      verificationStatus: nextEmailVerified || nextPhoneVerified ? "VERIFIED" : "UNVERIFIED",
       updatedAt: new Date()
     },
     $unset: { verificationOtpHash: "", verificationOtpChannel: "", verificationOtpExpiresAt: "", verificationOtpSentAtEmail: "", verificationOtpSentAtPhone: "", verificationOtpAttempts: "" }
