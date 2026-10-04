@@ -20,7 +20,7 @@ type NotificationRow = {
 };
 
 const categories = ["ACCOUNT_UPDATES", "TWITOK", "LIVE", "PROMOTE_ASSISTANT", "SAFETY", "CREATOR"];
-const audiences = ["ALL", "CREATORS", "VERIFIED", "COUNTRY"];
+const audiences = ["ALL", "CREATORS", "VERIFIED", "COUNTRY", "INDIVIDUALS"];
 
 export default function AdminNotificationsPage() {
   const [rows, setRows] = useState<NotificationRow[]>([]);
