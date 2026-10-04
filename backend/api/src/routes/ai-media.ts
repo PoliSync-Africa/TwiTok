@@ -72,9 +72,9 @@ async function retryStalledJob(job: Record<string, any>, userId: any) {
     return null;
   }
 
+  const retryCount = Number(current.retryCount ?? 0) + 1;
   try {
     const sourceUrl = (await createPresignedPlayback(String(current.sourceObjectKey), 600)).url;
-    const retryCount = Number(current.retryCount ?? 0) + 1;
     const idempotencyKey = crypto.randomUUID();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
