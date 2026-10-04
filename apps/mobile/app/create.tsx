@@ -26,6 +26,7 @@ export default function CreateScreen() {
   const [studioPlan, setStudioPlan] = useState<StudioPlan>(DEFAULT_STUDIO_PLAN);
   const [selectedClip, setSelectedClip] = useState(0);
   const advanceToNextClip = useRef(false);
+  const appliedAiOutputRef = useRef("");
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
@@ -46,9 +47,24 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, aiOutputUri, aiOutputMimeType, aiOutputDuration } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; aiOutputUri?: string; aiOutputMimeType?: string; aiOutputDuration?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, aiOutputUri, aiOutputMimeType, aiOutputDuration, aiOutputMode } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; aiOutputUri?: string; aiOutputMimeType?: string; aiOutputDuration?: string; aiOutputMode?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
+  useEffect(() => {
+    const uri = String(aiOutputUri ?? "");
+    if (!uri || appliedAiOutputRef.current === uri) return;
+    appliedAiOutputRef.current = uri;
+    const outputMode = String(aiOutputMode ?? "VIDEO").toUpperCase() === "PHOTO" ? "PHOTO" : "VIDEO";
+    replaceAssets([{
+      uri,
+      mimeType: String(aiOutputMimeType ?? (outputMode === "PHOTO" ? "image/jpeg" : "video/mp4")),
+      duration: Number(aiOutputDuration ?? 0) > 0 ? Number(aiOutputDuration) : null,
+    }]);
+    setMode(outputMode);
+    setSelectedClip(0);
+    setStatus("AI Studio result ready");
+  }, [aiOutputUri, aiOutputMimeType, aiOutputDuration, aiOutputMode]);
+
   useEffect(() => {
     const uri = String(recordedUri ?? "");
     if (!uri) return;
