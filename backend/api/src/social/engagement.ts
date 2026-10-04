@@ -1,4 +1,4 @@
-import { ObjectId, type Db } from "mongodb";
+import { ObjectId, type Collection, type Db, type Document } from "mongodb";
 import { createNotification } from "./notifications.js";
 import { createPresignedPlayback, verifyMediaObject } from "../media/storage.js";
 
@@ -16,7 +16,7 @@ async function getPublicVideo(db: Db, videoId: ObjectId) {
   return video;
 }
 
-async function ensureEngagementIndex(collection: ReturnType<Db["collection"]>, keys: Record<string, 1 | -1>, options: Parameters<ReturnType<Db["collection"]>["createIndex"]>[1] = {}) {
+async function ensureEngagementIndex(collection: Collection<Document>, keys: Record<string, 1 | -1>, options: any = {}) {
   const desiredName = typeof options.name === "string" ? options.name : Object.entries(keys).map(([field, direction]) => `${field}_${direction}`).join("_");
   const existing = await collection.listIndexes().toArray();
   for (const index of existing) {
