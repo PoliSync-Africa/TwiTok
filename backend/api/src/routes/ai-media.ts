@@ -19,6 +19,21 @@ const BACKGROUNDS = new Set(["ORIGINAL", "AI_BLUR", "REPLACE", "REMOVE", "STUDIO
 const PROVIDER_TERMINAL_FAILURES = new Set(["FAILED", "ERROR", "CANCELLED"]);
 const AI_JOB_TIMEOUT_MS = 10 * 60 * 1000;
 const AI_JOB_MAX_RETRIES = 2;
+const AI_RETRY_BASE_DELAY_MS = 2_000;
+const AI_RETRY_MAX_DELAY_MS = 15_000;
+
+function isRetryableProviderStatus(status: number) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function retryDelayMs(retryCount: number) {
+  const exponent = Math.max(0, retryCount - 1);
+  return Math.min(AI_RETRY_MAX_DELAY_MS, AI_RETRY_BASE_DELAY_MS * (2 ** exponent));
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 const QUALITY_PROFILES: Record<string, { targetResolution: string; enhanceLevel: number }> = {
   ORIGINAL: { targetResolution: "ORIGINAL", enhanceLevel: 0 },
   CLEAN: { targetResolution: "CLEAN", enhanceLevel: 1 },
@@ -170,57 +185,79 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
     }
 
     const sourceUrl = (await createPresignedPlayback(sourceObjectKey, 600)).url;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30_000);
-    let provider: Record<string, unknown>;
+    const idempotencyKey = crypto.randomUUID();
+    let provider: Record<string, unknown> = {};
+    let providerRetryCount = 0;
 
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          mode,
-          style,
-          prompt,
-          sourceUrl,
-          targetResolution,
-          qualityProfile,
-          enhanceLevel: QUALITY_PROFILES[qualityProfile].enhanceLevel,
-          aiTool,
-          faceFilter,
-          background,
-          operation: aiTool,
-          backgroundOperation: background,
-          relight: aiTool === "RELIGHT",
-          objectRemoval: aiTool === "REMOVE_OBJECT",
-          backgroundReplacement: aiTool === "BACKGROUND_REPLACE",
-          backgroundRemoval: aiTool === "BACKGROUND_REMOVE",
-          denoise: aiTool === "DENOISE",
-          skyReplacement: aiTool === "SKY",
-          preserveSubject: true,
-          preserveIdentity: true,
-          enhanceQuality: true,
-          autoPolish: true,
-          naturalSkinTexture: true,
-          outputSpec: req.body?.outputSpec && typeof req.body.outputSpec === "object"
-            ? req.body.outputSpec
-            : {},
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`provider HTTP ${response.status}`);
-      const json: unknown = await response.json();
-      if (!json || typeof json !== "object" || Array.isArray(json)) {
-        throw new Error("provider invalid response");
+    for (let attempt = 1; attempt <= AI_JOB_MAX_RETRIES + 1; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${apiKey}`,
+            "idempotency-key": idempotencyKey,
+          },
+          body: JSON.stringify({
+            mode,
+            style,
+            prompt,
+            sourceUrl,
+            targetResolution,
+            qualityProfile,
+            enhanceLevel: QUALITY_PROFILES[qualityProfile].enhanceLevel,
+            aiTool,
+            faceFilter,
+            background,
+            operation: aiTool,
+            backgroundOperation: background,
+            relight: aiTool === "RELIGHT",
+            objectRemoval: aiTool === "REMOVE_OBJECT",
+            backgroundReplacement: aiTool === "BACKGROUND_REPLACE",
+            backgroundRemoval: aiTool === "BACKGROUND_REMOVE",
+            denoise: aiTool === "DENOISE",
+            skyReplacement: aiTool === "SKY",
+            preserveSubject: true,
+            preserveIdentity: true,
+            enhanceQuality: true,
+            autoPolish: true,
+            naturalSkinTexture: true,
+            outputSpec: req.body?.outputSpec && typeof req.body.outputSpec === "object"
+              ? req.body.outputSpec
+              : {},
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          if (isRetryableProviderStatus(response.status) && attempt <= AI_JOB_MAX_RETRIES) {
+            providerRetryCount = attempt;
+            await sleep(retryDelayMs(attempt));
+            continue;
+          }
+          throw new Error(`provider HTTP ${response.status}`);
+        }
+
+        const json: unknown = await response.json();
+        if (!json || typeof json !== "object" || Array.isArray(json)) {
+          throw new Error("provider invalid response");
+        }
+        const normalized = normalizeProviderResponse(json);
+        if (!normalized) throw new Error("provider invalid response");
+        provider = normalized;
+        break;
+      } catch (error) {
+        if (attempt <= AI_JOB_MAX_RETRIES && error instanceof Error && error.name === "AbortError") {
+          providerRetryCount = attempt;
+          await sleep(retryDelayMs(attempt));
+          continue;
+        }
+        throw error;
+      } finally {
+        clearTimeout(timer);
       }
-      const normalized = normalizeProviderResponse(json);
-      if (!normalized) throw new Error("provider invalid response");
-      provider = normalized;
-    } finally {
-      clearTimeout(timer);
     }
 
     const outputUrl = validMediaOutput(provider.outputUrl);
@@ -250,8 +287,10 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       providerJobId,
       outputUrl,
       status: outputUrl ? "READY" : "PROCESSING",
-      retryCount: 0,
+      retryCount: providerRetryCount,
       maxRetries: AI_JOB_MAX_RETRIES,
+      idempotencyKey,
+      providerRequestId: idempotencyKey,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
