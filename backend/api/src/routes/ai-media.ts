@@ -119,11 +119,9 @@ function validateProviderOutputMetadata(value: unknown, mode: string) {
   const extracted = extractProviderOutput(value);
   if (!extracted) return null;
   const normalized = normalizeProviderResponse(extracted.root);
-  if (!normalized?.outputUrl) {
-    const nested = normalizeProviderResponse(extracted.output);
-    if (!nested?.outputUrl) return null;
-  }
-  const url = validateOutputForMode(normalized.outputUrl, mode);
+  const normalizedOutput = normalized?.outputUrl ? normalized : normalizeProviderResponse(extracted.output);
+  if (!normalizedOutput?.outputUrl) return null;
+  const url = validateOutputForMode(normalizedOutput.outputUrl, mode);
   if (!url) return null;
   const contentType = [
     extracted.root.contentType, extracted.root.content_type, extracted.root.mimeType, extracted.root.mime_type,
