@@ -13,7 +13,6 @@ export const authRouter = Router();
 const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const userWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
   try {
     const { username, password, email, phone, dateOfBirth, countryCode } = req.body ?? {};
@@ -24,13 +23,16 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     res.status(201).json({
       token,
       user,
-      verificationRequired: user.emailVerified !== true || user.phoneVerified !== true,
+      verificationRequired: false,
       verificationChannels: [ ...(user.email ? ["email"] : []), ...(user.phone ? ["phone"] : []) ],
-      verificationDelivery: "user_selected"
+      verificationDelivery: "deferred"
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create account";
-    res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: message });
+    const userMessage = /duplicate|E11000/i.test(message)
+      ? "This email, phone number, or username is already registered. Please log in or use another one."
+      : message;
+    res.status(/duplicate|E11000|already exists/i.test(message) ? 409 : 400).json({ error: userMessage });
   }
 });
 
@@ -42,17 +44,12 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const user = await authenticateUser(db, identifier, password, countryCode);
     const token = issueUserToken(user);
     res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
-    const verificationRequired = user.emailVerified !== true || user.phoneVerified !== true;
-    if (verificationRequired) {
-      return res.json({
-        token,
-        user,
-        verificationRequired: true,
-        verificationChannels: [ ...(user.email ? ["email"] : []), ...(user.phone ? ["phone"] : []) ],
-        verificationDelivery: "user_selected"
-      });
-    }
-    res.json({ token, user, verificationRequired: false, verificationDelivery: "not_required" });
+    res.json({
+      token,
+      user,
+      verificationRequired: false,
+      verificationDelivery: "deferred"
+    });
   } catch { res.status(401).json({ error: "Invalid login credentials" }); }
 });
 
@@ -191,7 +188,7 @@ authRouter.patch("/profile-setup", requireUser, userWriteLimit, async (req, res)
 
 authRouter.patch("/comment-settings", requireUser, userWriteLimit, async (req, res) => {
   try {
-    const settings = { allowComments: req.body?.allowComments !== false, filterAll: Boolean(req.body?.filterAll), filterSpam: req.body?.filterSpam !== false, filterKeywords: Array.isArray(req.body?.filterKeywords) ? [...new Set(req.body.filterKeywords.map((x: unknown) => String(x).trim().toLowerCase()).filter(Boolean))].slice(0, 100) : [] };
+    const settings = { allowComments: req.body?.allowComments !== false, filterAll: Boolean(req.body?.filterAll), filterSpam: req.body?.filterSpam !== false, filterKeywords: Array.isArray(req.body?.filterKeywords) ? [...new Set(req.body.filterKeywords.map((x: unknown) => String(x).trim().toLowerCase()).filter(Boolean)).slice(0, 100) : [] };
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $set: { commentSettings: settings, updatedAt: new Date() } });
     res.json({ commentSettings: settings });
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Unable to update comment settings" }); }
