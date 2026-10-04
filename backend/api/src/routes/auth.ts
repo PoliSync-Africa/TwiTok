@@ -133,6 +133,20 @@ authRouter.post("/change-password", requireUser, rateLimit({ windowMs: 15 * 60 *
   } catch { return res.status(400).json({ error: "Unable to change password" }); }
 });
 
+authRouter.get("/username-availability", requireUser, userReadLimit, async (req, res) => {
+  try {
+    const username = String(req.query?.username ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9._]{3,24}$/.test(username) || username.endsWith(".")) {
+      return res.json({ username, available: false, valid: false, reason: "Username must be 3-24 characters and use letters, numbers, dots or underscores" });
+    }
+    const db = await getDb();
+    const existing = await db.collection("users").findOne({ username, _id: { $ne: req.userId! } }, { projection: { _id: 1 } });
+    return res.json({ username, available: !existing, valid: true });
+  } catch {
+    return res.status(500).json({ error: "Unable to check username availability" });
+  }
+});
+
 authRouter.get("/me", requireUser, userReadLimit, async (req, res) => {
   try {
     const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
