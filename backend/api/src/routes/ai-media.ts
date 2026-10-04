@@ -151,6 +151,15 @@ function extractProviderOutput(value: unknown) {
   };
 }
 
+function providerOutputStatus(value: unknown) {
+  const extracted = extractProviderOutput(value);
+  if (!extracted) return "";
+  const normalized = normalizeProviderResponse(extracted.root);
+  if (normalized?.status) return String(normalized.status).toUpperCase();
+  const nested = normalizeProviderResponse(extracted.output);
+  return String(nested?.status ?? "").toUpperCase();
+}
+
 function validateOutputDimensions(value: unknown, mode: string, qualityProfile: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return true;
   const root = value as Record<string, unknown>;
@@ -362,7 +371,7 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       return res.status(502).json({ error: "AI provider returned invalid output dimensions", code: "AI_MEDIA_INVALID_OUTPUT" });
     }
     const providerJobId = safeJobId(provider.jobId);
-    const providerStatus = String(provider.status ?? "").toUpperCase();
+    const providerStatus = providerOutputStatus(provider);
     if (providerStatus && PROVIDER_TERMINAL_FAILURES.has(providerStatus) && !outputUrl && !providerJobId) {
       return res.status(502).json({ error: "AI provider rejected the media job", code: "AI_MEDIA_PROVIDER_FAILED" });
     }
