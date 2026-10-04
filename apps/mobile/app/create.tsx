@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, St
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
+import UnifiedMediaStudio, { DEFAULT_STUDIO_PLAN, type StudioPlan } from "../components/unified-media-studio";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
@@ -21,6 +22,8 @@ const EMOJI_STICKERS = EMOJI_CATALOG.map((emoji,i) => [emojiStickerId(emoji), em
 
 export default function CreateScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [studioVisible, setStudioVisible] = useState(false);
+  const [studioPlan, setStudioPlan] = useState<StudioPlan>(DEFAULT_STUDIO_PLAN);
   const [selectedClip, setSelectedClip] = useState(0);
   const advanceToNextClip = useRef(false);
   const [mode, setMode] = useState<"VIDEO"|"PHOTO"|"TEXT">("VIDEO");
@@ -43,7 +46,7 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, aiOutputUri, aiOutputMimeType, aiOutputDuration } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; aiOutputUri?: string; aiOutputMimeType?: string; aiOutputDuration?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   useEffect(() => {
@@ -306,7 +309,7 @@ export default function CreateScreen() {
           clipSettings,
           autoCaptions,
           captionLanguage,
-          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : []
+          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : [],\n          editPlan: studioPlan
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
@@ -346,7 +349,7 @@ export default function CreateScreen() {
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?recordPhoto:recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
         <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
       </View> : null}
-      <ScrollView contentContainerStyle={styles.content}>
+      {mode !== "TEXT" && assets.length ? <Pressable style={styles.studioButton} onPress={() => setStudioVisible(true)}><Text style={styles.studioButtonTitle}>✦ Open TwiTok Studio</Text><Text style={styles.studioButtonSub}>Free AI enhancement • face filters • backgrounds • effects • transitions • pro quality</Text></Pressable> : null}\n      <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
