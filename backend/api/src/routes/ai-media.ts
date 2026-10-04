@@ -28,7 +28,7 @@ const QUALITY_PROFILES: Record<string, { targetResolution: string; enhanceLevel:
   "12K_AI": { targetResolution: "12K_AI", enhanceLevel: 5 },
 };
 
-function jobIsStalled(job: { status?: unknown; updatedAt?: Date | string }) {
+function jobIsStalled(job: { status?: unknown; updatedAt?: Date | string } | Record<string, unknown>) {
   if (String(job.status ?? "PROCESSING").toUpperCase() !== "PROCESSING") return false;
   const updated = job.updatedAt instanceof Date ? job.updatedAt.getTime() : Date.parse(String(job.updatedAt ?? ""));
   return Number.isFinite(updated) && Date.now() - updated > AI_JOB_TIMEOUT_MS;
