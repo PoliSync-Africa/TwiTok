@@ -138,12 +138,15 @@ function validateOutputDimensions(value: unknown, mode: string, qualityProfile: 
   const width = Number(root.width ?? root.outputWidth ?? root.output_width);
   const height = Number(root.height ?? root.outputHeight ?? root.output_height);
   if (!Number.isFinite(width) || !Number.isFinite(height)) return true;
+  if (!Number.isInteger(width) || !Number.isInteger(height)) return false;
   if (width <= 0 || height <= 0 || width > 16384 || height > 16384) return false;
   const pixels = width * height;
   if (pixels > 268_435_456) return false;
   if (mode === "VIDEO") {
     const duration = Number(root.duration ?? root.durationSeconds);
-    if (Number.isFinite(duration) && (duration <= 0 || duration > 60 * 60)) return false;
+    if (Number.isFinite(duration) && (!Number.isFinite(duration) || duration <= 0 || duration > 60 * 60)) return false;
+    const fps = Number(root.fps ?? root.frameRate);
+    if (Number.isFinite(fps) && (fps <= 0 || fps > 120)) return false;
   }
   if (qualityProfile === "12K_AI" && Math.max(width, height) < 6000) return false;
   return true;
