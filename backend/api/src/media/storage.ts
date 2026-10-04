@@ -131,7 +131,7 @@ export async function createPresignedPlayback(objectKey: string, expiresInSecond
 
 export function publicMediaUrl(objectKey: string) {
   validateObjectKey(objectKey);
-  const base = process.env.MEDIA_PUBLIC_BASE_URL?.replace(/\/$/, "");
+  const base = (process.env.MEDIA_CDN_BASE_URL || process.env.MEDIA_PUBLIC_BASE_URL)?.replace(/\/$/, "");
   return base ? `${base}/${objectKey}` : null;
 }
 
