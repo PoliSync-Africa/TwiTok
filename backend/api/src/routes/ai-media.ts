@@ -17,6 +17,8 @@ const AI_TOOLS = new Set([
 ]);
 const BACKGROUNDS = new Set(["ORIGINAL", "AI_BLUR", "REPLACE", "REMOVE", "STUDIO", "GREEN_SCREEN"]);
 const PROVIDER_TERMINAL_FAILURES = new Set(["FAILED", "ERROR", "CANCELLED"]);
+const AI_JOB_TIMEOUT_MS = 10 * 60 * 1000;
+const AI_JOB_MAX_RETRIES = 2;
 const QUALITY_PROFILES: Record<string, { targetResolution: string; enhanceLevel: number }> = {
   ORIGINAL: { targetResolution: "ORIGINAL", enhanceLevel: 0 },
   CLEAN: { targetResolution: "CLEAN", enhanceLevel: 1 },
@@ -25,6 +27,12 @@ const QUALITY_PROFILES: Record<string, { targetResolution: string; enhanceLevel:
   "8K": { targetResolution: "8K", enhanceLevel: 4 },
   "12K_AI": { targetResolution: "12K_AI", enhanceLevel: 5 },
 };
+
+function jobIsStalled(job: { status?: unknown; updatedAt?: Date | string }) {
+  if (String(job.status ?? "PROCESSING").toUpperCase() !== "PROCESSING") return false;
+  const updated = job.updatedAt instanceof Date ? job.updatedAt.getTime() : Date.parse(String(job.updatedAt ?? ""));
+  return Number.isFinite(updated) && Date.now() - updated > AI_JOB_TIMEOUT_MS;
+}
 
 function safeUrl(value: unknown, hosts: string[]) {
   if (typeof value !== "string" || value.length > 2048) return null;
@@ -263,9 +271,9 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
   if (!job) return res.status(404).json({ error: "AI media job not found" });
 
   let outputUrl = safeUrl(job.outputUrl, allowedHosts());
-  let status = outputUrl ? "READY" : String(job.status ?? "PROCESSING");
+  let status = outputUrl ? "READY" : String(job.status ?? "PROCESSING");\n\n  if (!outputUrl && jobIsStalled(job)) {\n    status = "FAILED";\n    await (await getDb()).collection("ai_media_jobs").updateOne(\n      { _id: job._id, userId: req.userId, status: "PROCESSING" },\n      { $set: { status, failureCode: "AI_MEDIA_JOB_TIMEOUT", updatedAt: new Date() } },\n    );\n  }
 
-  if (!outputUrl && job.providerJobId) {
+  if (!outputUrl && status === "PROCESSING" && job.providerJobId) {
     const endpoint = providerStatusEndpoint(String(job.providerJobId));
     const apiKey = process.env.TWITOK_AI_MEDIA_API_KEY;
     if (endpoint && apiKey) {
