@@ -24,10 +24,12 @@ export default function MediaStudioScreen() {
           const operations = data.operations ?? {};
           const backgrounds = data.backgrounds ?? {};
           const qualityProfiles = data.qualityProfiles ?? {};
+          const faceFilters = data.faceFilters ?? {};
           setCapabilities(new Set([
             ...Object.entries(operations).filter(([, enabled]) => enabled).map(([name]) => name),
             ...Object.entries(backgrounds).filter(([, enabled]) => enabled).map(([name]) => name),
             ...Object.entries(qualityProfiles).filter(([, enabled]) => enabled).map(([name]) => name),
+            ...Object.entries(faceFilters).filter(([, enabled]) => enabled).map(([name]) => `FACE_FILTER_${name}`),
           ]));
         }
       } catch {
@@ -39,7 +41,7 @@ export default function MediaStudioScreen() {
 
   async function runAI() {
     const uri = String(params.uri ?? "");
-    const capabilityFor = (id: string) => ({REPLACE:"BACKGROUND_REPLACE",REMOVE:"BACKGROUND_REMOVE",BLUR:"AI_BLUR",STUDIO:"STUDIO",GREEN:"GREEN_SCREEN",RESTORE:"RESTORE",RELIGHT:"RELIGHT",DETAIL:"SUPER_DETAIL",COLORIZE:"COLORIZE",AI_ART:"AI_ART",AI_EXPAND:"AI_EXPAND",OBJECT_REMOVE:"REMOVE_OBJECT",FACE_REPAIR:"FACE_REPAIR",CLEAN:"CLEAN",HD:"HD","4K":"4K","8K":"8K","12K_AI":"12K_AI"} as Record<string,string>)[id];
+    const capabilityFor = (id: string) => ({REPLACE:"BACKGROUND_REPLACE",REMOVE:"BACKGROUND_REMOVE",BLUR:"AI_BLUR",STUDIO:"STUDIO",GREEN:"GREEN_SCREEN",RESTORE:"RESTORE",RELIGHT:"RELIGHT",DETAIL:"SUPER_DETAIL",COLORIZE:"COLORIZE",AI_ART:"AI_ART",AI_EXPAND:"AI_EXPAND",OBJECT_REMOVE:"REMOVE_OBJECT",SKY:"SKY",DENOISE:"DENOISE",FACE_REPAIR:"FACE_REPAIR",SMOOTH:"FACE_FILTER_SMOOTH",GLOW:"FACE_FILTER_GLOW",MAKEUP:"FACE_FILTER_MAKEUP",FACE_LIGHT:"FACE_FILTER_FACE_LIGHT",BEAUTY:"FACE_FILTER_BEAUTY",CLEAN:"CLEAN",HD:"HD","4K":"4K","8K":"8K","12K_AI":"12K_AI"} as Record<string,string>)[id];
     const required = [plan.quality, plan.aiTool, plan.background].map(capabilityFor).filter(Boolean) as string[];
     if (capabilities && capabilities.size && required.some(name => !capabilities.has(name))) {
       Alert.alert("AI Studio", "One or more selected AI tools are not available from the configured provider yet.");
