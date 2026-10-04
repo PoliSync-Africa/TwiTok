@@ -54,6 +54,23 @@ export async function verifySourceAndQueue(db: Db, userId: ObjectId, uploadId: s
   return { queued: true, jobCreated: result.upsertedCount === 1 };
 }
 
+export async function recoverStaleVideoUploads(db: Db) {
+  const now = new Date();
+  const staleBefore = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const result = await db.collection("video_uploads").updateMany(
+    { status: "UPLOADING", createdAt: { $lt: staleBefore } },
+    {
+      $set: {
+        status: "FAILED",
+        failureCode: "UPLOAD_EXPIRED",
+        processingError: "Upload session expired before completion",
+        updatedAt: now
+      }
+    }
+  );
+  return result.modifiedCount;
+}
+
 export async function recoverExpiredVideoJobs(db: Db) {
   const now = new Date();
   await db.collection("video_processing_jobs").updateMany(
