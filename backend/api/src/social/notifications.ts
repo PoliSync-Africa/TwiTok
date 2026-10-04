@@ -10,7 +10,7 @@ export type SystemNotificationCategory =
   | "SAFETY"
   | "CREATOR";
 
-export type SystemNotificationAudience = "ALL" | "CREATORS" | "VERIFIED" | "COUNTRY";
+export type SystemNotificationAudience = "ALL" | "CREATORS" | "VERIFIED" | "COUNTRY" | "INDIVIDUALS";
 
 let systemIndexesPromise: Promise<unknown> | null = null;
 
@@ -19,6 +19,7 @@ async function ensureSystemIndexes(db: Db) {
     systemIndexesPromise = Promise.all([
       db.collection("system_announcements").createIndex({ status: 1, startsAt: 1, expiresAt: 1, createdAt: -1 }),
       db.collection("system_announcements").createIndex({ audience: 1, targetCountryCode: 1, createdAt: -1 }),
+      db.collection("system_announcements").createIndex({ audience: 1, targetUserIds: 1, createdAt: -1 }),
       db.collection("system_notification_reads").createIndex({ userId: 1, announcementId: 1 }, { unique: true }),
       db.collection("system_notification_reads").createIndex({ userId: 1, readAt: 1 })
     ]);
@@ -74,7 +75,7 @@ async function getSystemAudienceFilter(db: Db, userId: ObjectId) {
     { projection: { isVerified: 1, countryCode: 1 } }
   );
   const creator = await db.collection("creator_profiles").findOne({ userId }, { projection: { _id: 1 } });
-  const audience: Array<Record<string, unknown>> = [{ audience: "ALL" }];
+  const audience: Array<Record<string, unknown>> = [{ audience: "ALL" }, { audience: "INDIVIDUALS", targetUserIds: userId }];
   if (creator) audience.push({ audience: "CREATORS" });
   if (user?.isVerified === true) audience.push({ audience: "VERIFIED" });
   if (typeof user?.countryCode === "string" && user.countryCode.trim()) {
