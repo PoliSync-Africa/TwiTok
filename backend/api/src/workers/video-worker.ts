@@ -147,13 +147,30 @@ async function runFfmpeg(
   const bg=String(plan.background)==="BLUR"?"boxblur=2:1":"null";
   const crop:Record<string,string>={"9:16":"crop=min(iw\,ih*0.5625):min(ih\,iw*1.7778)","1:1":"crop=min(iw\,ih):min(iw\,ih)","4:5":"crop=min(iw\,ih*0.8):min(ih\,iw*1.25)","16:9":"crop=min(iw\,ih*1.7778):min(ih\,iw*0.5625)"};
   const geometry=[crop[String(plan.crop??"ORIGINAL")]??"null",plan.mirror?"hflip":"null",Number(plan.rotate)===90?"transpose=1":Number(plan.rotate)===180?"transpose=1,transpose=1":Number(plan.rotate)===270?"transpose=2":"null"].filter(Boolean).filter(x=>x!=="null").join(",")||"null";
-  const filters = [
-    "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v360base]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v720base]`
-  ];
+  const sourceInfo = await probeVideoDimensions(input);
+  const maxHeight = sourceInfo?.height ?? 2160;
+  const requestedVariants = [
+    { id: "240", width: 426, height: 240, bitrate: "350k", maxrate: "450k", bufsize: "700k" },
+    { id: "360", width: 640, height: 360, bitrate: "650k", maxrate: "850k", bufsize: "1300k" },
+    { id: "480", width: 854, height: 480, bitrate: "1000k", maxrate: "1300k", bufsize: "2000k" },
+    { id: "720", width: 1280, height: 720, bitrate: "2200k", maxrate: "2800k", bufsize: "4400k" },
+    { id: "1080", width: 1920, height: 1080, bitrate: "5000k", maxrate: "6500k", bufsize: "10000k" },
+    { id: "1440", width: 2560, height: 1440, bitrate: "9000k", maxrate: "11500k", bufsize: "18000k" },
+    { id: "2160", width: 3840, height: 2160, bitrate: "16000k", maxrate: "20000k", bufsize: "32000k" },
+    { id: "2880", width: 5120, height: 2880, bitrate: "24000k", maxrate: "30000k", bufsize: "48000k" },
+    { id: "3456", width: 6144, height: 3456, bitrate: "32000k", maxrate: "40000k", bufsize: "64000k" },
+    { id: "4320", width: 7680, height: 4320, bitrate: "45000k", maxrate: "55000k", bufsize: "90000k" }
+  ].filter(variant => variant.height <= maxHeight);
 
+  const sourceStreamCount = requestedVariants.length;
+  const filters = [
+    `[0:v]split=\${sourceStreamCount}\${requestedVariants.map((_, index) => `[src\${index}]`).join("")}`
+  ];
+  requestedVariants.forEach((variant, index) => {
+    filters.push(
+      `[src\${index}]scale=w=\${variant.width}:h=\${variant.height}:force_original_aspect_ratio=decrease,\${polish},\${look[String(plan.filter??"NONE")]??"null"},\${face[String(plan.faceFilter??"NONE")]??"null"},\${bg},\${geometry},setpts=PTS/\${speed}[v\${variant.id}base]`
+    );
+  });
   const overlayInputs: string[] = [];
   for (let index = 0; index < textOverlays.length; index += 1) {
     const overlay = textOverlays[index];
@@ -161,11 +178,12 @@ async function runFfmpeg(
     fs.writeFileSync(textFile, overlay.text, "utf8");
     overlayInputs.push(textFile);
   }
-  const variants = [
-    { base: "v360base", out: "v360", width: 360 },
-    { base: "v540base", out: "v540", width: 540 },
-    { base: "v720base", out: "v720", width: 720 }
-  ];
+  const variants = requestedVariants.map(variant => ({
+    base: `v${variant.id}base`,
+    out: `v${variant.id}`,
+    width: variant.width,
+    height: variant.height
+  }));
   const captionInputs: string[] = [];
   for (let index = 0; index < captions.length; index += 1) {
     const caption = captions[index];
@@ -228,9 +246,12 @@ async function runFfmpeg(
     "-hide_banner", "-loglevel", "error", "-y",
     ...inputArgs,
     "-filter_complex", filters.join(";"),
-    "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
-    "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
-    "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
+    ...requestedVariants.flatMap((variant, index) => [
+      "-map", `[v${variant.id}]`, "-c:v:" + index, "libx264",
+      "-preset:v:" + index, process.env.TWITOK_VIDEO_X264_PRESET ?? "medium",
+      "-profile:v:" + index, "high", "-pix_fmt:v:" + index, "yuv420p",
+      "-b:v:" + index, variant.bitrate, "-maxrate:v:" + index, variant.maxrate, "-bufsize:v:" + index, variant.bufsize
+    ]),
     ...audioMap,
     ...(audioMap.length ? ["-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
     "-force_key_frames", "expr:gte(t,n_forced*2)",
@@ -239,10 +260,33 @@ async function runFfmpeg(
     "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init_%v.mp4",
     "-hls_segment_filename", path.join(outputDir, "seg_%v_%05d.m4s"),
     "-master_pl_name", "master.m3u8",
-    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0" : "v:0 v:1 v:2",
+    "-var_stream_map", requestedVariants.map((_, index) => audioMap.length ? `v:${index},a:0` : `v:${index}`).join(" "),
     path.join(outputDir, "stream_%v.m3u8")
   ];
   await runProcess(ffmpegBin, args);
+}
+
+async function probeVideoDimensions(input: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const result = await new Promise<string>((resolve, reject) => {
+      const child = spawn(ffprobeBin, [
+        "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "json", input
+      ], { stdio: ["ignore", "pipe", "pipe"] });
+      let out = ""; let err = "";
+      child.stdout.on("data", chunk => { out += chunk.toString(); });
+      child.stderr.on("data", chunk => { err += chunk.toString(); });
+      child.on("error", reject);
+      child.on("close", code => code === 0 ? resolve(out) : reject(new Error(err)));
+    });
+    const stream = JSON.parse(result).streams?.[0];
+    const width = Number(stream?.width);
+    const height = Number(stream?.height);
+    return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 ? { width, height } : null;
+  } catch {
+    return null;
+  }
 }
 
 async function getDurationMs(input: string) {
