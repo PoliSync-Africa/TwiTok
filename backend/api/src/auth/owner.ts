@@ -71,15 +71,24 @@ export function createOwnerToken(owner: StoredOwnerAccount, mfaVerified = false)
       mfaVerified
     },
     JWT_SECRET(),
-    { expiresIn: "30m", issuer: "twitok-admin" }
+    { expiresIn: "30m", issuer: "twitok-admin", audience: "twitok-admin-api" }
   );
 }
 
 export function verifyOwnerToken(token: string) {
-  return jwt.verify(token, JWT_SECRET(), { issuer: "twitok-admin" }) as {
+  const decoded = jwt.verify(token, JWT_SECRET(), {
+    issuer: "twitok-admin",
+    audience: "twitok-admin-api",
+    algorithms: ["HS256"]
+  }) as {
     sub: string;
     role: "OWNER";
     email: string;
     mfaVerified?: boolean;
+    typ: "owner_session";
   };
+  if (decoded.typ !== "owner_session" || decoded.role !== "OWNER" || !ObjectId.isValid(decoded.sub) || typeof decoded.email !== "string" || decoded.email.length === 0) {
+    throw new Error("Invalid owner token");
+  }
+  return decoded;
 }
