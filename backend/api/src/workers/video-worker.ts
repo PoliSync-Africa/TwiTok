@@ -6,7 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Db } from "mongodb";
 import { getDb } from "../db/mongo.js";
-import { claimNextVideoJob, markVideoProcessingFailed, markVideoProcessingSucceeded, recoverExpiredVideoJobs } from "../video/processing.js";
+import { claimNextVideoJob, markVideoProcessingFailed, markVideoProcessingSucceeded, recoverExpiredVideoJobs, recoverStaleVideoUploads } from "../video/processing.js";
 import { createOriginalSound } from "../music/service.js";
 
 const bucket = process.env.MEDIA_BUCKET ?? "";
@@ -419,6 +419,7 @@ async function loop() {
   console.log(`TwiTok video worker ${workerId} started`);
   for (;;) {
     await recoverExpiredVideoJobs(db);
+    await recoverStaleVideoUploads(db);
     const job = await claimNextVideoJob(db, workerId);
     if (!job) {
       await new Promise(resolve => setTimeout(resolve, pollMs));
