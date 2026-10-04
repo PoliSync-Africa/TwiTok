@@ -26,6 +26,7 @@ export default function MediaStudioScreen() {
           const qualityProfiles = data.qualityProfiles ?? {};
           const faceFilters = data.faceFilters ?? {};
           setCapabilities(new Set([
+            "__PROVIDER_BACKED__",
             ...Object.entries(operations).filter(([, enabled]) => enabled).map(([name]) => name),
             ...Object.entries(backgrounds).filter(([, enabled]) => enabled).map(([name]) => name),
             ...Object.entries(qualityProfiles).filter(([, enabled]) => enabled).map(([name]) => name),
