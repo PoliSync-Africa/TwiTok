@@ -70,7 +70,11 @@ function validMediaOutput(value: unknown) {
   const url = safeUrl(value, allowedHosts());
   if (!url) return null;
   const pathname = new URL(url).pathname.toLowerCase();
-  const allowed = [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".m4v", ".webm"];
+  const allowed = [
+    ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".webp", ".avif", ".heic", ".heif", ".tif", ".tiff", ".bmp",
+    ".gif", ".svg",
+    ".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".mpeg", ".mpg", ".m2ts", ".mts", ".ts", ".3gp", ".3g2",
+  ];
   return allowed.some(ext => pathname.endsWith(ext)) ? url : null;
 }
 
@@ -87,8 +91,13 @@ function validateOutputForMode(value: unknown, mode: string) {
   const url = validMediaOutput(value);
   if (!url) return null;
   const ext = outputExtension(url);
-  const imageExts = new Set([".jpg", ".jpeg", ".png", ".webp"]);
-  const videoExts = new Set([".mp4", ".mov", ".m4v", ".webm"]);
+  const imageExts = new Set([
+    ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".webp", ".avif", ".heic", ".heif", ".tif", ".tiff", ".bmp",
+    ".gif", ".svg",
+  ]);
+  const videoExts = new Set([
+    ".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".mpeg", ".mpg", ".m2ts", ".mts", ".ts", ".3gp", ".3g2",
+  ]);
   const expected = mediaKindForMode(mode);
   if (expected === "image" && !imageExts.has(ext)) return null;
   if (expected === "video" && !videoExts.has(ext)) return null;
