@@ -30,7 +30,7 @@ const sections = [
   { title: "Background Studio", items: [["BLUR","AI Blur"],["REPLACE","Replace Background"],["REMOVE","Remove Background"],["STUDIO","Studio Background"],["GREEN","Green Screen"],["ORIGINAL","Keep Original"]] },
   { title: "AI Studio — Free", items: [["RESTORE","Restore"],["RELIGHT","AI Relight"],["DETAIL","Super Detail"],["DENOISE","AI Denoise"],["COLORIZE","Colorize"],["AI_ART","AI Art"],["AI_EXPAND","AI Expand"],["OBJECT_REMOVE","Remove Object"],["SKY","AI Sky"],["FACE_REPAIR","Face Repair"]] },
   { title: "Frame & Motion", items: [["9:16","9:16"],["1:1","1:1"],["4:5","4:5"],["16:9","16:9"],["MIRROR","Mirror"],["ROTATE","Rotate"],["0.5","0.5×"],["0.75","0.75×"],["1","1×"],["1.5","1.5×"],["2","2×"]] },
-  ...(mode === "VIDEO" ? [{ title: "Transitions", items: [["NONE","None"],["FADE","Fade"],["DISSOLVE","Dissolve"],["WIPELEFT","Wipe Left"],["WIPERIGHT","Wipe Right"],["SLIDELEFT","Slide Left"],["SLIDERIGHT","Slide Right"]] }] : [])
+  ...(true ? [{ title: "Transitions", items: [["NONE","None"],["FADE","Fade"],["DISSOLVE","Dissolve"],["WIPELEFT","Wipe Left"],["WIPERIGHT","Wipe Right"],["SLIDELEFT","Slide Left"],["SLIDERIGHT","Slide Right"]] }] : [])
 ] as const;
 
 const aiIds = new Set(["12K_AI","RESTORE","RELIGHT","DETAIL","DENOISE","COLORIZE","AI_ART","AI_EXPAND","OBJECT_REMOVE","SKY","FACE_REPAIR","REPLACE","REMOVE","STUDIO","GREEN","BLUR","SMOOTH","GLOW","MAKEUP","FACE_LIGHT","BEAUTY","PORTRAIT"]);
