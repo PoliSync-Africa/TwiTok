@@ -32,7 +32,20 @@ export default function MediaStudioScreen() {
       const response=await fetch(API+"/ai-media/restyle",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({mode:mode==="PHOTO"?"IMAGE":"VIDEO",style:plan.filter==="PORTRAIT"?"PORTRAIT_PRO":"CLEAN",prompt:[plan.aiPrompt,plan.faceFilter!=="NONE"?`Apply the ${plan.faceFilter} face treatment naturally.`:"",plan.background!=="ORIGINAL"?`Use ${plan.background} background treatment.`:"",plan.quality==="12K_AI"?"Produce the highest practical AI resolution with premium detail reconstruction.":""].filter(Boolean).join(" "),sourceObjectKey:session.objectKey,targetResolution:plan.quality,outputSpec:{contrast:true,denoise:true,sharpen:true,naturalSkin:true,preserveIdentity:true}})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok) throw new Error(data.error||"Unable to start AI Studio.");
-      router.replace({pathname:"/create",params:{aiOutputUri:String(data.outputUrl??""),aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??"")}});
+      let outputUrl=String(data.outputUrl??"");
+      if(!outputUrl && data.jobId) {
+        for(let attempt=0; attempt<30; attempt++) {
+          await new Promise(resolve=>setTimeout(resolve,2000));
+          const jobResponse=await fetch(API+"/ai-media/jobs/"+encodeURIComponent(String(data.jobId)),{headers:{Authorization:"Bearer "+token}});
+          const job=await jobResponse.json().catch(()=>({}));
+          if(!jobResponse.ok) throw new Error(job.error||"Unable to check AI Studio.");
+          if(["FAILED","ERROR","CANCELLED"].includes(String(job.status))) throw new Error("AI Studio generation failed.");
+          outputUrl=String(job.outputUrl??"");
+          if(outputUrl) break;
+        }
+      }
+      if(!outputUrl) throw new Error("AI Studio is still processing. Please try again shortly.");
+      router.replace({pathname:"/create",params:{aiOutputUri:outputUrl,aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??"")}});
     } catch(e) { Alert.alert("AI Studio",e instanceof Error?e.message:"Unable to process media."); }
   }
 
