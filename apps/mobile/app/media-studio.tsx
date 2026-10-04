@@ -45,7 +45,7 @@ export default function MediaStudioScreen() {
         }
       }
       if(!outputUrl) throw new Error("AI Studio is still processing. Please try again shortly.");
-      router.replace({pathname:"/create",params:{aiOutputUri:outputUrl,aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??"")}});
+      router.replace({pathname:"/create",params:{aiOutputUri:outputUrl,aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??""),aiOutputMode:mode}});
     } catch(e) { Alert.alert("AI Studio",e instanceof Error?e.message:"Unable to process media."); }
   }
 
