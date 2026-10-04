@@ -11,6 +11,7 @@ type NotificationRow = {
   actionUrl: string | null;
   audience: string;
   targetCountryCode: string | null;
+  targetUserCount: number;
   priority: number;
   status: string;
   startsAt: string;
@@ -27,6 +28,7 @@ export default function AdminNotificationsPage() {
     category: "TWITOK",
     audience: "ALL",
     targetCountryCode: "",
+    targetUsernames: "",
     title: "",
     body: "",
     actionLabel: "",
@@ -57,6 +59,7 @@ export default function AdminNotificationsPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           ...form,
+          targetUsernames: form.targetUsernames.split(/[\\s,]+/).map(value => value.trim()).filter(Boolean),
           priority: Number(form.priority || 0),
           publish: true,
           startsAt: new Date().toISOString(),
@@ -65,7 +68,7 @@ export default function AdminNotificationsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to publish");
-      setForm(current => ({ ...current, title: "", body: "", actionLabel: "", actionUrl: "", expiresAt: "" }));
+      setForm(current => ({ ...current, targetUsernames: "", title: "", body: "", actionLabel: "", actionUrl: "", expiresAt: "" }));
       setMessage("System notification published.");
       await load();
     } catch (error) {
@@ -119,7 +122,8 @@ export default function AdminNotificationsPage() {
           <form className="notification-form" onSubmit={submit}>
             <label>Category<select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{categories.map(item => <option key={item}>{item}</option>)}</select></label>
             <label>Audience<select value={form.audience} onChange={e => setForm({ ...form, audience: e.target.value })}>{audiences.map(item => <option key={item}>{item}</option>)}</select></label>
-            {form.audience === "COUNTRY" && <label>Country code<input maxLength={2} placeholder="GH" value={form.targetCountryCode} onChange={e => setForm({ ...form, targetCountryCode: e.target.value.toUpperCase() })} required /></label>}
+{form.audience === "COUNTRY" && <label>Country code<input maxLength={2} placeholder="GH" value={form.targetCountryCode} onChange={e => setForm({ ...form, targetCountryCode: e.target.value.toUpperCase() })} required /></label>}
+            {form.audience === "INDIVIDUALS" && <label className="span-2">Individuals<input placeholder="@username1, @username2, @username3" value={form.targetUsernames} onChange={e => setForm({ ...form, targetUsernames: e.target.value })} required /><small className="field-help">Add up to 100 usernames. TwiTok verifies every account before publishing.</small></label>}
             <label>Priority<input type="number" min="0" max="100" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} /></label>
             <label className="span-2">Title<input maxLength={120} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required /></label>
             <label className="span-2">Message<textarea maxLength={3000} rows={6} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} required /></label>
