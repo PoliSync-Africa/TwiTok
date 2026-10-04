@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { rateLimitHit } from "../cache/redis.js";
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
@@ -9,10 +10,22 @@ function cleanup(now: number) {
 }
 
 export function rateLimit(options: { windowMs: number; max: number; key?: (req: Request) => string }) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const now = Date.now(); cleanup(now);
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now();
     const identity = options.key?.(req) ?? req.ip ?? req.socket.remoteAddress ?? "unknown";
-    const key = identity.slice(0, 220);
+    const key = `twitok:rl:${options.windowMs}:${options.max}:${identity.slice(0, 220)}`;
+
+    const distributed = await rateLimitHit(key, options.windowMs);
+    if (distributed) {
+      const remaining = Math.max(0, options.max - distributed.count);
+      res.setHeader("RateLimit-Limit", options.max);
+      res.setHeader("RateLimit-Remaining", remaining);
+      res.setHeader("RateLimit-Reset", Math.max(0, Math.ceil((distributed.resetAt - now) / 1000)));
+      if (distributed.count > options.max) return res.status(429).json({ error: "Too many requests. Please try again later." });
+      return next();
+    }
+
+    cleanup(now);
     const current = buckets.get(key);
     if (!current || current.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + options.windowMs });
