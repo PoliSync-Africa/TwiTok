@@ -132,6 +132,23 @@ function validateProviderOutputMetadata(value: unknown, mode: string) {
   return url;
 }
 
+function validateOutputDimensions(value: unknown, mode: string, qualityProfile: string) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return true;
+  const root = value as Record<string, unknown>;
+  const width = Number(root.width ?? root.outputWidth ?? root.output_width);
+  const height = Number(root.height ?? root.outputHeight ?? root.output_height);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return true;
+  if (width <= 0 || height <= 0 || width > 16384 || height > 16384) return false;
+  const pixels = width * height;
+  if (pixels > 268_435_456) return false;
+  if (mode === "VIDEO") {
+    const duration = Number(root.duration ?? root.durationSeconds);
+    if (Number.isFinite(duration) && (duration <= 0 || duration > 60 * 60)) return false;
+  }
+  if (qualityProfile === "12K_AI" && Math.max(width, height) < 6000) return false;
+  return true;
+}
+
 function providerStatusEndpoint(jobId: string) {
   const template = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
   if (!template) return null;
@@ -319,6 +336,9 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
     }
 
     const outputUrl = validateProviderOutputMetadata(provider, mode);
+    if (outputUrl && !validateOutputDimensions(provider, mode, qualityProfile)) {
+      return res.status(502).json({ error: "AI provider returned invalid output dimensions", code: "AI_MEDIA_INVALID_OUTPUT" });
+    }
     const providerJobId = safeJobId(provider.jobId);
     const providerStatus = String(provider.status ?? "").toUpperCase();
     if (providerStatus && PROVIDER_TERMINAL_FAILURES.has(providerStatus) && !outputUrl && !providerJobId) {
@@ -398,8 +418,8 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
           const json: unknown = await response.json();
           if (json && typeof json === "object" && !Array.isArray(json)) {
             const provider = json as Record<string, unknown>;
-            const candidate = validateOutputForMode(provider.outputUrl, String(job.mode ?? "VIDEO").toUpperCase());
-            if (candidate) {
+            const candidate = validateProviderOutputMetadata(provider, String(job.mode ?? "VIDEO").toUpperCase());
+            if (candidate && validateOutputDimensions(provider, String(job.mode ?? "VIDEO").toUpperCase(), String(job.qualityProfile ?? "ORIGINAL").toUpperCase())) {
               outputUrl = candidate;
               status = "READY";
               await (await getDb()).collection("ai_media_jobs").updateOne(
