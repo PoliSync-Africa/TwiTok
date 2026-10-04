@@ -104,6 +104,34 @@ function validateOutputForMode(value: unknown, mode: string) {
   return url;
 }
 
+const OUTPUT_CONTENT_TYPES = {
+  IMAGE: new Set([
+    "image/jpeg", "image/png", "image/webp", "image/avif", "image/heic", "image/heif",
+    "image/tiff", "image/bmp", "image/gif", "image/svg+xml",
+  ]),
+  VIDEO: new Set([
+    "video/mp4", "video/quicktime", "video/webm", "video/x-matroska", "video/x-msvideo",
+    "video/mpeg", "video/mp2t", "video/3gpp", "video/3gpp2",
+  ]),
+};
+
+function validateProviderOutputMetadata(value: unknown, mode: string) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const root = value as Record<string, unknown>;
+  const normalized = normalizeProviderResponse(root);
+  if (!normalized?.outputUrl) return null;
+  const url = validateOutputForMode(normalized.outputUrl, mode);
+  if (!url) return null;
+  const contentType = [root.contentType, root.content_type, root.mimeType, root.mime_type]
+    .find(item => typeof item === "string");
+  if (contentType) {
+    const normalizedType = contentType.toLowerCase().split(";")[0].trim();
+    const allowed = OUTPUT_CONTENT_TYPES[mode as "IMAGE" | "VIDEO"];
+    if (!allowed?.has(normalizedType)) return null;
+  }
+  return url;
+}
+
 function providerStatusEndpoint(jobId: string) {
   const template = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
   if (!template) return null;
@@ -290,7 +318,7 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       }
     }
 
-    const outputUrl = validateOutputForMode(provider.outputUrl, mode);
+    const outputUrl = validateProviderOutputMetadata(provider, mode);
     const providerJobId = safeJobId(provider.jobId);
     const providerStatus = String(provider.status ?? "").toUpperCase();
     if (providerStatus && PROVIDER_TERMINAL_FAILURES.has(providerStatus) && !outputUrl && !providerJobId) {
