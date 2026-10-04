@@ -116,20 +116,35 @@ const OUTPUT_CONTENT_TYPES = {
 };
 
 function validateProviderOutputMetadata(value: unknown, mode: string) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const root = value as Record<string, unknown>;
-  const normalized = normalizeProviderResponse(root);
+  const extracted = extractProviderOutput(value);
+  if (!extracted) return null;
+  const normalized = normalizeProviderResponse(extracted.root);
   if (!normalized?.outputUrl) return null;
   const url = validateOutputForMode(normalized.outputUrl, mode);
   if (!url) return null;
-  const contentType = [root.contentType, root.content_type, root.mimeType, root.mime_type]
-    .find(item => typeof item === "string");
+  const contentType = [
+    extracted.root.contentType, extracted.root.content_type, extracted.root.mimeType, extracted.root.mime_type,
+    extracted.result?.contentType, extracted.result?.content_type, extracted.result?.mimeType, extracted.result?.mime_type,
+  ].find(item => typeof item === "string");
   if (contentType) {
     const normalizedType = contentType.toLowerCase().split(";")[0].trim();
     const allowed = OUTPUT_CONTENT_TYPES[mode as "IMAGE" | "VIDEO"];
     if (!allowed?.has(normalizedType)) return null;
   }
   return url;
+}
+
+function extractProviderOutput(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const root = value as Record<string, unknown>;
+  const result = root.result && typeof root.result === "object" && !Array.isArray(root.result)
+    ? root.result as Record<string, unknown>
+    : null;
+  return {
+    root,
+    result,
+    output: result ?? root,
+  };
 }
 
 function validateOutputDimensions(value: unknown, mode: string, qualityProfile: string) {
