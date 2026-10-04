@@ -43,6 +43,14 @@ function safeJobId(value: unknown) {
   return value;
 }
 
+function validMediaOutput(value: unknown) {
+  const url = safeUrl(value, allowedHosts());
+  if (!url) return null;
+  const pathname = new URL(url).pathname.toLowerCase();
+  const allowed = [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".m4v", ".webm"];
+  return allowed.some(ext => pathname.endsWith(ext)) ? url : null;
+}
+
 function providerStatusEndpoint(jobId: string) {
   const template = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
   if (!template) return null;
@@ -205,8 +213,12 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       clearTimeout(timer);
     }
 
-    const outputUrl = safeUrl(provider.outputUrl, allowedHosts());
+    const outputUrl = validMediaOutput(provider.outputUrl);
     const providerJobId = safeJobId(provider.jobId);
+    if (providerStatus && PROVIDER_TERMINAL_FAILURES.has(providerStatus) && !outputUrl && !providerJobId) {
+      return res.status(502).json({ error: "AI provider rejected the media job", code: "AI_MEDIA_PROVIDER_FAILED" });
+    }
+
     if (!outputUrl && !providerJobId) {
       return res.status(502).json({ error: "AI provider returned no valid output" });
     }
@@ -268,7 +280,7 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
           const json: unknown = await response.json();
           if (json && typeof json === "object" && !Array.isArray(json)) {
             const provider = json as Record<string, unknown>;
-            const candidate = safeUrl(provider.outputUrl, allowedHosts());
+            const candidate = validMediaOutput(provider.outputUrl);
             if (candidate) {
               outputUrl = candidate;
               status = "READY";
