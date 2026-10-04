@@ -40,7 +40,7 @@ export default function UnifiedMediaStudio({ visible, mode, value, onChange, onC
   const update = (patch: Partial<StudioPlan>) => onChange({ ...value, ...patch });
   const filtered = useMemo(() => sections(mode).map(section => ({ ...section, items: section.items.filter(item => !search.trim() || item[1].toLowerCase().includes(search.toLowerCase())) })).filter(section => section.items.length), [mode, search]);
   const capabilityFor = (id: string) => ({REPLACE:"BACKGROUND_REPLACE",REMOVE:"BACKGROUND_REMOVE",BLUR:"AI_BLUR",STUDIO:"STUDIO",GREEN:"GREEN_SCREEN",RESTORE:"RESTORE",RELIGHT:"RELIGHT",DETAIL:"SUPER_DETAIL",COLORIZE:"COLORIZE",AI_ART:"AI_ART",AI_EXPAND:"AI_EXPAND",OBJECT_REMOVE:"REMOVE_OBJECT",SKY:"SKY",DENOISE:"DENOISE",FACE_REPAIR:"FACE_REPAIR",SMOOTH:"FACE_FILTER_SMOOTH",GLOW:"FACE_FILTER_GLOW",MAKEUP:"FACE_FILTER_MAKEUP",FACE_LIGHT:"FACE_FILTER_FACE_LIGHT",BEAUTY:"FACE_FILTER_BEAUTY",CLEAN:"CLEAN",HD:"HD","4K":"4K","8K":"8K","12K_AI":"12K_AI"} as Record<string,string>)[id];
-  const unavailable = (id: string) => Boolean(capabilities && capabilities.size && capabilityFor(id) && !capabilities.has(capabilityFor(id)!));
+  const unavailable = (id: string) => Boolean(capabilities && capabilities.has("__PROVIDER_BACKED__") && capabilityFor(id) && !capabilities.has(capabilityFor(id)!));
   const active = (id: string) =>
     value.quality === id || value.filter === id || value.faceFilter === id || value.background === id ||
     value.transition === id || value.crop === id || (id === "MIRROR" && value.mirror) ||
