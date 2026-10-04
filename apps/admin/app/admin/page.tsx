@@ -8,12 +8,10 @@ async function getOwnerData() {
   const cookieStore = await cookies();
   const token = cookieStore.get("twitok_owner_session")?.value;
   if (!token) return null;
-
   const response = await fetch(`${API_URL}/api/v1/admin/overview`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
-
   if (!response.ok) return null;
   return response.json();
 }
@@ -33,15 +31,15 @@ export default async function AdminHome() {
 
   const powers = [
     "Manage accounts and roles",
+    "Publish system notifications and announcements",
     "Remove or restrict content",
-    "Review safety decisions",
+    "Review safety decisions and appeals",
     "Configure youth protection",
-    "Manage creators and verification",
-    "Control LIVE access",
-    "Manage communities",
-    "Manage marketplace",
-    "Review platform analytics",
-    "Configure global settings",
+    "Manage creators, verification and monetization",
+    "Control LIVE access and safety",
+    "Manage communities and marketplace",
+    "Review platform analytics and finance",
+    "Configure global platform settings",
     "Audit administrator actions",
     "Emergency platform controls"
   ];
@@ -55,6 +53,7 @@ export default async function AdminHome() {
         </div>
         <nav>
           <Link className="active" href="/admin">Command Center</Link>
+          <Link href="/admin/notifications">Notifications & Announcements</Link>
           <Link href="/admin/users">Users</Link>
           <Link href="/admin/content">Content</Link>
           <Link href="/admin/safety">Safety & Moderation</Link>
@@ -81,9 +80,7 @@ export default async function AdminHome() {
             <h1>Owner Command Center</h1>
             <p className="muted">The private control plane for the TwiTok platform.</p>
           </div>
-          <form action="/api/admin/logout" method="post">
-            <button className="logout">Sign out</button>
-          </form>
+          <form action="/api/admin/logout" method="post"><button className="logout">Sign out</button></form>
         </header>
 
         <div className="notice">
@@ -92,11 +89,7 @@ export default async function AdminHome() {
 
         <section className="stats">
           {cards.map(([title, value, detail]) => (
-            <article className="stat" key={title}>
-              <span>{title}</span>
-              <strong>{value}</strong>
-              <small>{detail}</small>
-            </article>
+            <article className="stat" key={title}><span>{title}</span><strong>{value}</strong><small>{detail}</small></article>
           ))}
         </section>
 
@@ -116,7 +109,10 @@ export default async function AdminHome() {
           </article>
 
           <article className="panel wide">
-            <div className="panel-head"><div><p className="eyebrow">CONTROL</p><h2>Administrator Powers</h2></div></div>
+            <div className="panel-head">
+              <div><p className="eyebrow">CONTROL</p><h2>Administrator Powers</h2></div>
+              <Link href="/admin/notifications">Open communications</Link>
+            </div>
             <div className="power-grid">
               {powers.map((item) => <div className="power" key={item}>✓ {item}</div>)}
             </div>
