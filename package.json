@@ -13,5 +13,9 @@
     "start:admin": "npm --workspace apps/admin run start",
     "build:api": "npm --workspace @twitok/api run build",
     "start:api": "npm --workspace @twitok/api run start"
+  },
+  "dependencies": {
+    "@types/express": "^5.0.3",
+    "@types/cors": "^2.8.19"
   }
 }
