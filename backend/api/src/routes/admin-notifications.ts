@@ -27,16 +27,6 @@ adminNotificationsRouter.get("/", requireOwner, readLimit, async (req, res) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
     const db = await getDb();
-    let targetUserIds: ObjectId[] = [];
-    if (audience === "INDIVIDUALS") {
-      const usernames = [...new Set(targetUsernames.map((value: unknown) => String(value).trim().replace(/^@/, "").toLowerCase()).filter(Boolean))];
-      if (usernames.length > 100) return res.status(400).json({ error: "A maximum of 100 individuals can be targeted per announcement" });
-      const users = await db.collection("users").find({ username: { $in: usernames } }, { projection: { _id: 1, username: 1 } }).toArray();
-      const found = new Set(users.map(user => String(user.username).toLowerCase()));
-      const missing = usernames.filter(username => !found.has(username));
-      if (missing.length) return res.status(404).json({ error: "Some usernames were not found", missingUsernames: missing });
-      targetUserIds = users.map(user => user._id);
-    }
     const rows = await db.collection("system_announcements")
       .find({})
       .sort({ createdAt: -1 })
@@ -104,6 +94,16 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
     if (expiresAt && expiresAt <= startsAt) return res.status(400).json({ error: "Expiry must be after start time" });
 
     const db = await getDb();
+    let targetUserIds: ObjectId[] = [];
+    if (audience === "INDIVIDUALS") {
+      const usernames = [...new Set(targetUsernames.map((value: unknown) => String(value).trim().replace(/^@/, "").toLowerCase()).filter(Boolean))];
+      if (usernames.length > 100) return res.status(400).json({ error: "A maximum of 100 individuals can be targeted per announcement" });
+      const users = await db.collection("users").find({ username: { $in: usernames } }, { projection: { _id: 1, username: 1 } }).toArray();
+      const found = new Set(users.map(user => String(user.username).toLowerCase()));
+      const missing = usernames.filter(username => !found.has(username));
+      if (missing.length) return res.status(404).json({ error: "Some usernames were not found", missingUsernames: missing });
+      targetUserIds = users.map(user => user._id);
+    }
     const result = await db.collection("system_announcements").insertOne({
       category,
       title,
