@@ -195,8 +195,13 @@ videoRouter.post("/:videoId/remix", requireUser, async (req, res) => {
 });
 
 videoRouter.post("/:videoId/publish", requireUser, async (req, res) => {
-  try { res.json(await publishVideo(await getDb(), req.userId!, new ObjectId(String(req.params.videoId)))); }
-  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to publish video" }); }
+  try {
+    const videoId = String(req.params.videoId);
+    if (!ObjectId.isValid(videoId)) return res.status(400).json({ error: "Invalid video id" });
+    res.json(await publishVideo(await getDb(), req.userId!, new ObjectId(videoId)));
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Unable to publish video" });
+  }
 });
 
 videoRouter.post("/:videoId/transcription", requireUser, async (req, res) => {
