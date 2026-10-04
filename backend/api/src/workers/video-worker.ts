@@ -1,302 +1,3 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { spawn } from "node:child_process";
-import { pipeline } from "node:stream/promises";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Db } from "mongodb";
-import { getDb } from "../db/mongo.js";
-import { claimNextVideoJob, markVideoProcessingFailed, markVideoProcessingSucceeded, recoverExpiredVideoJobs, recoverStaleVideoUploads } from "../video/processing.js";
-import { createOriginalSound } from "../music/service.js";
-
-const bucket = process.env.MEDIA_BUCKET ?? "";
-const region = process.env.MEDIA_S3_REGION ?? "auto";
-const endpoint = process.env.MEDIA_S3_ENDPOINT || undefined;
-const accessKeyId = process.env.MEDIA_S3_ACCESS_KEY_ID ?? "";
-const secretAccessKey = process.env.MEDIA_S3_SECRET_ACCESS_KEY ?? "";
-const publicBase = (process.env.MEDIA_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
-const workerId = process.env.TWITOK_VIDEO_WORKER_ID ?? `video-worker-${process.pid}`;
-const ffmpegBin = process.env.FFMPEG_BIN ?? "ffmpeg";
-const ffprobeBin = process.env.FFPROBE_BIN ?? "ffprobe";
-const pollMs = Number(process.env.TWITOK_VIDEO_WORKER_POLL_MS ?? 2000);
-const fontFile = process.env.TWITOK_FONT_FILE ?? "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-const stickerMap: Record<string,string> = { africa:"🌍", ghana:"🇬🇭", nigeria:"🇳🇬", kenya:"🇰🇪", "south-africa":"🇿🇦", celebrate:"🎉", love:"❤️", fire:"🔥", laugh:"😂", wow:"😮", clap:"👏", dance:"💃", drum:"🥁", music:"🎶", community:"🤝", food:"🍲" };
-function resolveStickerGlyph(id: string) {
-  const known = stickerMap[id];
-  if (known) return known;
-  if (/^flag-[A-Z]{2}$/.test(id)) {
-    return id.slice(5).split("").map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join("");
-  }
-  if (/^emoji-[0-9a-f]+(?:-[0-9a-f]+)*$/i.test(id)) {
-    try {
-      const glyph = id.slice(6).split("-").map(x => Number.parseInt(x, 16)).map(cp => String.fromCodePoint(cp)).join("");
-      return glyph.length <= 32 ? glyph : "";
-    } catch {
-      return "";
-    }
-  }
-  return "";
-}
-
-if (!bucket || !accessKeyId || !secretAccessKey) throw new Error("Media storage credentials are required");
-const s3 = new S3Client({
-  region,
-  endpoint,
-  forcePathStyle: process.env.MEDIA_S3_FORCE_PATH_STYLE === "true",
-  credentials: { accessKeyId, secretAccessKey }
-});
-
-function urlFor(key: string) {
-  return publicBase ? `${publicBase}/${key}` : key;
-}
-
-async function downloadSource(key: string, target: string) {
-  const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  if (!response.Body) throw new Error("Storage returned an empty source object");
-  await pipeline(response.Body as NodeJS.ReadableStream, fs.createWriteStream(target));
-}
-
-async function downloadSoundAsset(audioUrl: string, target: string) {
-  if (/^https?:\/\//i.test(audioUrl)) {
-    const response = await fetch(audioUrl);
-    if (!response.ok || !response.body) throw new Error(`Unable to download sound asset: HTTP ${response.status}`);
-    await pipeline(response.body as any, fs.createWriteStream(target));
-    return;
-  }
-  await downloadSource(audioUrl, target);
-}
-
-async function uploadFile(file: string, key: string, contentType: string) {
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: fs.createReadStream(file),
-    ContentType: contentType,
-    CacheControl: key.endsWith(".m3u8") ? "public,max-age=60" : "public,max-age=31536000,immutable"
-  }));
-}
-
-function effectFilter(input: string, output: string, effect: string) {
-  const filters: Record<string, string> = {
-    NONE: "null",
-    VIBRANT: "eq=contrast=1.08:saturation=1.35",
-    WARM: "colorbalance=rs=.08:gs=.03:bs=-.03",
-    COOL: "colorbalance=rs=-.03:gs=.03:bs=.08",
-    NOIR: "hue=s=0,eq=contrast=1.15:brightness=-0.02",
-    VINTAGE: "eq=contrast=.95:saturation=.75:brightness=.02",
-    BRIGHT: "eq=contrast=1.03:saturation=1.05:brightness=.08",
-    FADE: "eq=contrast=.85:saturation=.9:brightness=.05"
-  };
-  const filter = filters[effect] ?? filters.NONE;
-  return `[${input}]${filter}[${output}]`;
-}
-
-function runProcess(bin: string, args: string[]) {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
-    let stderr = "";
-    child.stderr.on("data", chunk => { stderr += chunk.toString(); });
-    child.on("error", reject);
-    child.on("close", code => code === 0 ? resolve() : reject(new Error(`${bin} exited ${code}: ${stderr.slice(-4000)}`)));
-  });
-}
-
-async function hasAudio(input: string) {
-  try {
-    await runProcess(ffprobeBin, [
-      "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index",
-      "-of", "csv=p=0", input
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function runFfmpeg(
-  input: string,
-  outputDir: string,
-  options: {
-    hasOriginalAudio: boolean;
-    trimStartMs: number;
-    trimEndMs: number | null;
-    speed: number;
-    soundFile?: string;
-    originalVolume: number;
-    addedSoundVolume: number;
-    outputDurationSec: number;
-    textOverlays: Array<{ text: string; startMs: number; endMs: number; x: number; y: number; fontSize: number; color?: string; background?: string; align?: string }>;
-    captions: Array<{ text: string; startMs: number; endMs: number }>;
-    effect: string;
-    stickers: Array<{ stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number }>;
-    editPlan?: { quality?: string; filter?: string; faceFilter?: string; background?: string; crop?: string; rotate?: number; mirror?: boolean };
-  }
-) {
-  const { hasOriginalAudio, trimStartMs, trimEndMs, speed, soundFile, originalVolume, addedSoundVolume, outputDurationSec, textOverlays, captions, effect, stickers, editPlan } = options;
-  const inputArgs = [
-    ...(trimStartMs > 0 ? ["-ss", String(trimStartMs / 1000)] : []),
-    ...(trimEndMs && trimEndMs > trimStartMs ? ["-to", String(trimEndMs / 1000)] : []),
-    "-i", input
-  ];
-  if (soundFile) inputArgs.push("-stream_loop", "-1", "-i", soundFile);
-
-  const plan=editPlan ?? {};
-  const polish=String(plan.quality)==="12K_AI"||String(plan.quality)==="8K"||String(plan.quality)==="4K" ? "hqdn3d=0.8:0.8:3:3,eq=contrast=1.06:saturation=1.05:brightness=0.015,gblur=sigma=0.05,unsharp=5:5:0.35:5:5:0" : String(plan.quality)==="HD"||String(plan.quality)==="CLEAN" ? "hqdn3d=0.9:0.9:4:4,eq=contrast=1.04:saturation=1.04:brightness=0.01,unsharp=5:5:0.3:5:5:0" : "null";
-  const look:Record<string,string>={VIVID:"eq=contrast=1.08:saturation=1.22",CINEMATIC:"eq=contrast=1.1:saturation=1.06:gamma=1.03",WARM:"colorbalance=rs=.06:gs=.02:bs=-.02",COOL:"colorbalance=rs=-.02:gs=.02:bs=.06",NOIR:"hue=s=0,eq=contrast=1.14",VINTAGE:"eq=contrast=.96:saturation=.82",NATURAL:"eq=contrast=1.02:saturation=1.02",PORTRAIT:"eq=contrast=1.04:saturation=1.03"};
-  const face:Record<string,string>={SMOOTH:"hqdn3d=1.1:1.1:5:5",GLOW:"eq=brightness=.025:gamma=1.04",FACE_LIGHT:"eq=brightness=.045:gamma=1.06",BEAUTY:"hqdn3d=.9:.9:4:4,eq=brightness=.018:contrast=1.03"};
-  const bg=String(plan.background)==="BLUR"?"boxblur=2:1":"null";
-  const crop:Record<string,string>={"9:16":"crop=min(iw\,ih*0.5625):min(ih\,iw*1.7778)","1:1":"crop=min(iw\,ih):min(iw\,ih)","4:5":"crop=min(iw\,ih*0.8):min(ih\,iw*1.25)","16:9":"crop=min(iw\,ih*1.7778):min(ih\,iw*0.5625)"};
-  const geometry=[crop[String(plan.crop??"ORIGINAL")]??"null",plan.mirror?"hflip":"null",Number(plan.rotate)===90?"transpose=1":Number(plan.rotate)===180?"transpose=1,transpose=1":Number(plan.rotate)===270?"transpose=2":"null"].filter(Boolean).filter(x=>x!=="null").join(",")||"null";
-  const filters = [
-    "[0:v]split=3[v0][v1][v2]",
-    `[v0]scale=w=360:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v360base]`,
-    `[v1]scale=w=540:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v540base]`,
-    `[v2]scale=w=720:h=-2:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v720base]`
-  ];
-
-  const overlayInputs: string[] = [];
-  for (let index = 0; index < textOverlays.length; index += 1) {
-    const overlay = textOverlays[index];
-    const textFile = path.join(outputDir, `overlay-${index}.txt`);
-    fs.writeFileSync(textFile, overlay.text, "utf8");
-    overlayInputs.push(textFile);
-  }
-  const variants = [
-    { base: "v360base", out: "v360", width: 360 },
-    { base: "v540base", out: "v540", width: 540 },
-    { base: "v720base", out: "v720", width: 720 }
-  ];
-  const captionInputs: string[] = [];
-  for (let index = 0; index < captions.length; index += 1) {
-    const caption = captions[index];
-    const file = path.join(outputDir, `caption-${index}.txt`);
-    fs.writeFileSync(file, caption.text, "utf8");
-    captionInputs.push(file);
-  }
-  for (const variant of variants) {
-    let current = variant.base;
-    for (let si = 0; si < stickers.length; si++) {
-      const sticker = stickers[si];
-      const glyph = resolveStickerGlyph(sticker.stickerId);
-      if (!glyph) continue;
-      const file = path.join(outputDir, `sticker-${si}.txt`);
-      await fs.promises.writeFile(file, glyph, "utf8");
-      const out = `${variant.out}_sticker_${si}`;
-      const x = `(w*${sticker.x}-text_w/2)`;
-      const y = `(h*${sticker.y}-text_h/2)`;
-      filters.push(`[${current}]drawtext=fontfile='${fontFile}':textfile='${file}':fontsize=${Math.round(sticker.size)}:fontcolor=white:borderw=2:bordercolor=black@0.8:x=${x}:y=${y}:enable='between(t,${sticker.startMs/1000},${sticker.endMs/1000})'[${out}]`);
-      current = out;
-    }
-    const effectOut = `${variant.out}_effect`;
-    filters.push(effectFilter(current, effectOut, effect));
-    current = effectOut;
-    textOverlays.forEach((overlay, index) => {
-      const next = `${variant.out}_${index}`;
-      const x = overlay.align === "left" ? `(w*${overlay.x})` : overlay.align === "right" ? `(w*${overlay.x}-text_w)` : `(w*${overlay.x}-text_w/2)`;
-      const y = `(h*${overlay.y}-text_h/2)`;
-      const start = Math.max(0, overlay.startMs / 1000);
-      const end = Math.max(start + 0.01, overlay.endMs / 1000);
-      filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${overlayInputs[index]}:fontsize=${Math.round(overlay.fontSize)}:fontcolor=${overlay.color ?? "#FFFFFF"}:box=1:boxcolor=${overlay.background ?? "#000000@0.55"}:boxborderw=12:borderw=2:bordercolor=black@0.85:x=${x}:y=${y}:enable=between(t\\,${start}\\,${end})[${next}]`);
-      current = next;
-    });
-    captions.forEach((caption, index) => {
-      const next = `${variant.out}_caption_${index}`;
-      const start = Math.max(0, caption.startMs / 1000);
-      const end = Math.max(start + 0.01, caption.endMs / 1000);
-      filters.push(`[${current}]drawtext=fontfile=${fontFile}:textfile=${captionInputs[index]}:fontsize=34:fontcolor=white:borderw=3:bordercolor=black@0.9:x=(w-text_w)/2:y=h-text_h-80:enable=between(t\\,${start}\\,${end})[${next}]`);
-      current = next;
-    });
-    filters.push(`[${current}]null[${variant.out}]`);
-  }
-
-  if (soundFile) {
-    const soundInput = 1;
-    const soundFilter = `[${soundInput}:a]atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB,volume=${addedSoundVolume}[added]`;
-    filters.push(soundFilter);
-    if (hasOriginalAudio && originalVolume > 0) {
-      filters.push(`[0:a]atempo=${speed},volume=${originalVolume},atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB[original]`);
-      filters.push("[original][added]amix=inputs=2:duration=first:dropout_transition=0:normalize=1[mixed]");
-    } else {
-      filters.push("[added]anull[mixed]");
-    }
-  } else if (hasOriginalAudio) {
-    filters.push(`[0:a]atempo=${speed},volume=1,atrim=duration=${Math.max(0.1, outputDurationSec).toFixed(3)},asetpts=N/SR/TB[audio]`);
-  }
-
-  const audioMap = soundFile ? ["-map", "[mixed]"] : hasOriginalAudio ? ["-map", "[audio]"] : [];
-  const args = [
-    "-hide_banner", "-loglevel", "error", "-y",
-    ...inputArgs,
-    "-filter_complex", filters.join(";"),
-    "-map", "[v360]", "-c:v:0", "libx264", "-b:v:0", "500k", "-maxrate:v:0", "650k", "-bufsize:v:0", "1000k",
-    "-map", "[v540]", "-c:v:1", "libx264", "-b:v:1", "1100k", "-maxrate:v:1", "1400k", "-bufsize:v:1", "2200k",
-    "-map", "[v720]", "-c:v:2", "libx264", "-b:v:2", "2200k", "-maxrate:v:2", "2800k", "-bufsize:v:2", "4400k",
-    ...audioMap,
-    ...(audioMap.length ? ["-c:a", "aac", "-b:a", "96k", "-ar", "48000"] : []),
-    "-force_key_frames", "expr:gte(t,n_forced*2)",
-    "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
-    "-f", "hls", "-hls_time", "2", "-hls_playlist_type", "vod",
-    "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init_%v.mp4",
-    "-hls_segment_filename", path.join(outputDir, "seg_%v_%05d.m4s"),
-    "-master_pl_name", "master.m3u8",
-    "-var_stream_map", audioMap.length ? "v:0,a:0 v:1,a:0 v:2,a:0" : "v:0 v:1 v:2",
-    path.join(outputDir, "stream_%v.m3u8")
-  ];
-  await runProcess(ffmpegBin, args);
-}
-
-async function getDurationMs(input: string) {
-  try {
-    const result = await new Promise<string>((resolve, reject) => {
-      const child = spawn(ffprobeBin, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input], { stdio: ["ignore", "pipe", "pipe"] });
-      let out = ""; let err = "";
-      child.stdout.on("data", chunk => { out += chunk.toString(); });
-      child.stderr.on("data", chunk => { err += chunk.toString(); });
-      child.on("error", reject);
-      child.on("close", code => code === 0 ? resolve(out) : reject(new Error(err)));
-    });
-    const seconds = Number.parseFloat(result.trim());
-    return Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;
-  } catch { return null; }
-}
-
-async function concatClips(files: string[], output: string, transitions: Array<{ type: string; durationMs: number }> = []) {
-  if (files.length === 1) { await fs.promises.copyFile(files[0], output); return; }
-  const durations = await Promise.all(files.map(async file => Math.max(0.1, (await getDurationMs(file) ?? 100) / 1000)));
-  const inputs: string[] = [];
-  for (const file of files) inputs.push("-i", file);
-  const filters: string[] = [];
-  for (let i = 0; i < files.length; i += 1) {
-    const audio = await hasAudio(files[i]);
-    filters.push(`[${i}:v]fps=30,format=yuv420p,setpts=PTS-STARTPTS[v${i}]`);
-    if (audio) filters.push(`[${i}:a]aresample=48000,asetpts=PTS-STARTPTS[a${i}]`);
-    else filters.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${durations[i].toFixed(3)},asetpts=N/SR/TB[a${i}]`);
-  }
-  let currentV = "v0", currentA = "a0", currentDuration = durations[0];
-  for (let i = 1; i < files.length; i += 1) {
-    const transition = transitions[i - 1] ?? { type: "NONE", durationMs: 0 };
-    const d = Math.max(0, Math.min(1.5, Number(transition.durationMs ?? 0) / 1000));
-    if (transition.type === "NONE" || d <= 0) {
-      filters.push(`[${currentV}][v${i}]concat=n=2:v=1:a=0[vcat${i}]`);
-      filters.push(`[${currentA}][a${i}]concat=n=2:v=0:a=1[acat${i}]`);
-      currentV = `vcat${i}`; currentA = `acat${i}`; currentDuration += durations[i];
-      continue;
-    }
-    const safeD = Math.min(d, Math.max(0.05, currentDuration - 0.05), Math.max(0.05, durations[i] - 0.05));
-    const transitionName = transition.type === "FADE" ? "fade" : transition.type === "DISSOLVE" ? "fade" : transition.type === "WIPELEFT" ? "wipeleft" : transition.type === "WIPERIGHT" ? "wiperight" : transition.type === "SLIDELEFT" ? "slideleft" : "slideright";
-    const offset = Math.max(0.05, currentDuration - safeD);
-    filters.push(`[${currentV}][v${i}]xfade=transition=${transitionName}:duration=${safeD.toFixed(3)}:offset=${offset.toFixed(3)}[vtrans${i}]`);
-    filters.push(`[${currentA}][a${i}]acrossfade=d=${safeD.toFixed(3)}[atrans${i}]`);
-    currentV = `vtrans${i}`; currentA = `atrans${i}`; currentDuration = currentDuration + durations[i] - safeD;
-  }
-  filters.push(`[${currentV}]format=yuv420p[vout]`);
-  filters.push(`[${currentA}]aresample=48000[aout]`);
-  await runProcess(ffmpegBin, [
-    "-hide_banner", "-loglevel", "error", "-y", ...inputs,
-    "-filter_complex", filters.join(";"),
-    "-map", "[vout]", "-map", "[aout]",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-    "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
     "-movflags", "+faststart", output
   ]);
 }
@@ -312,7 +13,22 @@ async function createThumbnail(input: string, output: string, coverTimeMs = 0) {
   ]);
 }
 
+async function renewVideoLease(db: Db, jobId: any, workerId: string) {
+  const leaseExpiresAt = new Date(Date.now() + 2 * 60 * 1000);
+  const result = await db.collection("video_processing_jobs").updateOne(
+    { _id: jobId, status: "RUNNING", workerId },
+    { $set: { leaseExpiresAt, updatedAt: new Date() } }
+  );
+  if (result.modifiedCount !== 1) throw new Error("Video processing lease was lost");
+}
+
 async function processJob(db: Db, job: any) {
+  await renewVideoLease(db, job._id, workerId);
+  const heartbeat = setInterval(() => {
+    void renewVideoLease(db, job._id, workerId).catch(error => {
+      console.error(`lease renewal failed for ${job.uploadId}: ${error instanceof Error ? error.message : "unknown error"}`);
+    });
+  }, 30_000);
   const upload = await db.collection("video_uploads").findOne({ uploadId: job.uploadId, userId: job.userId });
   if (!upload) throw new Error("Upload session no longer exists");
 
@@ -410,6 +126,7 @@ async function processJob(db: Db, job: any) {
       durationMs: Math.round(outputDurationSec * 1000)
     });
   } finally {
+    clearInterval(heartbeat);
     await fs.promises.rm(workDir, { recursive: true, force: true });
   }
 }
