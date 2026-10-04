@@ -426,14 +426,13 @@ async function processJob(db: Db, job: any) {
       durationMs: Math.round(outputDurationSec * 1000)
     });
   } finally {
+    await fs.promises.rm(workDir, { recursive: true, force: true });
+  }
+  finally {
     clearInterval(heartbeat);
     await fs.promises.rm(workDir, { recursive: true, force: true });
   }
 }
-  } finally {
-    clearInterval(heartbeat);
-
-
 async function loop() {
   const db = await getDb();
   console.log(`TwiTok video worker ${workerId} started`);
