@@ -6,9 +6,10 @@ import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
 
 export const liveRouter = Router();
+const liveReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const liveActionLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-liveRouter.get("/streams", requireUser, async (req, res) => {
+liveRouter.get("/streams", requireUser, liveReadLimit, async (req, res) => {
   const db = await getDb();
   const status = typeof req.query.status === "string" ? req.query.status : "LIVE";
   const streams = await db.collection("live_streams")
@@ -19,7 +20,7 @@ liveRouter.get("/streams", requireUser, async (req, res) => {
   return res.json({ streams });
 });
 
-liveRouter.get("/streams/:streamId/guests", requireUser, async (req, res) => {
+liveRouter.get("/streams/:streamId/guests", requireUser, liveReadLimit, async (req, res) => {
   const db = await getDb();
   const streamId = String(req.params.streamId);
   const stream = await db.collection("live_streams").findOne({ streamId }, { projection: { hostUserId: 1 } });
