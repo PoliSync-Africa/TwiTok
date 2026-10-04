@@ -21,6 +21,14 @@ export async function initializeVideoIndexes(db: Db) {
     db.collection("videos").createIndex({ visibility: 1, publishedAt: -1 }),
     db.collection("videos").createIndex({ hashtags: 1, publishedAt: -1 }),
     db.collection("video_uploads").createIndex({ userId: 1, createdAt: -1 }),
+    db.collection("video_uploads").createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 7 * 24 * 60 * 60, partialFilterExpression: { status: { $in: ["UPLOADING", "FAILED"] } }, name: "video_uploads_stale_ttl" }
+    ),
+    db.collection("photo_uploads").createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 7 * 24 * 60 * 60, partialFilterExpression: { status: { $in: ["UPLOADING", "FAILED"] } }, name: "photo_uploads_stale_ttl" }
+    ),
     db.collection("video_uploads").createIndex({ uploadId: 1 }, { unique: true }),
     db.collection("video_processing_jobs").createIndex({ status: 1, createdAt: 1 }),
     db.collection("video_remixes").createIndex({ creatorId: 1, createdAt: -1 }),
