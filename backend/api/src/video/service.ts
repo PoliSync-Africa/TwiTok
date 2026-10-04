@@ -78,7 +78,7 @@ export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadI
   await db.collection("videos").insertOne({
     _id: postId, ownerId: userId, mediaType: "PHOTO", photoObjectKeys: uploads.map(x => x.objectKey),
     photoMimeTypes: uploads.map(x => x.mimeType), caption, hashtags: normalizeHashtags(input.hashtags), mentions: normalizeMentions(input.mentions), location: String(input.location ?? "").trim().slice(0, 120) || null,
-    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
+    editPlan,\n    visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
     status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
   });
   return { postId: postId.toHexString(), status: "PUBLISHED", mediaType: "PHOTO", photoCount: uploads.length };
@@ -184,6 +184,8 @@ export async function createVideoDraft(db: Db, userId: ObjectId, input: {
   const rawTransitions = Array.isArray((input as any).clipTransitions) ? (input as any).clipTransitions : [];
   const rawClipSettings = Array.isArray((input as any).clipSettings) ? (input as any).clipSettings : [];
   const clipSettings = clipIds.map((_, index) => { const x=rawClipSettings[index] ?? {}; const speed=[0.5,0.75,1,1.5,2].includes(Number(x?.speed)) ? Number(x.speed) : 1; const volume=Math.max(0,Math.min(1,Number(x?.volume ?? 1))); return { speed, volume, muted: Boolean(x?.muted) }; });
+  const rawEditPlan = (input as any).editPlan && typeof (input as any).editPlan === "object" ? (input as any).editPlan : {};
+  const editPlan = { quality: ["ORIGINAL","CLEAN","HD","4K","8K","12K_AI"].includes(String(rawEditPlan.quality)) ? String(rawEditPlan.quality) : "12K_AI", filter: String(rawEditPlan.filter ?? "NONE").slice(0,32), faceFilter: String(rawEditPlan.faceFilter ?? "NONE").slice(0,32), background: String(rawEditPlan.background ?? "ORIGINAL").slice(0,32), transition: String(rawEditPlan.transition ?? "NONE").slice(0,32), speed: [0.5,0.75,1,1.5,2].includes(Number(rawEditPlan.speed)) ? Number(rawEditPlan.speed) : 1, crop: String(rawEditPlan.crop ?? "ORIGINAL").slice(0,16), rotate: [0,90,180,270].includes(Number(rawEditPlan.rotate)) ? Number(rawEditPlan.rotate) : 0, mirror: Boolean(rawEditPlan.mirror), aiTool: String(rawEditPlan.aiTool ?? "NONE").slice(0,40), aiPrompt: String(rawEditPlan.aiPrompt ?? "").slice(0,1600) };
   const clipTransitions = clipIds.slice(0, Math.max(0, clipIds.length - 1)).map((_, index) => { const x = rawTransitions[index] ?? {}; const type = ["NONE","FADE","DISSOLVE","WIPELEFT","WIPERIGHT","SLIDELEFT","SLIDERIGHT"].includes(String(x?.type)) ? String(x.type) : "NONE"; const durationMs = Math.max(0, Math.min(1500, Number(x?.durationMs ?? 500))); return { type, durationMs }; });
   const clipUploads = [] as any[];
   for (const clipId of clipIds) {
