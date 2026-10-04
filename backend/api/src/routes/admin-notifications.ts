@@ -93,12 +93,15 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
     }
     if (expiresAt && expiresAt <= startsAt) return res.status(400).json({ error: "Expiry must be after start time" });
 
+    const ownerId = typeof req.ownerId === "string" ? req.ownerId : "";
+    if (!ObjectId.isValid(ownerId)) return res.status(403).json({ error: "Invalid owner identity" });
+
     const db = await getDb();
     let targetUserIds: ObjectId[] = [];
     if (audience === "INDIVIDUALS") {
       const usernames = [...new Set(targetUsernames.map((value: unknown) => String(value).trim().replace(/^@/, "").toLowerCase()).filter(Boolean))];
       if (usernames.length > 100) return res.status(400).json({ error: "A maximum of 100 individuals can be targeted per announcement" });
-      const users = await db.collection("users").find({ username: { $in: usernames } }, { projection: { _id: 1, username: 1 } }).toArray();
+      const users = await db.collection<{ _id: ObjectId; username: string }>("users").find({ username: { $in: usernames } }, { projection: { _id: 1, username: 1 } }).toArray();
       const found = new Set(users.map(user => String(user.username).toLowerCase()));
       const missing = usernames.filter(username => !found.has(username));
       if (missing.length) return res.status(404).json({ error: "Some usernames were not found", missingUsernames: missing });
@@ -117,7 +120,7 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
       status: publish ? "PUBLISHED" : "DRAFT",
       startsAt,
       expiresAt,
-      createdBy: new ObjectId(req.ownerId!),
+      createdBy: new ObjectId(ownerId),
       createdAt: new Date(),
       updatedAt: new Date()
     });
@@ -140,10 +143,11 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
 
 adminNotificationsRouter.post("/:id/publish", requireOwner, readLimit, async (req, res) => {
   try {
-    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid notification id" });
+    const notificationId = String(req.params.id);
+    if (!ObjectId.isValid(notificationId)) return res.status(400).json({ error: "Invalid notification id" });
     const db = await getDb();
     const result = await db.collection("system_announcements").updateOne(
-      { _id: new ObjectId(req.params.id), status: "DRAFT" },
+      { _id: new ObjectId(notificationId), status: "DRAFT" },
       { $set: { status: "PUBLISHED", updatedAt: new Date(), startsAt: new Date() } }
     );
     if (!result.matchedCount) return res.status(404).json({ error: "Draft notification not found" });
@@ -152,7 +156,7 @@ adminNotificationsRouter.post("/:id/publish", requireOwner, readLimit, async (re
       actorRole: "OWNER",
       action: "SYSTEM_NOTIFICATION_PUBLISHED",
       resourceType: "SYSTEM_ANNOUNCEMENT",
-      resourceId: req.params.id,
+      resourceId: notificationId,
       createdAt: new Date()
     });
     return res.json({ published: true });
@@ -166,7 +170,7 @@ adminNotificationsRouter.post("/:id/archive", requireOwner, readLimit, async (re
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid notification id" });
     const db = await getDb();
     const result = await db.collection("system_announcements").updateOne(
-      { _id: new ObjectId(req.params.id), status: { $in: ["DRAFT", "PUBLISHED"] } },
+      { _id: new ObjectId(notificationId), status: { $in: ["DRAFT", "PUBLISHED"] } },
       { $set: { status: "ARCHIVED", updatedAt: new Date() } }
     );
     if (!result.matchedCount) return res.status(404).json({ error: "Notification not found" });
@@ -175,7 +179,7 @@ adminNotificationsRouter.post("/:id/archive", requireOwner, readLimit, async (re
       actorRole: "OWNER",
       action: "SYSTEM_NOTIFICATION_ARCHIVED",
       resourceType: "SYSTEM_ANNOUNCEMENT",
-      resourceId: req.params.id,
+      resourceId: notificationId,
       createdAt: new Date()
     });
     return res.json({ archived: true });
