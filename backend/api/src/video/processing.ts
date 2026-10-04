@@ -108,16 +108,29 @@ export async function markVideoProcessingSucceeded(
     hlsUrl: string;
     thumbnailUrl?: string | null;
     durationMs?: number | null;
-  }
+  },
+  workerId?: string
 ) {
   const job = await db.collection("video_processing_jobs").findOne({ _id: jobId });
   if (!job) throw new Error("Processing job not found");
 
+  const ownership = {
+    _id: jobId,
+    status: "RUNNING",
+    ...(workerId ? { workerId } : {})
+  };
   const now = new Date();
-  await db.collection("video_processing_jobs").updateOne(
-    { _id: jobId },
-    { $set: { status: "SUCCEEDED", assets, finishedAt: now, updatedAt: now }, $unset: { leaseExpiresAt: "" } }
+  const result = await db.collection("video_processing_jobs").updateOne(
+    ownership,
+    {
+      $set: { status: "SUCCEEDED", assets, finishedAt: now, updatedAt: now },
+      $unset: { leaseExpiresAt: "", workerId: "" }
+    }
   );
+
+  if (result.modifiedCount !== 1) {
+    throw new Error("Video processing lease was lost before completion");
+  }
 
   await db.collection("video_uploads").updateOne(
     { uploadId: job.uploadId },
@@ -130,17 +143,23 @@ export async function markVideoProcessingSucceeded(
   );
 }
 
-export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMessage: string) {
+export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMessage: string, workerId?: string) {
   const job = await db.collection("video_processing_jobs").findOne({ _id: jobId });
   if (!job) throw new Error("Processing job not found");
 
   const attempts = Number(job.attempts ?? 0);
   const terminal = attempts >= Number(job.maxAttempts ?? 5);
   const now = new Date();
-  const nextAttemptAt = new Date(now.getTime() * 0 + now.getTime() + Math.min(60 * 60 * 1000, 2 ** attempts * 1000));
+  const backoffMs = Math.min(60 * 60 * 1000, 2 ** attempts * 1000);
+  const nextAttemptAt = new Date(now.getTime() + backoffMs);
 
-  await db.collection("video_processing_jobs").updateOne(
-    { _id: jobId },
+  const ownership = {
+    _id: jobId,
+    status: "RUNNING",
+    ...(workerId ? { workerId } : {})
+  };
+  const result = await db.collection("video_processing_jobs").updateOne(
+    ownership,
     {
       $set: {
         status: terminal ? "DEAD_LETTER" : "QUEUED",
@@ -148,9 +167,13 @@ export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMe
         nextAttemptAt: terminal ? null : nextAttemptAt,
         updatedAt: now
       },
-      $unset: { leaseExpiresAt: "" }
+      $unset: { leaseExpiresAt: "", workerId: "" }
     }
   );
+
+  if (result.modifiedCount !== 1) {
+    return false;
+  }
 
   if (terminal) {
     await db.collection("video_uploads").updateOne(
@@ -162,4 +185,5 @@ export async function markVideoProcessingFailed(db: Db, jobId: ObjectId, errorMe
       { $set: { status: "FAILED", updatedAt: now, processingError: errorMessage } }
     );
   }
+  return true;
 }
