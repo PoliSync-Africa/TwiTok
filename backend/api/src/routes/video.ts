@@ -79,12 +79,39 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
     const uploadId = String(req.params.uploadId);
     const upload = await db.collection("video_uploads").findOne({ uploadId, userId: req.userId });
     if (!upload) return res.status(404).json({ error: "Upload session not found" });
-    // Completion is intentionally idempotent: mobile clients may retry after a
-    // network timeout even though object storage already completed the upload.
+    // Completion is idempotent, but the storage completion itself is not safe
+    // to execute concurrently. Atomically claim the completion step so two
+    // mobile retries cannot both finalize the same object-storage upload.
     if (upload.multipartCompletedAt) {
       return res.json({ uploadId, completed: true, etag: upload.etag ?? null, idempotent: true });
     }
     if (!upload.multipartUploadId) return res.status(404).json({ error: "Multipart upload not found" });
+
+    const completionLeaseMs = 10 * 60 * 1000;
+    const now = new Date();
+    const claimed = await db.collection("video_uploads").findOneAndUpdate(
+      {
+        uploadId,
+        userId: req.userId,
+        multipartUploadId: upload.multipartUploadId,
+        $or: [
+          { multipartCompletingAt: { $exists: false } },
+          { multipartCompletingAt: { $lt: new Date(now.getTime() - completionLeaseMs) } }
+        ]
+      },
+      { $set: { multipartCompletingAt: now, updatedAt: now } },
+      { returnDocument: "after" }
+    );
+    if (!claimed) {
+      const current = await db.collection("video_uploads").findOne(
+        { uploadId, userId: req.userId },
+        { projection: { multipartCompletedAt: 1, etag: 1 } }
+      );
+      if (current?.multipartCompletedAt) {
+        return res.json({ uploadId, completed: true, etag: current.etag ?? null, idempotent: true });
+      }
+      return res.status(409).json({ error: "Multipart upload completion is already in progress" });
+    }
     const partSizeBytes = 10 * 1024 * 1024;
     const parts = Array.isArray(req.body?.parts) ? req.body.parts.map((part: any) => ({ partNumber: Number(part.partNumber), etag: String(part.etag).trim() })) : [];
     const maxParts = Math.ceil(Number(upload.sizeBytes) / partSizeBytes);
@@ -96,7 +123,13 @@ videoRouter.post("/uploads/:uploadId/multipart/complete", requireUser, async (re
     if (verified.sizeBytes !== Number(upload.sizeBytes)) {
       return res.status(400).json({ error: "Uploaded video size does not match the declared size" });
     }
-    await db.collection("video_uploads").updateOne({ uploadId, userId: req.userId }, { $set: { multipartCompletedAt: new Date(), updatedAt: new Date(), etag: result.etag } });
+    await db.collection("video_uploads").updateOne(
+      { uploadId, userId: req.userId, multipartCompletingAt: claimed.multipartCompletingAt },
+      {
+        $set: { multipartCompletedAt: new Date(), updatedAt: new Date(), etag: result.etag },
+        $unset: { multipartCompletingAt: "" }
+      }
+    );
     res.json({ uploadId, completed: true, etag: result.etag });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Unable to complete multipart upload" }); }
 });
