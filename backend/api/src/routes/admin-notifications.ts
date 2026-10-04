@@ -69,7 +69,7 @@ adminNotificationsRouter.post("/", requireOwner, rateLimit({
     const actionLabel = typeof body.actionLabel === "string" ? body.actionLabel.trim() : "";
     const actionUrl = typeof body.actionUrl === "string" ? body.actionUrl.trim() : "";
     const targetCountryCode = typeof body.targetCountryCode === "string" ? body.targetCountryCode.trim().toUpperCase() : null;
-    const targetUsernames = Array.isArray(body.targetUsernames) ? body.targetUsernames : [];
+    const targetUsernames: string[] = Array.isArray(body.targetUsernames) ? body.targetUsernames.filter((value: unknown): value is string => typeof value === "string") : [];
     const priority = Math.min(100, Math.max(0, Number(body.priority ?? 0)));
     const startsAt = body.startsAt ? new Date(body.startsAt) : new Date();
     const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
@@ -167,7 +167,8 @@ adminNotificationsRouter.post("/:id/publish", requireOwner, readLimit, async (re
 
 adminNotificationsRouter.post("/:id/archive", requireOwner, readLimit, async (req, res) => {
   try {
-    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid notification id" });
+    const notificationId = typeof req.params.id === "string" ? req.params.id : "";
+    if (!ObjectId.isValid(notificationId)) return res.status(400).json({ error: "Invalid notification id" });
     const db = await getDb();
     const result = await db.collection("system_announcements").updateOne(
       { _id: new ObjectId(notificationId), status: { $in: ["DRAFT", "PUBLISHED"] } },
