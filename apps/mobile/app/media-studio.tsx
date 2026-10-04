@@ -10,7 +10,6 @@ export default function MediaStudioScreen() {
   const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mode?: string; duration?: string }>();
   const mode = String(params.mode ?? "VIDEO").toUpperCase() === "PHOTO" ? "PHOTO" : "VIDEO";
   const [plan, setPlan] = useState<StudioPlan>(DEFAULT_STUDIO_PLAN);
-  const [processing, setProcessing] = useState(false);
 
   async function runAI() {
     const uri = String(params.uri ?? "");
@@ -18,7 +17,6 @@ export default function MediaStudioScreen() {
     const token = await getAuthToken();
     if (!token) { Alert.alert("Media Studio", "Please sign in again."); return; }
     try {
-      setProcessing(true);
       const blob = await (await fetch(uri)).blob();
       const mimeType = String(params.mimeType ?? blob.type ?? (mode === "PHOTO" ? "image/jpeg" : "video/mp4"));
       const endpoint = mode === "PHOTO" ? "/video/photos/uploads" : "/video/uploads";
@@ -48,7 +46,7 @@ export default function MediaStudioScreen() {
       }
       if(!outputUrl) throw new Error("AI Studio is still processing. Please try again shortly.");
       router.replace({pathname:"/create",params:{aiOutputUri:outputUrl,aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??""),aiOutputMode:mode}});
-    } catch(e) { Alert.alert("AI Studio",e instanceof Error?e.message:"Unable to process media."); } finally { setProcessing(false); }
+    } catch(e) { Alert.alert("AI Studio",e instanceof Error?e.message:"Unable to process media."); }
   }
 
   return <UnifiedMediaStudio visible mode={mode} value={plan} onChange={setPlan} onClose={()=>router.back()} onRunAI={()=>void runAI()} />;
