@@ -309,7 +309,8 @@ export default function CreateScreen() {
           clipSettings,
           autoCaptions,
           captionLanguage,
-          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : [],\n          editPlan: studioPlan
+          textOverlays: overlayText.trim() ? [{ text: overlayText.trim(), startMs: overlayStartMs, endMs: Math.max(overlayStartMs + 500, Math.min(overlayEndMs || (durationMs || 3000), durationMs || (overlayEndMs || 3000))), x: overlayX, y: overlayY, fontSize: 42, color: "#FFFFFF", background: "#000000@0.55", align: "center" }] : [],
+          editPlan: studioPlan
         })
       });
       const draft = await draftResponse.json().catch(() => ({}));
