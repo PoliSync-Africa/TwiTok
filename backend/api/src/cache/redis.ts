@@ -69,6 +69,19 @@ export async function cacheDelete(key: string) {
   }
 }
 
+export async function rateLimitHit(key: string, windowMs: number) {
+  try {
+    const redis = await getClient();
+    if (!redis) return null;
+    const count = await redis.incr(key);
+    if (count === 1) await redis.pExpire(key, windowMs);
+    return { count, resetAt: Date.now() + Math.max(0, await redis.pTTL(key)) };
+  } catch (error) {
+    console.warn("Redis rate-limit skipped:", error instanceof Error ? error.message : "unknown error");
+    return null;
+  }
+}
+
 export async function cacheDeletePrefix(prefix: string) {
   try {
     const redis = await getClient();
