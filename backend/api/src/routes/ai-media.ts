@@ -118,6 +118,9 @@ const OUTPUT_CONTENT_TYPES = {
 };
 
 async function validateOutputContent(url: string, mode: string) {
+  // Only server-fetch provider output when an explicit host allowlist is configured.
+  // This prevents turning output validation into an arbitrary outbound fetch primitive.
+  if (!allowedHosts().length) return true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), AI_OUTPUT_FETCH_TIMEOUT_MS);
   try {
