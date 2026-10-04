@@ -164,11 +164,11 @@ async function runFfmpeg(
 
   const sourceStreamCount = requestedVariants.length;
   const filters = [
-    `[0:v]split=\${sourceStreamCount}\${requestedVariants.map((_, index) => `[src\${index}]`).join("")}`
+    `[0:v]split=${sourceStreamCount}${requestedVariants.map((_, index) => `[src${index}]`).join("")}`
   ];
   requestedVariants.forEach((variant, index) => {
     filters.push(
-      `[src\${index}]scale=w=\${variant.width}:h=\${variant.height}:force_original_aspect_ratio=decrease,\${polish},\${look[String(plan.filter??"NONE")]??"null"},\${face[String(plan.faceFilter??"NONE")]??"null"},\${bg},\${geometry},setpts=PTS/\${speed}[v\${variant.id}base]`
+      `[src${index}]scale=w=${variant.width}:h=${variant.height}:force_original_aspect_ratio=decrease,${polish},${look[String(plan.filter??"NONE")]??"null"},${face[String(plan.faceFilter??"NONE")]??"null"},${bg},${geometry},setpts=PTS/${speed}[v${variant.id}base]`
     );
   });
   const overlayInputs: string[] = [];
