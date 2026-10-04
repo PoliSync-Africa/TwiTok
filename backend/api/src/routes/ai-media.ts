@@ -55,6 +55,43 @@ function allowedHosts() {
     .split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
 }
 
+aiMediaRouter.get("/capabilities", requireUser, (_req, res) => {
+  const configured = Boolean(safeUrl(process.env.TWITOK_AI_MEDIA_ENDPOINT, []) && process.env.TWITOK_AI_MEDIA_API_KEY);
+  const configuredCapabilities = (process.env.TWITOK_AI_MEDIA_CAPABILITIES ?? "")
+    .split(",").map(x => x.trim().toUpperCase()).filter(Boolean);
+  const supports = (name: string) => configured && (
+    configuredCapabilities.length === 0 || configuredCapabilities.includes(name)
+  );
+
+  return res.json({
+    configured,
+    providerBacked: configured,
+    operations: {
+      RESTORE: supports("RESTORE"),
+      RELIGHT: supports("RELIGHT"),
+      SUPER_DETAIL: supports("SUPER_DETAIL"),
+      COLORIZE: supports("COLORIZE"),
+      AI_ART: supports("AI_ART"),
+      AI_EXPAND: supports("AI_EXPAND"),
+      REMOVE_OBJECT: supports("REMOVE_OBJECT"),
+      BACKGROUND_REPLACE: supports("BACKGROUND_REPLACE"),
+      BACKGROUND_REMOVE: supports("BACKGROUND_REMOVE"),
+      FACE_REPAIR: supports("FACE_REPAIR"),
+    },
+    backgrounds: {
+      AI_BLUR: supports("AI_BLUR"),
+      REPLACE: supports("BACKGROUND_REPLACE"),
+      REMOVE: supports("BACKGROUND_REMOVE"),
+      STUDIO: supports("STUDIO"),
+      GREEN_SCREEN: supports("GREEN_SCREEN"),
+    },
+    qualityProfiles: Object.fromEntries(
+      Object.keys(QUALITY_PROFILES).map(name => [name, supports(name)]),
+    ),
+    note: "Capabilities are provider-backed. The app must not present an unavailable operation as executable.",
+  });
+});
+
 aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
   try {
     const mode = String(req.body?.mode ?? "").toUpperCase();
