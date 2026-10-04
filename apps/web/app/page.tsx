@@ -51,7 +51,7 @@ export default function Home() {
   const [commentDraft, setCommentDraft] = useState("");
   const [commentsBusy, setCommentsBusy] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Array<{ id: string; type: string; read: boolean; createdAt: string; videoId: string | null; actor: { username?: string; nickname?: string } | null }>>([]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; type: string; category?: string | null; title?: string | null; body?: string | null; actionLabel?: string | null; actionUrl?: string | null; read: boolean; createdAt: string; videoId: string | null; actor: { username?: string; nickname?: string } | null }>>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [stories, setStories] = useState<Array<{id:string;username:string;nickname:string;playback?:{mp4Url?:string;hlsUrl?:string}|null;thumbnail?:string|null;caption:string;viewed:boolean}>>([]);
   const [storyOpen, setStoryOpen] = useState<string | null>(null);
@@ -369,10 +369,18 @@ export default function Home() {
         <header className="comments-header"><strong>Notifications</strong><button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></header>
         <div className="comments-list">
           {notifications.length ? notifications.map(item => {
-            const actor = item.actor?.username ? "@" + item.actor.username : "Someone";
-            const text = item.type === "FOLLOW" ? "followed you" : item.type === "LIKE" ? "liked your video" : item.type === "REPOST" ? "reposted your video" : "commented on your video";
+            const actor = item.actor?.username ? "@" + item.actor.username : "TwiTok";
+            const isSystem = item.type === "SYSTEM";
+            const text = item.body ?? (item.type === "FOLLOW" ? "followed you" : item.type === "LIKE" ? "liked your video" : item.type === "REPOST" ? "reposted your video" : "commented on your video");
             return <article className={"comment-item " + (item.read ? "" : "notification-unread")} key={item.id}>
-              <div className="comment-avatar">♥</div><div><strong>{actor}</strong><p>{text}</p><small>{new Date(item.createdAt).toLocaleString()}</small></div>
+              <div className="comment-avatar">{isSystem ? "T" : "♥"}</div>
+              <div>
+                {item.category && <small className="notification-category">{item.category.replaceAll("_", " ")}</small>}
+                <strong>{isSystem ? (item.title ?? "TwiTok") : actor}</strong>
+                <p>{text}</p>
+                {item.actionUrl && <a href={item.actionUrl}>{item.actionLabel ?? "View more"}</a>}
+                <small>{new Date(item.createdAt).toLocaleString()}</small>
+              </div>
             </article>;
           }) : <p className="comments-empty">No notifications yet.</p>}
         </div>
