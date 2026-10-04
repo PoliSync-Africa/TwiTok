@@ -74,6 +74,27 @@ function validMediaOutput(value: unknown) {
   return allowed.some(ext => pathname.endsWith(ext)) ? url : null;
 }
 
+function mediaKindForMode(mode: string) {
+  return mode === "IMAGE" ? "image" : "video";
+}
+
+function outputExtension(url: string) {
+  const pathname = new URL(url).pathname.toLowerCase();
+  return pathname.slice(pathname.lastIndexOf("."));
+}
+
+function validateOutputForMode(value: unknown, mode: string) {
+  const url = validMediaOutput(value);
+  if (!url) return null;
+  const ext = outputExtension(url);
+  const imageExts = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+  const videoExts = new Set([".mp4", ".mov", ".m4v", ".webm"]);
+  const expected = mediaKindForMode(mode);
+  if (expected === "image" && !imageExts.has(ext)) return null;
+  if (expected === "video" && !videoExts.has(ext)) return null;
+  return url;
+}
+
 function providerStatusEndpoint(jobId: string) {
   const template = process.env.TWITOK_AI_MEDIA_STATUS_ENDPOINT;
   if (!template) return null;
@@ -260,7 +281,7 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       }
     }
 
-    const outputUrl = validMediaOutput(provider.outputUrl);
+    const outputUrl = validateOutputForMode(provider.outputUrl, mode);
     const providerJobId = safeJobId(provider.jobId);
     const providerStatus = String(provider.status ?? "").toUpperCase();
     if (providerStatus && PROVIDER_TERMINAL_FAILURES.has(providerStatus) && !outputUrl && !providerJobId) {
@@ -340,7 +361,7 @@ aiMediaRouter.get("/jobs/:jobId", requireUser, async (req, res) => {
           const json: unknown = await response.json();
           if (json && typeof json === "object" && !Array.isArray(json)) {
             const provider = json as Record<string, unknown>;
-            const candidate = validMediaOutput(provider.outputUrl);
+            const candidate = validateOutputForMode(provider.outputUrl, String(job.mode ?? "VIDEO").toUpperCase());
             if (candidate) {
               outputUrl = candidate;
               status = "READY";
