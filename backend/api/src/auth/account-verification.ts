@@ -115,7 +115,14 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
   }
   const channel = user.verificationOtpChannel as VerificationChannel;
   if (channel === "email" && hashCode(code.trim()) !== user.verificationOtpHash) {
-    await users.updateOne({ _id: user._id }, { $inc: { verificationOtpAttempts: 1 }, $set: { updatedAt: new Date() } });
+    const attempt = await users.findOneAndUpdate(
+      { _id: user._id, verificationOtpAttempts: { $lt: MAX_ATTEMPTS } },
+      { $inc: { verificationOtpAttempts: 1 }, $set: { updatedAt: new Date() } },
+      { returnDocument: "after", projection: { verificationOtpAttempts: 1 } }
+    );
+    if (Number(attempt?.verificationOtpAttempts ?? MAX_ATTEMPTS) >= MAX_ATTEMPTS) {
+      throw new Error("Too many incorrect verification attempts. Request a new code.");
+    }
     throw new Error("Invalid verification code");
   }
   if (channel === "phone") {
@@ -125,11 +132,19 @@ export async function verifyAccountCode(db: Db, userId: string, code: string) {
     const response = await fetch("https://sms.arkesel.com/api/otp/verify", {
       method: "POST",
       headers: { accept: "application/json", "api-key": apiKey, "content-type": "application/json" },
-      body: JSON.stringify({ code: code.trim(), number: phone.replace(/^\+/, "") })
+      body: JSON.stringify({ code: code.trim(), number: phone.replace(/^\+/, "") }),
+      signal: AbortSignal.timeout(8000)
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || String(data?.code ?? "") !== "1100") {
-      await users.updateOne({ _id: user._id }, { $inc: { verificationOtpAttempts: 1 }, $set: { updatedAt: new Date() } });
+      const attempt = await users.findOneAndUpdate(
+        { _id: user._id, verificationOtpAttempts: { $lt: MAX_ATTEMPTS } },
+        { $inc: { verificationOtpAttempts: 1 }, $set: { updatedAt: new Date() } },
+        { returnDocument: "after", projection: { verificationOtpAttempts: 1 } }
+      );
+      if (Number(attempt?.verificationOtpAttempts ?? MAX_ATTEMPTS) >= MAX_ATTEMPTS) {
+        throw new Error("Too many incorrect verification attempts. Request a new code.");
+      }
       throw new Error("Invalid verification code");
     }
   }
