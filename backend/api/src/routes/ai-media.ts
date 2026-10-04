@@ -50,6 +50,21 @@ function providerStatusEndpoint(jobId: string) {
   return safeUrl(template.replaceAll("{jobId}", encoded), []);
 }
 
+function normalizeProviderResponse(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const root = value as Record<string, unknown>;
+  const result = root.result && typeof root.result === "object" && !Array.isArray(root.result)
+    ? root.result as Record<string, unknown>
+    : null;
+  const outputUrl = [root.outputUrl, root.output_url, root.url, result?.outputUrl, result?.output_url, result?.url]
+    .find(value => typeof value === "string") ?? null;
+  const jobId = [root.jobId, root.job_id, root.id, result?.jobId, result?.job_id, result?.id]
+    .find(value => typeof value === "string") ?? null;
+  const status = [root.status, result?.status]
+    .find(value => typeof value === "string") ?? null;
+  return { outputUrl, jobId, status };
+}
+
 function allowedHosts() {
   return (process.env.TWITOK_AI_MEDIA_ALLOWED_HOSTS ?? "")
     .split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
@@ -185,7 +200,7 @@ aiMediaRouter.post("/restyle", requireUser, async (req, res) => {
       if (!json || typeof json !== "object" || Array.isArray(json)) {
         throw new Error("provider invalid response");
       }
-      provider = json as Record<string, unknown>;
+      const normalized = normalizeProviderResponse(json);\n      if (!normalized) throw new Error("provider invalid response");\n      provider = normalized;
     } finally {
       clearTimeout(timer);
     }
