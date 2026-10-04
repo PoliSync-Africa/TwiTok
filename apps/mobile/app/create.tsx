@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Animated, FlatList, Pressable, ScrollView, St
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { getAuthToken } from "../lib/auth";
-import UnifiedMediaStudio, { DEFAULT_STUDIO_PLAN, type StudioPlan } from "../components/unified-media-studio";
+import UnifiedMediaStudio, { DEFAULT_STUDIO_PLAN, type StudioPlan } from "../components/unified-media-studio"; // TwiTok Studio
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
