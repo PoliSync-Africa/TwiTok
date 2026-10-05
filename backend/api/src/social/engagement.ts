@@ -18,15 +18,28 @@ async function getPublicVideo(db: Db, videoId: ObjectId) {
 
 async function ensureEngagementIndex(collection: Collection<Document>, keys: Record<string, 1 | -1>, options: any = {}) {
   const desiredName = typeof options.name === "string" ? options.name : Object.entries(keys).map(([field, direction]) => `${field}_${direction}`).join("_");
-  const existing = await collection.listIndexes().toArray();
-  for (const index of existing) {
-    if (index.name === "_id_") continue;
-    const sameKeys = JSON.stringify(index.key) === JSON.stringify(keys);
-    if (sameKeys && index.name !== desiredName) {
-      await collection.dropIndex(index.name);
+  try {
+    const existing = await collection.listIndexes().toArray();
+    for (const index of existing) {
+      if (index.name === "_id_") continue;
+      const sameKeys = JSON.stringify(index.key) === JSON.stringify(keys);
+      const sameName = index.name === desiredName;
+      const uniqueMismatch = Boolean(index.unique) !== Boolean(options.unique);
+      if ((sameKeys && (index.name !== desiredName || uniqueMismatch)) || (sameName && (!sameKeys || uniqueMismatch))) {
+        await collection.dropIndex(index.name);
+      }
+    }
+    await collection.createIndex(keys, options);
+  } catch (err: any) {
+    if (err?.code === 86 || err?.codeName === "IndexKeySpecsConflict") {
+      try {
+        await collection.dropIndex(desiredName);
+      } catch (_) {}
+      await collection.createIndex(keys, options);
+    } else {
+      throw err;
     }
   }
-  await collection.createIndex(keys, options);
 }
 
 export async function initializeEngagementIndexes(db: Db) {
