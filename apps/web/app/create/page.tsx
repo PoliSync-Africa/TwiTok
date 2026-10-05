@@ -86,6 +86,8 @@ export default function CreatePage() {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const cameraRecorderRef = useRef<MediaRecorder | null>(null);
   const cameraChunksRef = useRef<Blob[]>([]);
+  const cameraAutoStartRef = useRef(false);
+  const openBrowserCameraRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); }, [preview]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
@@ -182,13 +184,6 @@ export default function CreatePage() {
       .catch(() => undefined);
   }, []);
 
-  // Opening /create is the explicit user action that enters TwiTok's creator camera.
-  // Request camera + microphone automatically on supported secure browsers.
-  useEffect(() => {
-    if (file || cameraActive || cameraStarting) return;
-    const timer = window.setTimeout(() => { void openBrowserCamera(); }, 80);
-    return () => window.clearTimeout(timer);
-  }, []); 
 
   async function toggleSoundPreview(sound: Sound) {
     if (!sound.audioUrl) return setMessage("This sound does not have a preview available yet.");
@@ -347,12 +342,16 @@ export default function CreatePage() {
     }
   }
 
+  // Opening /create is the explicit user action that enters TwiTok's creator camera.
+  // Browser permissions still require the browser/OS decision; this automatically
+  // starts the request on supported secure contexts without stale hook dependencies.
+  openBrowserCameraRef.current = async () => { await openBrowserCamera(); };
+
   useEffect(() => {
-    if (preview || cameraActive) return;
+    if (cameraAutoStartRef.current) return;
+    cameraAutoStartRef.current = true;
     void refreshCameraPermission();
-    const timer = window.setTimeout(() => {
-      void openBrowserCamera("user");
-    }, 250);
+    const timer = window.setTimeout(() => { void openBrowserCameraRef.current?.(); }, 80);
     return () => window.clearTimeout(timer);
   }, []);
 
