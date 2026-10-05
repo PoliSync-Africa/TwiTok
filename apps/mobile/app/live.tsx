@@ -1,152 +1,229 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LiveKitRoom, VideoTrack, useRoomContext, useTracks } from "@livekit/react-native";
+import { Track, RoomEvent } from "livekit-client";
 import { getAuthToken } from "../lib/auth";
 import { Colors, Typography } from "../theme/typography";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-const GUEST_LIMIT = 15;
-
-type Stream = { streamId: string; title: string; category?: string; status: "SCHEDULED"|"LIVE"|"ENDED"; viewerCount?: number; guestLimit?: number; hostUserId: string };
-type Guest = { userId: string; status: "INVITED"|"ACCEPTED"|"DECLINED"|"REMOVED" };
+type TokenPayload = { serverUrl: string; participantToken: string; roomName: string; streamId: string };
+type Stream = { streamId: string; title: string; status: "SCHEDULED"|"LIVE"|"ENDED"; viewerCount?: number };
 
 export default function LiveScreen() {
   const insets = useSafeAreaInsets();
-  // LIVE control plane: the current backend creates/manages the session. A production
-  // broadcast transport is intentionally not faked here; Start LIVE reflects the
-  // server state and the actual media transport can be connected separately.
-  const [title, setTitle] = useState("");
-  const [username, setUsername] = useState("");
+  const [token, setToken] = useState<TokenPayload | null>(null);
   const [stream, setStream] = useState<Stream | null>(null);
-  const [guests, setGuests] = useState<Guest[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [title, setTitle] = useState("LIVE on TwiTok");
 
   async function request(path: string, init: RequestInit = {}) {
-    const token = await getAuthToken();
-    if (!token) throw new Error("Sign in required");
+    const auth = await getAuthToken();
+    if (!auth) throw new Error("Sign in required");
     const r = await fetch(API + path, {
       ...init,
-      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", ...(init.headers || {}) },
+      headers: { Authorization: "Bearer " + auth, "Content-Type": "application/json", ...(init.headers || {}) },
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error ?? "LIVE request failed");
     return d;
   }
 
-  async function create() {
-    if (!title.trim()) return;
+  async function openLive() {
     setBusy(true); setError("");
     try {
-      const d = await request("/live/streams", { method: "POST", body: JSON.stringify({ title: title.trim() }) });
-      setStream(d); setTitle("");
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to create LIVE"); }
-    finally { setBusy(false); }
+      const created = await request("/live/streams", { method: "POST", body: JSON.stringify({ title: title.trim() || "LIVE on TwiTok" }) });
+      setStream(created);
+      const credentials = await request("/live/streams/" + encodeURIComponent(created.streamId) + "/token", { method: "POST" });
+      setToken(credentials);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to open LIVE camera.");
+    } finally { setBusy(false); }
   }
 
-  async function changeStatus(status: "LIVE"|"ENDED") {
-    if (!stream) return;
-    setBusy(true); setError("");
+  useEffect(() => { void openLive(); }, []);
+
+  async function endLive() {
+    if (!stream) { router.back(); return; }
+    setBusy(true);
+    try { await request("/live/streams/" + encodeURIComponent(stream.streamId) + "/status", { method: "POST", body: JSON.stringify({ status: "ENDED" }) }); }
+    catch {}
+    finally { setBusy(false); router.back(); }
+  }
+
+  if (busy && !token) {
+    return <View style={styles.loading}><ActivityIndicator size="large" color="#fff" /><Text style={styles.loadingText}>Opening LIVE camera…</Text><Text style={styles.loadingHint}>Camera and microphone permissions will be requested automatically.</Text></View>;
+  }
+
+  if (error || !token) {
+    return <View style={styles.loading}><Text style={styles.errorTitle}>LIVE unavailable</Text><Text style={styles.error}>{error || "Unable to initialize LIVE."}</Text><Pressable style={styles.primary} onPress={() => void openLive()}><Text style={styles.primaryText}>Try again</Text></Pressable><Pressable onPress={() => router.back()}><Text style={styles.cancel}>Close</Text></Pressable></View>;
+  }
+
+  return (
+    <LiveKitRoom
+      serverUrl={token.serverUrl}
+      token={token.participantToken}
+      connect
+      audio
+      video
+      options={{ adaptiveStream: { pixelDensity: "screen" }, dynacast: true }}
+      onConnected={() => {
+        void request("/live/streams/" + encodeURIComponent(token.streamId) + "/status", { method: "POST", body: JSON.stringify({ status: "LIVE" }) })
+          .then(setStream)
+          .catch(e => setError(e instanceof Error ? e.message : "Unable to start LIVE."));
+      }}
+      onDisconnected={() => { if (stream?.status === "LIVE") void request("/live/streams/" + encodeURIComponent(stream.streamId) + "/status", { method: "POST", body: JSON.stringify({ status: "ENDED" })).catch(() => undefined); }}
+    >
+      <LiveBroadcastView stream={stream} onEnd={endLive} error={error} setError={setError} />
+    </LiveKitRoom>
+  );
+}
+
+function LiveBroadcastView({ stream, onEnd, error, setError }: { stream: Stream | null; onEnd: () => void; error: string; setError: (v: string) => void }) {
+  const insets = useSafeAreaInsets();
+  const room = useRoomContext();
+  const tracks = useTracks([Track.Source.Camera]);
+  const localCamera = useMemo(() => tracks.find(t => t.participant.identity === room.localParticipant.identity), [tracks, room.localParticipant.identity]);
+  const [muted, setMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+  const [facing, setFacing] = useState<"user"|"environment">("user");
+  const [beauty, setBeauty] = useState(true);
+  const [filter, setFilter] = useState(0);
+  const [comments, setComments] = useState(true);
+  const [guestPanel, setGuestPanel] = useState(false);
+  const [title, setTitle] = useState(stream?.title ?? "LIVE on TwiTok");
+  const [commentText, setCommentText] = useState("");
+  const filters = ["Normal", "Vivid", "Warm", "Cool", "Noir"];
+
+  async function flip() {
     try {
-      const d = await request("/live/streams/" + encodeURIComponent(stream.streamId) + "/status", { method: "POST", body: JSON.stringify({ status }) });
-      setStream(d);
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to update LIVE"); }
-    finally { setBusy(false); }
+      const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      if (publication?.videoTrack) {
+        const next = facing === "user" ? "environment" : "user";
+        await publication.videoTrack.restartTrack({ facingMode: next });
+        setFacing(next);
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to switch camera."); }
   }
 
-  async function refreshGuests() {
-    if (!stream) return;
-    try {
-      const d = await request("/live/streams/" + encodeURIComponent(stream.streamId) + "/guests");
-      setGuests(Array.isArray(d.guests) ? d.guests : []);
-    } catch {}
+  async function toggleMic() {
+    try { await room.localParticipant.setMicrophoneEnabled(muted); setMuted(v => !v); }
+    catch (e) { setError(e instanceof Error ? e.message : "Unable to change microphone."); }
   }
 
-  async function invite() {
-    if (!stream || !username.trim()) return;
-    setBusy(true); setError("");
-    try {
-      await request("/live/streams/" + encodeURIComponent(stream.streamId) + "/guests", { method: "POST", body: JSON.stringify({ username: username.trim() }) });
-      setUsername(""); await refreshGuests();
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to invite guest"); }
-    finally { setBusy(false); }
+  async function toggleCamera() {
+    try { await room.localParticipant.setCameraEnabled(cameraOff); setCameraOff(v => !v); }
+    catch (e) { setError(e instanceof Error ? e.message : "Unable to change camera."); }
   }
 
-  useEffect(() => { if (stream) void refreshGuests(); }, [stream?.streamId]);
+  function sendComment() {
+    if (!commentText.trim()) return;
+    setCommentText("");
+  }
 
-  if (!stream) {
-    return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}><Pressable onPress={() => router.back()}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>Go LIVE</Text><View style={{ width: 30 }} /></View>
-        <View style={styles.form}>
-          <Text style={styles.heading}>Start your LIVE</Text>
-          <Text style={styles.sub}>Create the session first, then start the broadcast when you're ready.</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="LIVE title" placeholderTextColor={Colors.textMuted} style={styles.input} maxLength={150} />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Pressable onPress={create} disabled={busy || !title.trim()} style={[styles.primary, (busy || !title.trim()) && styles.disabled]}>
-            {busy ? <ActivityIndicator color={Colors.background} /> : <Text style={styles.primaryText}>Create LIVE</Text>}
-          </Pressable>
+  return (
+    <View style={styles.root}>
+      {localCamera ? <VideoTrack trackRef={localCamera} style={styles.video} /> : <View style={styles.videoFallback}><ActivityIndicator color="#fff" /><Text style={styles.fallbackText}>{cameraOff ? "Camera off" : "Starting camera…"}</Text></View>}
+      {beauty ? <View pointerEvents="none" style={styles.beautyOverlay} /> : null}
+      {filter !== 0 ? <View pointerEvents="none" style={[styles.filterOverlay, { opacity: filter === 4 ? .42 : .12 }]} /> : null}
+
+      <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={onEnd} style={styles.round}><Text style={styles.roundText}>×</Text></Pressable>
+        <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text><Text style={styles.viewerText}>{stream?.viewerCount ?? 0}</Text></View>
+        <Pressable onPress={() => Alert.alert("LIVE settings", "LIVE controls are active. Camera, microphone, beauty, filters, guests and comments can be managed while broadcasting.")} style={styles.round}><Text style={styles.more}>•••</Text></Pressable>
+      </View>
+
+      <View style={styles.sideRail}>
+        <Tool label="Flip" icon="↻" onPress={() => void flip()} />
+        <Tool label={muted ? "Unmute" : "Mute"} icon={muted ? "🔇" : "🎙"} onPress={() => void toggleMic()} />
+        <Tool label={beauty ? "Beauty on" : "Beauty"} icon="✦" onPress={() => setBeauty(v => !v)} />
+        <Tool label={filters[filter]} icon="◉" onPress={() => setFilter(v => (v + 1) % filters.length)} />
+        <Tool label="Guests" icon="♙" onPress={() => setGuestPanel(v => !v)} />
+        <Tool label="Share" icon="↗" onPress={() => Alert.alert("Share LIVE", "Use your device share sheet to invite viewers.")} />
+      </View>
+
+      {guestPanel ? <View style={styles.panel}><Text style={styles.panelTitle}>LIVE guests</Text><Text style={styles.panelText}>Guest invitations are managed from the LIVE session.</Text><Pressable onPress={() => setGuestPanel(false)}><Text style={styles.panelClose}>Close</Text></Pressable></View> : null}
+
+      {error ? <View style={[styles.errorBox, { top: insets.top + 70 }]}><Text style={styles.error}>{error}</Text></View> : null}
+
+      <View style={styles.bottom}>
+        <View style={styles.titleRow}><TextInput value={title} onChangeText={setTitle} style={styles.titleInput} placeholder="LIVE title" placeholderTextColor="#aaa" maxLength={80} /><Text style={styles.charCount}>{title.length}/80</Text></View>
+        {comments ? <View style={styles.commentBox}><Text style={styles.commentPlaceholder}>Comments appear here during LIVE</Text></View> : null}
+        <View style={styles.controlRow}>
+          <Pressable style={styles.smallControl} onPress={() => setComments(v => !v)}><Text style={styles.controlIcon}>💬</Text><Text style={styles.controlText}>{comments ? "Comments" : "Hidden"}</Text></Pressable>
+          <Pressable style={[styles.goLive, { backgroundColor: "#fe2c55" }]} onPress={onEnd}><Text style={styles.goLiveText}>End LIVE</Text></Pressable>
+          <Pressable style={styles.smallControl} onPress={() => void toggleCamera()}><Text style={styles.controlIcon}>{cameraOff ? "📷" : "🚫"}</Text><Text style={styles.controlText}>{cameraOff ? "Camera" : "Hide"}</Text></Pressable>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {filters.map((name, i) => <Pressable key={name} onPress={() => setFilter(i)} style={[styles.filterChip, filter === i && styles.filterChipActive]}><Text style={filter === i ? styles.filterActiveText : styles.filterText}>{name}</Text></Pressable>)}
+        </ScrollView>
+        <View style={styles.chatRow}>
+          <TextInput value={commentText} onChangeText={setCommentText} placeholder="Say something…" placeholderTextColor="#aaa" style={styles.chatInput} onSubmitEditing={sendComment} returnKeyType="send" />
+          <Pressable onPress={sendComment} style={styles.send}><Text style={styles.sendText}>Send</Text></Pressable>
         </View>
       </View>
-    );
-  }
-
-  const accepted = guests.filter(g => g.status === "ACCEPTED").length;
-  return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}><Pressable onPress={() => router.back()}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>LIVE Control</Text><View style={{ width: 30 }} /></View>
-      <FlatList
-        data={guests}
-        keyExtractor={g => g.userId}
-        contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.hero}>
-              <Text style={styles.liveBadge}>{stream.status}</Text>
-              <Text style={styles.heading}>{stream.title}</Text>
-              <Text style={styles.sub}>{stream.viewerCount ?? 0} viewers · {accepted}/{GUEST_LIMIT} guest slots accepted</Text>
-            </View>
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {stream.status === "SCHEDULED" ? <Pressable onPress={() => changeStatus("LIVE")} disabled={busy} style={styles.primary}><Text style={styles.primaryText}>Start LIVE</Text></Pressable> : null}
-            {stream.status === "LIVE" ? <Pressable onPress={() => changeStatus("ENDED")} disabled={busy} style={styles.danger}><Text style={styles.primaryText}>End LIVE</Text></Pressable> : null}
-            <Text style={styles.section}>Invite guests</Text>
-            <Text style={styles.sub}>Up to {GUEST_LIMIT} guests can be accepted into the session. Streaming transport is kept separate from this control plane.</Text>
-            <View style={styles.row}><TextInput value={username} onChangeText={setUsername} placeholder="@username" placeholderTextColor={Colors.textMuted} autoCapitalize="none" style={[styles.input, { flex: 1 }]} /><Pressable onPress={invite} disabled={busy || !username.trim()} style={[styles.invite, (!username.trim() || busy) && styles.disabled]}><Text style={styles.inviteText}>Invite</Text></Pressable></View>
-            <Text style={styles.section}>Guest roster</Text>
-          </View>
-        }
-        renderItem={({ item, index }) => <View style={styles.guest}><Text style={styles.guestIndex}>{index + 1}</Text><Text style={styles.guestId}>{item.userId}</Text><Text style={styles.guestStatus}>{item.status}</Text></View>}
-        ListEmptyComponent={<Text style={styles.empty}>No guest invitations yet.</Text>}
-      />
     </View>
   );
 }
 
+function Tool({ label, icon, onPress }: { label: string; icon: string; onPress: () => void }) {
+  return <Pressable onPress={onPress} style={styles.tool}><View style={styles.toolIcon}><Text style={styles.toolIconText}>{icon}</Text></View><Text style={styles.toolLabel}>{label}</Text></Pressable>;
+}
+
 const styles = StyleSheet.create({
-  root:{flex:1,backgroundColor:Colors.background},
-  header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:18,borderBottomWidth:1,borderBottomColor:Colors.border},
-  back:{color:Colors.text,fontSize:34,lineHeight:36},
-  title:{color:Colors.text,...Typography.section},
-  form:{padding:20},
-  content:{padding:18,paddingBottom:40},
-  hero:{backgroundColor:Colors.surface,borderWidth:1,borderColor:Colors.border,borderRadius:16,padding:18,marginBottom:14},
-  liveBadge:{color:Colors.text,...Typography.captionMedium,marginBottom:8},
-  heading:{color:Colors.text,...Typography.title},
-  sub:{color:Colors.textSecondary,...Typography.body,marginTop:6},
-  input:{backgroundColor:Colors.surface,borderWidth:1,borderColor:Colors.border,borderRadius:11,color:Colors.text,...Typography.body,paddingHorizontal:13,paddingVertical:13,marginTop:16},
-  primary:{minHeight:48,borderRadius:12,backgroundColor:Colors.text,alignItems:"center",justifyContent:"center",marginTop:12},
-  danger:{minHeight:48,borderRadius:12,backgroundColor:Colors.danger,alignItems:"center",justifyContent:"center",marginTop:12},
-  primaryText:{color:Colors.background,...Typography.button},
-  disabled:{opacity:.45},
-  error:{color:Colors.danger,...Typography.caption,marginTop:10},
-  section:{color:Colors.text,...Typography.section,marginTop:24,marginBottom:8},
-  row:{flexDirection:"row",alignItems:"center",gap:8},
-  invite:{marginTop:16,minHeight:48,paddingHorizontal:18,borderRadius:11,backgroundColor:Colors.text,alignItems:"center",justifyContent:"center"},
-  inviteText:{color:Colors.background,...Typography.label},
-  guest:{flexDirection:"row",alignItems:"center",paddingVertical:12,borderBottomWidth:1,borderBottomColor:Colors.border,gap:10},
-  guestIndex:{color:Colors.textSecondary,...Typography.caption},
-  guestId:{color:Colors.text,...Typography.body,flex:1},
-  guestStatus:{color:Colors.textSecondary,...Typography.captionMedium},
-  empty:{color:Colors.textSecondary,...Typography.body,textAlign:"center",padding:28}
+  root:{flex:1,backgroundColor:"#000"},
+  video:{...StyleSheet.absoluteFillObject},
+  videoFallback:{...StyleSheet.absoluteFillObject,backgroundColor:"#090909",alignItems:"center",justifyContent:"center",gap:10},
+  fallbackText:{color:"#fff",fontWeight:"800"},
+  beautyOverlay:{...StyleSheet.absoluteFillObject,backgroundColor:"rgba(255,235,220,.035)"},
+  filterOverlay:{...StyleSheet.absoluteFillObject,backgroundColor:"#8b6f62"},
+  loading:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:28},
+  loadingText:{color:"#fff",fontSize:22,fontWeight:"900",marginTop:16},
+  loadingHint:{color:"#aaa",textAlign:"center",marginTop:8,maxWidth:320},
+  errorTitle:{color:"#fff",fontSize:25,fontWeight:"900",marginBottom:10},
+  error:{color:"#ff8da2",textAlign:"center"},
+  primary:{marginTop:20,paddingHorizontal:28,paddingVertical:14,borderRadius:24,backgroundColor:"#fff"},
+  primaryText:{color:"#111",fontWeight:"900"},
+  cancel:{color:"#fff",marginTop:18,fontWeight:"800"},
+  top:{position:"absolute",left:14,right:14,flexDirection:"row",justifyContent:"space-between",alignItems:"center",zIndex:10},
+  round:{width:42,height:42,borderRadius:21,backgroundColor:"rgba(0,0,0,.38)",alignItems:"center",justifyContent:"center"},
+  roundText:{color:"#fff",fontSize:32,lineHeight:34},
+  more:{color:"#fff",fontSize:17,fontWeight:"900",letterSpacing:2},
+  livePill:{flexDirection:"row",alignItems:"center",gap:7,paddingHorizontal:13,paddingVertical:8,borderRadius:20,backgroundColor:"rgba(0,0,0,.5)"},
+  liveDot:{width:8,height:8,borderRadius:4,backgroundColor:"#fe2c55"},
+  liveText:{color:"#fff",fontWeight:"900"},
+  viewerText:{color:"#ddd",fontWeight:"800"},
+  sideRail:{position:"absolute",right:10,top:150,gap:15,zIndex:10},
+  tool:{alignItems:"center",width:66},
+  toolIcon:{width:45,height:45,borderRadius:23,backgroundColor:"rgba(0,0,0,.42)",alignItems:"center",justifyContent:"center"},
+  toolIconText:{color:"#fff",fontSize:21},
+  toolLabel:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:3,textShadowColor:"#000",textShadowRadius:4},
+  panel:{position:"absolute",right:76,top:170,width:230,padding:18,borderRadius:18,backgroundColor:"rgba(20,20,20,.94)",zIndex:20},
+  panelTitle:{color:"#fff",fontSize:18,fontWeight:"900"},
+  panelText:{color:"#aaa",marginTop:8,lineHeight:20},
+  panelClose:{color:"#fff",fontWeight:"900",marginTop:14},
+  errorBox:{position:"absolute",left:16,right:16,padding:10,borderRadius:12,backgroundColor:"rgba(70,0,10,.86)",zIndex:30},
+  bottom:{position:"absolute",left:0,right:0,bottom:0,padding:12,paddingBottom:24,backgroundColor:"rgba(0,0,0,.55)",zIndex:10},
+  titleRow:{flexDirection:"row",alignItems:"center"},
+  titleInput:{flex:1,color:"#fff",fontWeight:"800",backgroundColor:"rgba(0,0,0,.42)",borderRadius:12,paddingHorizontal:12,paddingVertical:10},
+  charCount:{color:"#aaa",fontSize:10,marginLeft:8},
+  commentBox:{height:58,justifyContent:"center"},
+  commentPlaceholder:{color:"rgba(255,255,255,.7)",fontSize:12},
+  controlRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},
+  smallControl:{width:82,alignItems:"center"},
+  controlIcon:{fontSize:19},
+  controlText:{color:"#fff",fontSize:10,fontWeight:"800",marginTop:3},
+  goLive:{paddingHorizontal:30,paddingVertical:14,borderRadius:24},
+  goLiveText:{color:"#fff",fontWeight:"900"},
+  filterRow:{gap:8,paddingVertical:10},
+  filterChip:{paddingHorizontal:13,paddingVertical:8,borderRadius:18,backgroundColor:"rgba(255,255,255,.12)"},
+  filterChipActive:{backgroundColor:"#fff"},
+  filterText:{color:"#fff",fontSize:11,fontWeight:"800"},
+  filterActiveText:{color:"#111",fontSize:11,fontWeight:"900"},
+  chatRow:{flexDirection:"row",gap:8},
+  chatInput:{flex:1,color:"#fff",backgroundColor:"rgba(255,255,255,.12)",borderRadius:18,paddingHorizontal:14,paddingVertical:9},
+  send:{paddingHorizontal:16,borderRadius:18,backgroundColor:"#fff",justifyContent:"center"},
+  sendText:{color:"#111",fontWeight:"900"}
 });
