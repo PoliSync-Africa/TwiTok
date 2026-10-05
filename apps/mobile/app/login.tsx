@@ -48,7 +48,7 @@ export default function LoginScreen() {
       <View style={styles.passwordRow}><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor={Colors.textMuted} secureTextEntry={!showPassword} style={styles.passwordInput}/><Pressable onPress={()=>setShowPassword(v=>!v)}><Text style={styles.show}>{showPassword?"Hide":"Show"}</Text></Pressable></View>
       {error?<Text style={styles.error}>{error}</Text>:null}
       <Pressable style={[styles.button,busy&&styles.disabled]} onPress={login} disabled={busy}>{busy?<ActivityIndicator color="#000"/>:<Text style={styles.buttonText}>Log in</Text>}</Pressable>
-      <Pressable style={styles.forgot} onPress={()=>router.push("/forgot-password")}><Text style={styles.forgotText}>Forgot password?</Text></Pressable>
+      <Text style={styles.forgotText}>Forgot password? Use password recovery from your account settings.</Text>
       <View style={styles.divider}><View style={styles.line}/><Text style={styles.or}>OR</Text><View style={styles.line}/></View>
       <Pressable style={styles.alt}><Text style={styles.altIcon}></Text><Text style={styles.altText}>Continue with Apple</Text></Pressable>
       <Pressable style={styles.alt}><Text style={styles.altIcon}>G</Text><Text style={styles.altText}>Continue with Google</Text></Pressable>
