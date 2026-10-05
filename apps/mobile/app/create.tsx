@@ -96,6 +96,8 @@ export default function CreateScreen() {
     }
     if (recordedEffect && ["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].includes(String(recordedEffect))) {
       setEffect(String(recordedEffect));
+      const studioFilter = String(recordedEffect) === "VIBRANT" ? "VIVID" : String(recordedEffect);
+      setStudioPlan(plan => ({ ...plan, filter: studioFilter }));
     }
     if (String(autoStudio ?? "") === "1") {
       const timer = setTimeout(() => setStudioVisible(true), 180);
