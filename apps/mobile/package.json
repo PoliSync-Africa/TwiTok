@@ -24,7 +24,12 @@
     "expo-camera": "57.0.5",
     "react-native-purchases": "^10.10.2",
     "uuid": "^11.1.1",
-    "expo-symbols": "~57.0.3"
+    "expo-symbols": "~57.0.3",
+    "@livekit/react-native": "^3.0.0",
+    "@livekit/react-native-expo-plugin": "^1.0.3",
+    "@livekit/react-native-webrtc": "^144.2.0",
+    "@config-plugins/react-native-webrtc": "^15.0.2",
+    "livekit-client": "^2.22.3"
   },
   "overrides": {
     "decode-uri-component": "0.5.0",
