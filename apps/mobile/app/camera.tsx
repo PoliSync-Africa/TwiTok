@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,6 +39,8 @@ export default function CameraStudioScreen() {
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView | null>(null);
   const recordingRef = useRef<Promise<{ uri: string } | undefined> | null>(null);
+  const holdRef = useRef(false);
+  const recordingStartedRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
   const [facing, setFacing] = useState<Facing>("front");
@@ -54,6 +56,10 @@ export default function CameraStudioScreen() {
   const [grid, setGrid] = useState(false);
   const [mode, setMode] = useState<Mode>("VIDEO");
   const [error, setError] = useState("");
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle } = useLocalSearchParams<{ soundId?: string; soundTitle?: string }>();
+  const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
+  const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
+  useEffect(() => { if (incomingSoundId) setSoundId(String(incomingSoundId)); if (incomingSoundTitle) setSoundTitle(String(incomingSoundTitle)); }, [incomingSoundId, incomingSoundTitle]);
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted) void requestCameraPermission();
@@ -67,44 +73,49 @@ export default function CameraStudioScreen() {
 
   async function startRecording() {
     if (recording || countdown !== null || !cameraRef.current || mode !== "VIDEO") return;
-    if (!microphonePermission?.granted) {
-      setError("Microphone access is needed for video recording.");
-      return;
-    }
-
+    if (!microphonePermission?.granted) { setError("Microphone access is needed for video recording."); return; }
+    if (!holdRef.current) return;
     setError("");
     if (timer > 0) {
       for (let value = timer; value > 0; value--) {
+        if (!holdRef.current) return;
         setCountdown(value);
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       setCountdown(null);
+      if (!holdRef.current) return;
     }
-
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !holdRef.current) return;
     setRecording(true);
+    recordingStartedRef.current = true;
     const started = Date.now();
-    recordingRef.current = cameraRef.current.recordAsync({ maxDuration: durationLimit });
-
+    recordingRef.current = cameraRef.current.recordAsync({ maxDuration: durationLimit, progressUpdateInterval: 0.25 });
     try {
       const result = await recordingRef.current;
       if (!result?.uri) throw new Error("Camera did not return a video.");
       const duration = Math.max(1, Math.min(durationLimit * 1000, Date.now() - started));
-      router.replace({
-        pathname: "/create",
-        params: {
-          recordedUri: result.uri,
-          recordedDuration: String(duration),
-          recordedEffect: effect,
-          recordedSpeed: String(speed),
-        },
-      });
+      router.replace({ pathname: "/create", params: {
+        recordedUri: result.uri, recordedDuration: String(duration),
+        recordedEffect: effect, recordedSpeed: String(speed),
+        soundId, soundTitle, autoStudio: "1"
+      }});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to record video.");
     } finally {
-      recordingRef.current = null;
-      setRecording(false);
+      recordingRef.current = null; recordingStartedRef.current = false; setRecording(false);
     }
+  }
+
+  function beginVideoHold() {
+    if (mode !== "VIDEO" || recording || countdown !== null) return;
+    holdRef.current = true;
+    void startRecording();
+  }
+
+  function endVideoHold() {
+    holdRef.current = false;
+    if (countdown !== null && !recordingStartedRef.current) setCountdown(null);
+    if (recordingStartedRef.current && cameraRef.current) cameraRef.current.stopRecording();
   }
 
   async function takePhoto() {
@@ -226,9 +237,9 @@ export default function CameraStudioScreen() {
         <Pressable style={styles.close} onPress={() => router.back()} accessibilityLabel="Close camera">
           <Icon name="xmark" size={25} />
         </Pressable>
-        <Pressable style={styles.soundPill} onPress={() => router.push({ pathname: "/sounds", params: { select: "1" } })}>
+        <Pressable style={styles.soundPill} onPress={() => router.push({ pathname: "/sounds", params: { select: "1", returnTo: "/camera" } })}>
           <Icon name="music.note" size={17} />
-          <Text style={styles.soundText}>Add sound</Text>
+          <Text style={styles.soundText} numberOfLines={1}>{soundTitle || "Add sound"}</Text>
         </Pressable>
         <Pressable style={styles.rotate} onPress={() => setFacing(v => v === "back" ? "front" : "back")} accessibilityLabel="Flip camera">
           <Icon name="camera.rotate" size={25} />
@@ -284,12 +295,15 @@ export default function CameraStudioScreen() {
           </Pressable>
 
           <Pressable
-            accessibilityLabel={mode === "PHOTO" ? "Take photo" : "Record video"}
-            onPress={mode === "PHOTO" ? takePhoto : startRecording}
+            accessibilityLabel={mode === "PHOTO" ? "Take photo" : "Hold to record video"}
+            onPress={mode === "PHOTO" ? takePhoto : undefined}
+            onPressIn={mode === "VIDEO" ? beginVideoHold : undefined}
+            onPressOut={mode === "VIDEO" ? endVideoHold : undefined}
             style={[styles.recordOuter, recording && styles.recordingOuter]}
           >
             <View style={[styles.recordInner, recording && styles.recordingInner]} />
           </Pressable>
+          <Text style={styles.holdHint}>{mode === "VIDEO" ? (recording ? "Release to stop" : "Hold to record") : "Tap to capture"}</Text>
 
           <Pressable style={styles.sideAction} onPress={() => setEffect(EFFECTS[(EFFECTS.indexOf(effect) + 1) % EFFECTS.length])}>
             <Icon name="wand.and.stars" size={27} /><Text style={styles.sideText}>Effects</Text>
@@ -336,6 +350,7 @@ const styles = StyleSheet.create({
   captureRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:30},
   sideAction:{width:78,alignItems:"center",justifyContent:"center"},
   sideText:{color:"#fff",fontSize:12,fontWeight:"900",marginTop:4},
+  holdHint:{position:"absolute",bottom:92,color:"rgba(255,255,255,.82)",fontSize:10,fontWeight:"800"},
   recordOuter:{width:84,height:84,borderRadius:42,borderWidth:5,borderColor:"#fff",alignItems:"center",justifyContent:"center"},
   recordInner:{width:66,height:66,borderRadius:33,backgroundColor:"#fe2c55"},
   recordingOuter:{borderColor:"#fff"},
