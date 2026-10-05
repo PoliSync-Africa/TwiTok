@@ -66,7 +66,7 @@ const ICONS: Record<string, { ios: string; android: string; web: string }> = {
 
 function Icon({ name, size = 23, color = "#fff" }: { name: string; size?: number; color?: string }) {
   const icon = ICONS[name] ?? ICONS.message;
-  return <SymbolView name={icon} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+  return <SymbolView name={icon as any} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
 }
 
 function initials(user?: Conversation["otherUser"]) {
