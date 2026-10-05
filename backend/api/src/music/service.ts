@@ -43,7 +43,9 @@ export async function searchSounds(db: Db, q: string, countryCode?: string, limi
   // Community tracks are not marked as commercially licensed by TwiTok.
   try {
     const params = new URLSearchParams({ query: q.trim() || "trending", limit: String(Math.min(limit, 20)) });
-    const response = await fetch("https://api.audius.co/v1/tracks/search?" + params.toString());
+    const baseUrl = (process.env.AUDIUS_API_BASE_URL ?? "https://api.audius.co/v1").replace(/\/$/, "");
+    const apiKey = process.env.AUDIUS_API_KEY;
+    const response = await fetch(baseUrl + "/tracks/search?" + params.toString(), { headers: apiKey ? { "X-API-Key": apiKey } : undefined });
     if (!response.ok) return local;
     const payload = await response.json() as any;
     const tracks = Array.isArray(payload?.data) ? payload.data : [];
