@@ -35,9 +35,9 @@ const demoLocations = [
 ];
 
 const tabs = [
-  { label: "You", surface: "FOR_YOU" },
   { label: "Following", surface: "FOLLOWING" },
-  { label: "Explore Africa", surface: "AFRICA" }
+  { label: "For You", surface: "FOR_YOU" },
+  { label: "Community", surface: "AFRICA" }
 ] as const;
 
 export default function Home() {
@@ -299,7 +299,7 @@ export default function Home() {
         <Link href="/">⌂ <span>Home</span></Link>
         <Link href="/discover">⌕ <span>Discover</span></Link>
         <Link href="/live">◉ <span>LIVE</span></Link>
-        <Link href="/creator/studio">▣ <span>Creator Studio</span></Link>
+        <Link href="/creator/studio">▣ <span>Studio</span></Link>
         <Link href="/inbox">✉ <span>Inbox</span></Link>
       </nav>
       <div className="rail-bottom"><Link className="primary" href="/create">＋ Create</Link><small>Global social video</small></div>
@@ -409,10 +409,10 @@ export default function Home() {
     </div>}
     <nav className="mobile-nav" aria-label="Primary navigation">
       <Link href="/" className="mobile-nav-item active"><span>⌂</span><small>Home</small></Link>
-      <Link href="/discover" className="mobile-nav-item"><span>⌕</span><small>Explore</small></Link>
+      <Link href="/discover" className="mobile-nav-item"><span>♟</span><small>Friends</small></Link>
       <Link href="/create" className="mobile-create"><span>＋</span><small>Create</small></Link>
       <Link href="/inbox" className="mobile-nav-item"><span>✉</span><small>Inbox</small></Link>
-      <Link href="/creator/studio" className="mobile-nav-item"><span>◉</span><small>Studio</small></Link>
+      <Link href="/profile" className="mobile-nav-item"><span>♙</span><small>Profile</small></Link>
     </nav>
   </main>;
 }
