@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import { CameraView, getCameraPermissionsAsync, getMicrophonePermissionsAsync, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Effect = "NONE" | "VIBRANT" | "WARM" | "COOL" | "NOIR" | "VINTAGE";
@@ -83,9 +83,27 @@ export default function CameraStudioScreen() {
     }
   }, [mode, microphonePermission?.granted]);
 
+  useEffect(() => {
+    const refreshPermissions = async () => {
+      try {
+        const [camera, microphone] = await Promise.all([
+          getCameraPermissionsAsync(),
+          getMicrophonePermissionsAsync()
+        ]);
+        if (!camera.granted && camera.canAskAgain) void requestCameraPermission();
+        if (mode === "VIDEO" && !microphone.granted && microphone.canAskAgain) void requestMicrophonePermission();
+      } catch {}
+    };
+    void refreshPermissions();
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") void refreshPermissions();
+    });
+    return () => subscription.remove();
+  }, [mode]);
+
   async function startRecording() {
     if (recording || countdown !== null || !cameraRef.current || mode !== "VIDEO") return;
-    if (!microphonePermission?.granted) { setError("Microphone access is needed for video recording."); return; }
+    
     if (!holdRef.current) return;
     setError("");
     if (timer > 0) {
@@ -181,17 +199,15 @@ export default function CameraStudioScreen() {
   }
 
   const cameraBlocked = !cameraPermission?.granted;
-  const microphoneBlocked = mode === "VIDEO" && !microphonePermission?.granted;
+  
 
-  if (cameraBlocked || microphoneBlocked) {
+  if (cameraBlocked) {
     return (
       <View style={styles.permission}>
         <View style={styles.permissionIcon}><Icon name={cameraBlocked ? "camera.fill" : "mic.fill"} size={34} /></View>
-        <Text style={styles.permissionTitle}>{cameraBlocked ? "Camera access" : "Microphone access"}</Text>
+        <Text style={styles.permissionTitle}>Camera access</Text>
         <Text style={styles.permissionText}>
-          {cameraBlocked
-            ? "TwiTok needs camera access to create videos and photos."
-            : "TwiTok needs microphone access to record video with sound."}
+          TwiTok needs camera access to create videos and photos.
         </Text>
         <Pressable
           style={styles.primary}
@@ -202,7 +218,7 @@ export default function CameraStudioScreen() {
                 const result = await requestCameraPermission();
                 if (!result.granted) return;
               }
-              if (mode === "VIDEO" && microphoneBlocked) {
+              if (mode === "VIDEO" && !microphonePermission?.granted) {
                 await requestMicrophonePermission();
               }
             } catch (e) {
@@ -235,7 +251,7 @@ export default function CameraStudioScreen() {
         facing={facing}
         mode={mode === "PHOTO" ? "picture" : "video"}
         flash={flash}
-        mute={muted}
+        mute={muted || (mode === "VIDEO" && !microphonePermission?.granted)}
         zoom={zoom}
         mirror={facing === "front"}
         videoQuality="1080p"
