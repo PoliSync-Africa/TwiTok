@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { rateLimit as expressRateLimit } from "express-rate-limit";
+import { rateLimit as expressRateLimit, ipKeyGenerator } from "express-rate-limit";
 
 export const analyticsRouter = Router();
 
@@ -10,7 +10,7 @@ const analyticsReadLimit = expressRateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: req => req.userId?.toHexString() ?? req.ip ?? "unknown"
+  keyGenerator: req => req.userId?.toHexString() ?? ipKeyGenerator(req.ip ?? "unknown")
 });
 
 analyticsRouter.get("/creator/overview", requireUser, analyticsReadLimit, async (req, res) => {
