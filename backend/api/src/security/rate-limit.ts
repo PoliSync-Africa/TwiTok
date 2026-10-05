@@ -11,7 +11,7 @@ function cleanup(now: number) {
 }
 
 export function getClientIp(req: Request): string {
-  const raw = req.ip ?? req.socket.remoteAddress ?? "unknown";
+  const raw = req.ip ?? req.socket?.remoteAddress ?? "unknown";
   return raw !== "unknown" ? ipKeyGenerator(raw) : "unknown";
 }
 
