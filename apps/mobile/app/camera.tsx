@@ -85,7 +85,7 @@ export default function CameraStudioScreen() {
   }
 
   async function uploadFromGallery() {
-    const mediaTypes = mode === "PHOTO" ? ["images"] : ["videos"];
+    const mediaTypes = mode === "PHOTO" ? "images" : "videos";
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes,
       allowsMultipleSelection: mode === "PHOTO",
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   camera:{flex:1},
   permission:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:28},
   permissionTitle:{color:"#fff",fontSize:28,fontWeight:"900",marginBottom:10},
-  permissionText:{color:"#aaa",textAlign:"center",lineHeight:21,marginBottom:24,textAlign:"center"},
+  permissionText:{color:"#aaa",textAlign:"center",lineHeight:21,marginBottom:24},
   primary:{backgroundColor:"#fe2c55",paddingHorizontal:20,paddingVertical:14,borderRadius:24},
   primaryText:{color:"#fff",fontWeight:"900"},
   cancel:{color:"#aaa",fontWeight:"800",padding:20},
