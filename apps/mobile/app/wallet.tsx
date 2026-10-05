@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { Colors, Typography } from "../theme/typography";
 import { getAuthToken } from "../lib/auth";
 import { configureRevenueCat, getCoinPackages, purchaseCoinPackage } from "../lib/revenuecat";
 import type { PurchasesPackage } from "react-native-purchases";
@@ -11,6 +12,7 @@ type Wallet = { coinBalance?: number; diamondBalance?: number; cashBalanceUsd?: 
 type Gift = { giftName: string; quantity: number; coinsSpent: number; diamondsAwarded: number; createdAt?: string };
 type Withdrawal = { withdrawalId: string; amountUsd: number; payoutAmount: number; payoutCurrency: string; type: string; status: string; createdAt?: string };
 type CoinPackage = { sku: string; coins: number; priceUsd: number };
+const GIFT_CATALOG=[["🌹","Rose","1"],["💖","Heart","5"],["👏","Clap","10"],["🧵","Kente","50"],["🥁","Golden Drum","100"],["👑","Royal Crown","500"],["🦁","Golden Lion","1,000"],["💎","Diamond Kingdom","5,000"],["🧢","TwiTok Cap","100,000"],["💸","Money Gun","500,000"],["💍","Wedding Rings","1,000,000"],["👼","Flying Angel","2,000,000"],["🛥️","Luxury Yacht","5,000,000"],["✈️","Private Jet","10,000,000"],["🏡","Luxury Mansion","20,000,000"],["🏎️","Super Car","30,000,000"]];
 
 export default function WalletScreen() {
   const [wallet,setWallet]=useState<Wallet>({});
@@ -186,6 +188,9 @@ export default function WalletScreen() {
       <Pressable style={styles.buyCard} disabled={purchasing} onPress={()=>void buyCoins()}>
         <View><Text style={styles.buyTitle}>{purchasing?"Processing…":"Buy Coins"}</Text><Text style={styles.buySub}>Apple App Store / Google Play</Text></View><Text style={styles.arrow}>›</Text>
       </Pressable>
+      <View style={styles.giftHeader}><View><Text style={styles.giftTitle}>🎁 TwiTok Gifts</Text><Text style={styles.giftSub}>Support creators • Stand out • Celebrate</Text></View><Pressable style={styles.coinPill} onPress={()=>void buyCoins()}><Text style={styles.coinPillText}>🪙 {Math.floor(wallet.coinBalance??0).toLocaleString()} +</Text></Pressable></View>
+      <Text style={styles.giftCategory}>Popular Gifts</Text>
+      <View style={styles.giftGrid}>{GIFT_CATALOG.map(([icon,name,price])=><Pressable key={name} style={styles.giftCard} onPress={()=>void buyCoins()}><Text style={styles.giftIcon}>{icon}</Text><Text style={styles.giftName}>{name}</Text><Text style={styles.giftPrice}>🪙 {price}</Text></Pressable>)}</View>
       <Section title="Recent gifts">
         {gifts.length?gifts.map((g,i)=><View style={styles.row} key={i}><View><Text style={styles.rowTitle}>{g.giftName} × {g.quantity}</Text><Text style={styles.rowSub}>{g.createdAt?new Date(g.createdAt).toLocaleString():""}</Text></View><Text style={styles.positive}>+{Number(g.diamondsAwarded).toFixed(2)} ♦</Text></View>):<Text style={styles.empty}>No gifts received yet.</Text>}
       </Section>
@@ -209,6 +214,7 @@ function Section({title,children}:{title:string;children:React.ReactNode}){retur
 function Field(props:React.ComponentProps<typeof TextInput>){return <TextInput {...props} placeholderTextColor="#777" style={styles.input}/>}
 
 const styles=StyleSheet.create({
+ giftHeader:{marginHorizontal:16,marginTop:8,marginBottom:10,padding:15,borderRadius:16,borderWidth:1,borderColor:Colors.border,backgroundColor:"#0d0d0d",flexDirection:"row",alignItems:"center",justifyContent:"space-between"},giftTitle:{color:Colors.text,...Typography.section},giftSub:{color:Colors.textSecondary,...Typography.caption,marginTop:3},coinPill:{backgroundColor:"#211907",borderWidth:1,borderColor:Colors.gold,borderRadius:18,paddingHorizontal:12,paddingVertical:8},coinPillText:{color:Colors.gold,...Typography.captionMedium},giftCategory:{color:Colors.gold,...Typography.section,marginHorizontal:16,marginTop:6,marginBottom:8},giftGrid:{flexDirection:"row",flexWrap:"wrap",paddingHorizontal:12,gap:8},giftCard:{width:"23.5%",minHeight:108,borderRadius:12,borderWidth:1,borderColor:Colors.border,backgroundColor:Colors.surface,alignItems:"center",justifyContent:"center",padding:7},giftIcon:{fontSize:34},giftName:{color:Colors.text,...Typography.captionMedium,textAlign:"center",marginTop:5},giftPrice:{color:Colors.gold,fontSize:11,fontWeight:"800",marginTop:4},
  screen:{flex:1,backgroundColor:"#000"},center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center"},
  header:{height:58,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"#222"},back:{color:"#fff",fontSize:40},title:{color:"#fff",fontSize:18,fontWeight:"900"},refresh:{color:"#fff",fontSize:28},
  content:{padding:16,paddingBottom:40},hero:{backgroundColor:"#171717",borderRadius:20,padding:24,borderWidth:1,borderColor:"#292929",marginBottom:12},heroLabel:{color:"#999",fontSize:11,fontWeight:"900",letterSpacing:1.5},heroCash:{color:"#fff",fontSize:38,fontWeight:"900",marginTop:7},heroHint:{color:"#888",marginTop:5},
