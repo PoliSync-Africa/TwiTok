@@ -86,7 +86,7 @@ export default function CreatePage() {
   const cameraChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); }, [preview]);
-  // iPhone/Safari camera permission is requested from an explicit user action.
+  useEffect(() => { if (step !== "SELECT" || cameraActive || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return; void openBrowserCamera(); }, [step]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
 
   useEffect(() => () => { soundAudioRef.current?.pause(); }, []);
