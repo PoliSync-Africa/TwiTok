@@ -13,15 +13,26 @@ type Mode = "VIDEO" | "PHOTO" | "TEXT";
 
 const EFFECTS: Effect[] = ["NONE", "VIBRANT", "WARM", "COOL", "NOIR", "VINTAGE"];
 
+const ICONS: Record<string, { ios: string; android: string; web: string }> = {
+  "camera.fill": { ios: "camera.fill", android: "camera_alt", web: "camera_alt" },
+  "mic.fill": { ios: "mic.fill", android: "mic", web: "mic" },
+  xmark: { ios: "xmark", android: "close", web: "close" },
+  "music.note": { ios: "music.note", android: "music_note", web: "music_note" },
+  "camera.rotate": { ios: "camera.rotate", android: "flip_camera_android", web: "flip_camera_android" },
+  "arrow.triangle.2.circlepath.camera": { ios: "arrow.triangle.2.circlepath.camera", android: "flip_camera_android", web: "flip_camera_android" },
+  "wand.and.stars": { ios: "wand.and.stars", android: "auto_awesome", web: "auto_awesome" },
+  "speaker.slash.fill": { ios: "speaker.slash.fill", android: "volume_off", web: "volume_off" },
+  "speaker.wave.2.fill": { ios: "speaker.wave.2.fill", android: "volume_up", web: "volume_up" },
+  timer: { ios: "timer", android: "timer", web: "timer" },
+  "bolt.slash": { ios: "bolt.slash", android: "flash_off", web: "flash_off" },
+  "bolt.fill": { ios: "bolt.fill", android: "flash_on", web: "flash_on" },
+  grid: { ios: "grid", android: "grid_4x4", web: "grid_4x4" },
+  "photo.on.rectangle": { ios: "photo.on.rectangle", android: "photo_library", web: "photo_library" },
+};
+
 function Icon({ name, size = 24, color = "#fff" }: { name: string; size?: number; color?: string }) {
-  return (
-    <SymbolView
-      name={{ ios: name, android: name, web: name }}
-      tintColor={color}
-      size={size}
-      fallback={<Text style={{ color, fontSize: size, lineHeight: size }}>•</Text>}
-    />
-  );
+  const icon = ICONS[name] ?? { ios: "circle", android: "circle", web: "circle" };
+  return <SymbolView name={icon} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size, lineHeight: size }}>•</Text>} />;
 }
 
 export default function CameraStudioScreen() {
