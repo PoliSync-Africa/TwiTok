@@ -30,7 +30,7 @@ export default function ProfilePage() {
     (async () => {
       try {
         const token = localStorage.getItem("twitok_user_token");
-        if (!token) throw new Error("Sign in to view your profile.");
+        if (!token) throw new Error("SIGN_IN_REQUIRED");
         const me = await fetch(API + "/auth/me", { headers: { Authorization: "Bearer " + token } });
         const md = await me.json().catch(() => ({}));
         if (!me.ok || !md.user?.username) throw new Error(md.error ?? "Profile setup is incomplete.");
@@ -49,7 +49,7 @@ export default function ProfilePage() {
   }, []);
 
   if (loading) return <main className="profile-page"><div className="profile-card">Loading profile…</div></main>;
-  if (error || !profile) return <main className="profile-page"><div className="profile-card"><p>{error || "Profile unavailable."}</p><Link href="/">Back to TwiTok</Link></div></main>;
+  if (error || !profile) return <main className="profile-page"><div className="profile-card"><p>{error === "SIGN_IN_REQUIRED" ? "Sign in to view your profile." : (error || "Profile unavailable.")}</p>{error === "SIGN_IN_REQUIRED" ? <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:14}}><Link href="/register">Sign up</Link><Link href="/login">Sign in</Link></div> : null}<Link href="/">Back to TwiTok</Link></div></main>;
 
   return <main className="profile-page">
     <section className="profile-shell">
@@ -61,7 +61,7 @@ export default function ProfilePage() {
         </div>
         <div className="profile-stats"><span><b>{profile.following}</b><small>Following</small></span><span><b>{profile.followers}</b><small>Followers</small></span><span><b>{profile.likes}</b><small>Likes</small></span></div>
         {profile.bio ? <p className="profile-bio">{profile.bio}</p> : null}
-        <div className="profile-actions"><Link href="/edit-profile" className="profile-primary">Edit profile</Link><Link href="/create" className="profile-secondary">Create</Link><button className="profile-secondary" onClick={() => { navigator.clipboard?.writeText(window.location.href); }}>Share</button></div>
+        <div className="profile-actions"><Link href="/edit-profile" className="profile-primary">Edit profile</Link><Link href="/create" className="profile-secondary">Create</Link><button className="profile-secondary" onClick={() => { navigator.clipboard?.writeText(window.location.href); }}>Share</button><button className="profile-secondary" onClick={async () => { await fetch(API+"/auth/logout",{method:"POST",credentials:"include"}).catch(()=>{}); localStorage.removeItem("twitok_user_token"); window.location.href="/"; }}>Sign out</button></div>
       </div>
       <nav className="profile-tabs">
         {(["videos","reposts","liked","saved"] as const).map(key => <button key={key} className={tab === key ? "active" : ""} onClick={() => { setTab(key); void loadVideos(profile.username, key); }}>{key === "videos" ? "Posts" : key[0].toUpperCase() + key.slice(1)}</button>)}
