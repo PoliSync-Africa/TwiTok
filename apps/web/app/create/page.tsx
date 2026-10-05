@@ -86,7 +86,6 @@ export default function CreatePage() {
   const cameraChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); }, [preview]);
-  useEffect(() => { if (step !== "SELECT" || cameraActive || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return; void openBrowserCamera(); }, [step]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
 
   useEffect(() => () => { soundAudioRef.current?.pause(); }, []);
@@ -280,7 +279,7 @@ export default function CreatePage() {
       setCameraActive(false);
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "SecurityError") {
-        setMessage("Camera permission is blocked. Allow Camera for twitokapp.com in Safari, then tap Enable camera to retry.");
+        setMessage("Camera permission is blocked. Allow Camera for twitokapp.com in your browser settings, then tap Enable camera to retry.");
       } else if (name === "NotFoundError") {
         setMessage("No camera was found on this device.");
       } else {
@@ -456,7 +455,7 @@ export default function CreatePage() {
           ) : (
             <div className="camera-create">
               <div className="camera-stage">
-                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Tap Enable camera to give Safari permission, or upload a video.</small><button type="button" className="camera-enable" onClick={() => void openBrowserCamera()}>Enable camera</button></div>}
+                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Tap Enable camera to give Chrome permission, or upload a video.</small><button type="button" className="camera-enable" onClick={() => void openBrowserCamera()}>Enable camera</button></div>}
                 <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
                 <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
                 <div className="camera-side-tools">
