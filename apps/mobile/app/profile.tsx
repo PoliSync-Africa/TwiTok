@@ -2,16 +2,14 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { getAuthToken } from "../lib/auth";
-import { Colors, Typography } from "../theme/typography";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
-
 type Video = { id:string; thumbnail?:string|null; playback?:string|null; caption?:string; status?:string };
 type Profile = { id:string; username:string; nickname?:string; bio?:string; countryCode?:string; followers:number; following:number; likes:number; isFollowing:boolean; followPending:boolean; isPrivate:boolean; isVerified?:boolean; verificationType?:string|null; profilePhotoUrl?:string|null };
 
 export default function ProfileScreen() {
   const { username: requestedUsername } = useLocalSearchParams<{username?:string}>();
-  const [username, setUsername] = useState<string | null>(requestedUsername ? String(requestedUsername) : null);
+  const [username,setUsername]=useState<string|null>(requestedUsername?String(requestedUsername):null);
   const [profile,setProfile]=useState<Profile|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
@@ -20,95 +18,118 @@ export default function ProfileScreen() {
   const [activeTab,setActiveTab]=useState<"videos"|"reposts"|"saved"|"liked"|"drafts">("videos");
   const [viewerId,setViewerId]=useState("");
 
-  async function load() {
-    try {
+  async function load(){
+    try{
       const token=await getAuthToken();
-      let target = username;
-      if (!target) {
-        if (!token) throw new Error("Sign in required");
-        const me = await fetch(API+"/auth/me",{headers:{Authorization:"Bearer "+token}});
-        const md = await me.json().catch(()=>({}));
-        target = md.user?.username ? String(md.user.username) : null;
-        if (!target) throw new Error("Profile setup is incomplete");
+      let target=username;
+      if(!target){
+        if(!token)throw new Error("Sign in required");
+        const me=await fetch(API+"/auth/me",{headers:{Authorization:"Bearer "+token}});
+        const md=await me.json().catch(()=>({}));
+        target=md.user?.username?String(md.user.username):null;
+        if(!target)throw new Error("Profile setup is incomplete");
         setUsername(target);
       }
       const r=await fetch(API+"/profile/"+encodeURIComponent(target),{headers:token?{Authorization:"Bearer "+token}:{}});
       const d=await r.json().catch(()=>({}));
-      if(!r.ok) throw new Error(d.error??"Profile unavailable");
+      if(!r.ok)throw new Error(d.error??"Profile unavailable");
       setProfile(d.profile);
       const me=await fetch(API+"/auth/me",{headers:token?{Authorization:"Bearer "+token}:{}});
-      const md=await me.json().catch(()=>({})); setViewerId(md.user?._id?.toString?.() || md.user?.id || "");
-      const vr=await fetch(API+"/profile/"+encodeURIComponent(String(username))+"/videos",{headers:token?{Authorization:"Bearer "+token}:{}});
-      const vd=await vr.json().catch(()=>({})); if(vr.ok) setVideos(vd.videos??[]);
-    } catch(e){setError(e instanceof Error?e.message:"Profile unavailable");}
+      const md=await me.json().catch(()=>({}));setViewerId(md.user?._id?.toString?.()||md.user?.id||"");
+      const vr=await fetch(API+"/profile/"+encodeURIComponent(target)+"/videos",{headers:token?{Authorization:"Bearer "+token}:{}});
+      const vd=await vr.json().catch(()=>({}));if(vr.ok)setVideos(vd.videos??[]);
+    }catch(e){setError(e instanceof Error?e.message:"Profile unavailable");}
     finally{setLoading(false);}
   }
-  useEffect(()=>{load();},[username]);
+  useEffect(()=>{void load();},[username]);
 
-  async function follow() {
-    if(!profile||busy) return;
+  async function follow(){
+    if(!profile||busy)return;
     setBusy(true);
-    try {
-      const token=await getAuthToken();
-      if(!token) throw new Error("Sign in required");
+    try{
+      const token=await getAuthToken();if(!token)throw new Error("Sign in required");
       const method=profile.isFollowing?"DELETE":"POST";
       const r=await fetch(API+"/profile/"+encodeURIComponent(profile.username)+"/follow",{method,headers:{Authorization:"Bearer "+token}});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok) throw new Error(d.error??"Unable to update follow");
+      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error??"Unable to update follow");
       setProfile(p=>p?{...p,isFollowing:Boolean(d.following),followPending:Boolean(d.pending),followers:p.followers+(d.following?1:p.isFollowing?-1:0)}:p);
-    } catch(e){setError(e instanceof Error?e.message:"Unable to update follow");}
+    }catch(e){setError(e instanceof Error?e.message:"Unable to update follow");}
     finally{setBusy(false);}
   }
 
-  async function publishDraft(videoId:string) {
-    if (busy) return;
+  async function publishDraft(videoId:string){
+    if(busy)return;
     setBusy(true);
-    try {
-      const token=await getAuthToken();
-      if(!token) throw new Error("Sign in required");
+    try{
+      const token=await getAuthToken();if(!token)throw new Error("Sign in required");
       const r=await fetch(API+"/video/"+encodeURIComponent(videoId)+"/publish",{method:"POST",headers:{Authorization:"Bearer "+token}});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok) throw new Error(d.error??"Unable to publish draft");
-      setVideos(items=>items.filter(item=>item.id!==videoId));
-      Alert.alert("Published","Your draft is now live.");
-    } catch(e) {
-      Alert.alert("Draft","Unable to publish this draft.",[{text:e instanceof Error?e.message:"Try again"}]);
-    } finally { setBusy(false); }
+      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error??"Unable to publish draft");
+      setVideos(items=>items.filter(item=>item.id!==videoId));Alert.alert("Published","Your draft is now live.");
+    }catch(e){Alert.alert("Draft",e instanceof Error?e.message:"Unable to publish this draft.");}
+    finally{setBusy(false);}
   }
 
-  if(loading) return <View style={styles.center}><ActivityIndicator color="#fff"/></View>;
-  if(error||!profile) return <View style={styles.center}><Text style={styles.error}>{error||"Profile unavailable"}</Text><Pressable onPress={()=>router.back()}><Text style={styles.link}>Go back</Text></Pressable></View>;
+  async function loadTab(tab:typeof activeTab){
+    setActiveTab(tab);
+    try{
+      const token=await getAuthToken();
+      const endpoint=tab==="videos"?"videos":tab==="reposts"?"reposts":tab==="liked"?"liked":tab==="saved"?"saved":"drafts";
+      const r=await fetch(API+"/profile/"+encodeURIComponent(String(username))+"/"+endpoint,{headers:token?{Authorization:"Bearer "+token}:{}});
+      const d=await r.json().catch(()=>({}));if(r.ok)setVideos(d.videos??[]);
+    }catch{}
+  }
+
+  if(loading)return <View style={styles.center}><ActivityIndicator color="#fff"/></View>;
+  if(error||!profile)return <View style={styles.center}><Text style={styles.error}>{error||"Profile unavailable"}</Text><Pressable onPress={()=>router.back()}><Text style={styles.link}>Go back</Text></Pressable></View>;
+
+  const own=viewerId===profile.id;
+  const tabs=own?["videos","reposts","liked","saved","drafts"] as const:["videos","reposts"] as const;
 
   return <View style={styles.screen}>
-    <View style={styles.header}><Pressable onPress={()=>router.back()}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.headerTitle}>Profile</Text><View style={{width:32}}/></View>
+    <View style={styles.topBar}>
+      <Pressable onPress={()=>router.back()} style={styles.topIcon}><Text style={styles.topIconText}>‹</Text></Pressable>
+      <Text style={styles.topTitle}>Profile</Text>
+      <View style={styles.topRight}><Pressable style={styles.topIcon}><Text style={styles.topIconText}>♧</Text></Pressable><Pressable style={styles.topIcon}><Text style={styles.topIconText}>↗</Text></Pressable></View>
+    </View>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.avatar}>{profile.profilePhotoUrl?<Image source={{uri:profile.profilePhotoUrl}} style={styles.avatarImage}/>:<Text style={styles.avatarText}>{(profile.nickname||profile.username||"?").slice(0,1).toUpperCase()}</Text>}</View>
-      <View style={styles.nameRow}><Text style={styles.nickname}>{profile.nickname||profile.username}</Text>{profile.isVerified&&<View style={styles.verifiedBadge}><Text style={styles.verifiedBadgeCheck}>✓</Text></View>}</View>
-      <Text style={styles.username}>@{profile.username}</Text>
-      {viewerId===profile.id&&<Pressable style={styles.verifyButton} onPress={()=>router.push("/verification")}><Text style={styles.verifyText}>Get verified</Text></Pressable>}{viewerId===profile.id&&<Pressable style={styles.editButton} onPress={()=>router.push({pathname:"/edit-profile",params:{username:profile.username,nickname:profile.nickname??"",bio:profile.bio??"",isPrivate:String(profile.isPrivate)}})}><Text style={styles.editText}>Edit profile</Text></Pressable>}
-      {!!profile.bio&&<Text style={styles.bio}>{profile.bio}</Text>}
-      <View style={styles.stats}><View><Text style={styles.stat}>{profile.followers}</Text><Text style={styles.statLabel}>Followers</Text></View><View><Text style={styles.stat}>{profile.following}</Text><Text style={styles.statLabel}>Following</Text></View><View><Text style={styles.stat}>{profile.likes}</Text><Text style={styles.statLabel}>Likes</Text></View></View>
-      {viewerId!==profile.id&&<Pressable onPress={follow} disabled={busy} style={[styles.followButton,profile.isFollowing&&styles.followingButton,profile.followPending&&styles.pendingButton]}>
-        {busy?<ActivityIndicator color="#fff" size="small"/>:<Text style={styles.followText}>{profile.isFollowing?"Following":profile.followPending?"Requested":"Follow"}</Text>}
-      </Pressable>}
-      {profile.isPrivate&&!profile.isFollowing?<Text style={styles.private}>This account is private. Follow to see their content.</Text>:<Text style={styles.private}>Creator profile</Text>}
-      <View style={styles.tabs}>
-        {(["videos","reposts",...(viewerId===profile?.id?["liked" as const,"saved" as const,"drafts" as const]:[])] as const).map(tab=><Pressable key={tab} style={[styles.tab,activeTab===tab&&styles.tabActive]} onPress={async()=>{
-          setActiveTab(tab);
-          try {
-            const token=await getAuthToken();
-            const endpoint=tab==="videos"?"videos":tab==="reposts"?"reposts":tab==="liked"?"liked":tab==="saved"?"saved":"drafts";
-            const r=await fetch(API+"/profile/"+encodeURIComponent(String(username))+"/"+endpoint,{headers:token?{Authorization:"Bearer "+token}:{}});
-            const d=await r.json().catch(()=>({}));
-            if(r.ok) setVideos(d.videos??[]);
-          } catch {}
-        }}><Text style={[styles.tabText,activeTab===tab&&styles.tabTextActive]}>{tab==="videos"?"Videos":tab==="reposts"?"Reposts":tab==="liked"?"Liked":tab==="saved"?"Saved":"Drafts"}</Text></Pressable>)}
+      <View style={styles.identityRow}>
+        <View style={styles.identityCopy}>
+          <View style={styles.nameLine}><Text style={styles.nickname}>{profile.nickname||profile.username}</Text>{profile.isVerified&&<View style={styles.verified}><Text style={styles.verifiedText}>✓</Text></View>}</View>
+          <Text style={styles.username}>@{profile.username}</Text>
+          <View style={styles.stats}>
+            <View><Text style={styles.stat}>{profile.following}</Text><Text style={styles.statLabel}>Following</Text></View>
+            <View><Text style={styles.stat}>{profile.followers}</Text><Text style={styles.statLabel}>Followers</Text></View>
+            <View><Text style={styles.stat}>{profile.likes}</Text><Text style={styles.statLabel}>Likes</Text></View>
+          </View>
+        </View>
+        <View style={styles.avatar}>{profile.profilePhotoUrl?<Image source={{uri:profile.profilePhotoUrl}} style={styles.avatarImage}/>:<Text style={styles.avatarText}>{(profile.nickname||profile.username||"?").slice(0,1).toUpperCase()}</Text>}</View>
       </View>
-      <View style={styles.grid}>{videos.map(v=><View key={v.id} style={styles.gridItem}>{v.thumbnail?<Image source={{uri:v.thumbnail}} style={styles.gridImage}/>:<View style={styles.gridFallback}><Text style={styles.gridFallbackText}>{activeTab==="drafts"?"✎":"▶"}</Text></View>}{activeTab==="drafts"?<View style={styles.draftOverlay}><Text style={styles.draftStatus}>{v.status==="PROCESSING"?"Processing":"Draft"}</Text><Pressable style={styles.publishDraftButton} onPress={()=>publishDraft(v.id)} disabled={busy}><Text style={styles.publishDraftText}>Publish</Text></Pressable></View>:<Pressable style={styles.gridTap} onPress={()=>v.playback&&router.push({pathname:"/feed",params:{videoId:v.id}})}/>}</View>)}</View>
+
+      {own ? <View style={styles.actionRow}><Pressable style={styles.editButton} onPress={()=>router.push({pathname:"/edit-profile",params:{username:profile.username,nickname:profile.nickname??"",bio:profile.bio??"",isPrivate:String(profile.isPrivate)}})}><Text style={styles.editText}>Edit profile</Text></Pressable><Pressable style={styles.iconButton} onPress={()=>router.push("/verification")}><Text style={styles.actionIcon}>✓</Text></Pressable><Pressable style={styles.iconButton}><Text style={styles.actionIcon}>⚙</Text></Pressable></View>
+      : <View style={styles.actionRow}><Pressable style={styles.followButton} onPress={follow} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.followText}>{profile.isFollowing?"Following":profile.followPending?"Requested":"Follow"}</Text>}</Pressable><Pressable style={styles.messageButton} onPress={()=>router.push({pathname:"/messages",params:{username:profile.username}})}><Text style={styles.messageText}>Message</Text></Pressable><Pressable style={styles.iconButton}><Text style={styles.actionIcon}>＋</Text></Pressable></View>}
+
+      {!!profile.bio&&<Text style={styles.bio}>{profile.bio}</Text>}
+      <Pressable style={styles.livePill} onPress={()=>router.push("/live")}><Text style={styles.liveDot}>●</Text><Text style={styles.liveText}>LIVE</Text></Pressable>
+
+      <View style={styles.tabs}>
+        {tabs.map(tab=><Pressable key={tab} style={[styles.tab,activeTab===tab&&styles.tabActive]} onPress={()=>void loadTab(tab)}><Text style={styles.tabIcon}>{tab==="videos"?"▦":tab==="reposts"?"↻":tab==="liked"?"♡":tab==="saved"?"▣":"✎"}</Text></Pressable>)}
+      </View>
+
+      <View style={styles.grid}>{videos.map(v=><View key={v.id} style={styles.gridItem}>{v.thumbnail?<Image source={{uri:v.thumbnail}} style={styles.gridImage}/>:<View style={styles.gridFallback}><Text style={styles.gridFallbackText}>{activeTab==="drafts"?"✎":"▶"}</Text></View>}<Text style={styles.views}>▶  {v.status==="PROCESSING"?"Processing":"0"}</Text>{activeTab==="drafts"?<View style={styles.draftOverlay}><Text style={styles.draftStatus}>Draft</Text><Pressable style={styles.publishDraftButton} onPress={()=>publishDraft(v.id)} disabled={busy}><Text style={styles.publishDraftText}>Publish</Text></Pressable></View>:<Pressable style={styles.gridTap} onPress={()=>v.playback&&router.push({pathname:"/feed",params:{videoId:v.id}})}/>}</View>)}</View>
     </ScrollView>
   </View>;
 }
 
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:Colors.background},header:{height:66,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:Colors.border},back:{color:Colors.text,fontSize:40,lineHeight:40},headerTitle:{color:Colors.text,...Typography.section},content:{alignItems:"center",padding:20},avatar:{width:104,height:104,borderRadius:52,backgroundColor:Colors.surfaceRaised,borderWidth:2,borderColor:Colors.gold,alignItems:"center",justifyContent:"center",marginTop:14},avatarText:{color:Colors.gold,fontSize:38,fontWeight:"900"},avatarImage:{width:"100%",height:"100%",borderRadius:52},nameRow:{flexDirection:"row",alignItems:"center",gap:7,marginTop:14},nickname:{color:Colors.text,...Typography.title},verifiedBadge:{width:20,height:20,borderRadius:10,backgroundColor:Colors.verified,alignItems:"center",justifyContent:"center"},verifiedBadgeCheck:{color:"#fff",fontSize:12,fontWeight:"900"},username:{color:Colors.textSecondary,...Typography.body,marginTop:4},bio:{color:Colors.textSecondary,...Typography.body,textAlign:"center",lineHeight:21,marginTop:12,maxWidth:330},stats:{flexDirection:"row",gap:42,marginTop:24,marginBottom:22},stat:{color:Colors.text,...Typography.numeric,textAlign:"center"},statLabel:{color:Colors.textMuted,...Typography.caption,marginTop:3},followButton:{minWidth:190,height:46,borderRadius:12,backgroundColor:Colors.gold,alignItems:"center",justifyContent:"center"},followingButton:{backgroundColor:Colors.surface,borderWidth:1,borderColor:Colors.border},pendingButton:{backgroundColor:Colors.surface,borderWidth:1,borderColor:Colors.border},followText:{color:"#080808",fontWeight:"900"},private:{color:Colors.textMuted,...Typography.caption,textAlign:"center",marginTop:24},verifyButton:{marginTop:12,paddingHorizontal:24,height:40,borderRadius:12,backgroundColor:Colors.gold,alignItems:"center",justifyContent:"center"},verifyText:{color:"#080808",fontWeight:"900"},editButton:{marginTop:12,paddingHorizontal:24,height:40,borderRadius:12,borderWidth:1,borderColor:Colors.border,backgroundColor:Colors.surface,alignItems:"center",justifyContent:"center"},editText:{color:Colors.text,fontWeight:"800"},tabs:{width:"100%",flexDirection:"row",marginTop:28,borderTopWidth:1,borderTopColor:Colors.border},tab:{flex:1,alignItems:"center",paddingVertical:14,borderBottomWidth:3,borderBottomColor:"transparent"},tabActive:{borderBottomColor:Colors.gold},tabText:{color:Colors.textMuted,fontWeight:"800",fontSize:13},tabTextActive:{color:Colors.gold},grid:{width:"100%",flexDirection:"row",flexWrap:"wrap",gap:3,marginTop:0,borderTopWidth:1,borderTopColor:Colors.border,paddingTop:3},gridItem:{width:"32.7%",aspectRatio:.72,backgroundColor:Colors.surface},gridImage:{width:"100%",height:"100%"},gridFallback:{flex:1,alignItems:"center",justifyContent:"center"},gridFallbackText:{color:Colors.textMuted,fontSize:20},gridTap:{position:"absolute",top:0,bottom:0,left:0,right:0},draftOverlay:{position:"absolute",left:0,right:0,bottom:0,padding:6,backgroundColor:"rgba(0,0,0,.72)",gap:5},draftStatus:{color:Colors.text,fontSize:10,fontWeight:"800"},publishDraftButton:{backgroundColor:Colors.gold,borderRadius:6,paddingVertical:6,alignItems:"center"},publishDraftText:{color:"#080808",fontSize:11,fontWeight:"900"},center:{flex:1,backgroundColor:Colors.background,alignItems:"center",justifyContent:"center",padding:24},error:{color:Colors.danger,textAlign:"center",marginBottom:15},link:{color:Colors.gold,fontWeight:"800"}
+ screen:{flex:1,backgroundColor:"#000"},
+ topBar:{height:60,flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingHorizontal:14,borderBottomWidth:1,borderBottomColor:"rgba(255,255,255,.08)"},
+ topRight:{flexDirection:"row",gap:4},topIcon:{width:38,height:38,alignItems:"center",justifyContent:"center"},topIconText:{color:"#fff",fontSize:25},topTitle:{color:"#fff",fontSize:16,fontWeight:"800"},
+ content:{paddingTop:18,paddingBottom:40},
+ identityRow:{flexDirection:"row",justifyContent:"space-between",paddingHorizontal:16},
+ identityCopy:{flex:1,paddingRight:12},nameLine:{flexDirection:"row",alignItems:"center",gap:6},nickname:{color:"#fff",fontSize:30,fontWeight:"900",letterSpacing:-.8},verified:{width:19,height:19,borderRadius:10,backgroundColor:"#20b2aa",alignItems:"center",justifyContent:"center"},verifiedText:{color:"#fff",fontSize:11,fontWeight:"900"},username:{color:"rgba(255,255,255,.55)",fontSize:15,marginTop:3},
+ avatar:{width:96,height:96,borderRadius:48,backgroundColor:"#1b1b1b",borderWidth:2,borderColor:"rgba(255,255,255,.22)",alignItems:"center",justifyContent:"center",overflow:"hidden"},avatarImage:{width:"100%",height:"100%"},avatarText:{color:"#fff",fontSize:36,fontWeight:"900"},
+ stats:{flexDirection:"row",gap:24,marginTop:18},stat:{color:"#fff",fontSize:20,fontWeight:"900"},statLabel:{color:"rgba(255,255,255,.55)",fontSize:13,marginTop:2},
+ actionRow:{flexDirection:"row",gap:8,paddingHorizontal:16,marginTop:18},followButton:{flex:1,height:42,borderRadius:8,backgroundColor:"#fe2c55",alignItems:"center",justifyContent:"center"},followText:{color:"#fff",fontSize:15,fontWeight:"900"},messageButton:{flex:1,height:42,borderRadius:8,backgroundColor:"#2a2a2a",alignItems:"center",justifyContent:"center"},messageText:{color:"#fff",fontSize:15,fontWeight:"800"},editButton:{flex:1,height:42,borderRadius:8,borderWidth:1,borderColor:"rgba(255,255,255,.18)",backgroundColor:"#151515",alignItems:"center",justifyContent:"center"},editText:{color:"#fff",fontSize:15,fontWeight:"800"},iconButton:{width:42,height:42,borderRadius:9,backgroundColor:"#202020",alignItems:"center",justifyContent:"center"},actionIcon:{color:"#fff",fontSize:20,fontWeight:"800"},
+ bio:{color:"#fff",fontSize:15,lineHeight:21,paddingHorizontal:16,marginTop:14},livePill:{alignSelf:"flex-start",marginLeft:16,marginTop:14,flexDirection:"row",alignItems:"center",gap:6,borderWidth:1,borderColor:"rgba(255,255,255,.18)",borderRadius:20,paddingHorizontal:12,paddingVertical:7},liveDot:{color:"#fe2c55",fontSize:10},liveText:{color:"#fff",fontSize:13,fontWeight:"900"},
+ tabs:{marginTop:18,height:48,flexDirection:"row",justifyContent:"center",borderBottomWidth:1,borderBottomColor:"rgba(255,255,255,.08)"},tab:{width:70,alignItems:"center",justifyContent:"center",borderBottomWidth:2,borderBottomColor:"transparent"},tabActive:{borderBottomColor:"#fff"},tabIcon:{color:"rgba(255,255,255,.55)",fontSize:23},grid:{flexDirection:"row",flexWrap:"wrap",gap:2,padding:2},gridItem:{width:"32.95%",aspectRatio:.75,backgroundColor:"#111",position:"relative"},gridImage:{width:"100%",height:"100%"},gridFallback:{flex:1,alignItems:"center",justifyContent:"center"},gridFallbackText:{color:"#555",fontSize:24},gridTap:{position:"absolute",top:0,bottom:0,left:0,right:0},views:{position:"absolute",left:7,bottom:6,color:"#fff",fontSize:11,fontWeight:"800",textShadowColor:"#000",textShadowRadius:5},draftOverlay:{position:"absolute",left:0,right:0,bottom:0,padding:6,backgroundColor:"rgba(0,0,0,.72)"},draftStatus:{color:"#fff",fontSize:10,fontWeight:"800"},publishDraftButton:{marginTop:5;backgroundColor:"#fe2c55",borderRadius:6,paddingVertical:5,alignItems:"center"},publishDraftText:{color:"#fff",fontSize:10,fontWeight:"900"},
+ center:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:24},error:{color:"#ff7d96",textAlign:"center",marginBottom:15},link:{color:"#fff",fontWeight:"800"}
 });
