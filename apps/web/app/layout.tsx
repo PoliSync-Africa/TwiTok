@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "TwiTok — Africa's Video Platform",
+  title: "TwiTok — Global Social Video",
   description: "Our Stories • Our People • Our Culture • Our Future"
 };
 
