@@ -267,14 +267,14 @@ export default function CreatePage() {
 
       cameraStreamRef.current = stream;
       setCameraFacingMode(nextFacingMode);
+      if (cameraPreviewRef.current) {
+        cameraPreviewRef.current.srcObject = stream;
+        cameraPreviewRef.current.muted = true;
+        cameraPreviewRef.current.setAttribute("playsinline", "true");
+        try { await cameraPreviewRef.current.play(); } catch {}
+      }
       setCameraActive(true);
       setMessage("");
-      requestAnimationFrame(() => {
-        if (cameraPreviewRef.current) {
-          cameraPreviewRef.current.srcObject = stream;
-          void cameraPreviewRef.current.play().catch(() => undefined);
-        }
-      });
     } catch (error) {
       setCameraActive(false);
       const name = error instanceof DOMException ? error.name : "";
@@ -455,7 +455,7 @@ export default function CreatePage() {
           ) : (
             <div className="camera-create">
               <div className="camera-stage">
-                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Tap Enable camera to give Chrome permission, or upload a video.</small><button type="button" className="camera-enable" onClick={() => void openBrowserCamera()}>Enable camera</button></div>}
+                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Tap Enable camera to request permission. If permission was previously denied, allow Camera for this site in browser settings and try again.</small><button type="button" className="camera-enable" onClick={(event) => { event.preventDefault(); event.stopPropagation(); void openBrowserCamera(); }}>Enable camera</button></div>}
                 <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
                 <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
                 <div className="camera-side-tools">
