@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LiveKitRoom, VideoTrack, useRoomContext, useTracks } from "@livekit/react-native";
-import { Track, RoomEvent } from "livekit-client";
+import { Track } from "livekit-client";
 import { getAuthToken } from "../lib/auth";
 import { Colors, Typography } from "../theme/typography";
 
@@ -74,7 +74,7 @@ export default function LiveScreen() {
           .then(setStream)
           .catch(e => setError(e instanceof Error ? e.message : "Unable to start LIVE."));
       }}
-      onDisconnected={() => { if (stream?.status === "LIVE") void request("/live/streams/" + encodeURIComponent(stream.streamId) + "/status", { method: "POST", body: JSON.stringify({ status: "ENDED" })).catch(() => undefined); }}
+      onDisconnected={() => { if (stream?.status === "LIVE") void request("/live/streams/" + encodeURIComponent(stream.streamId) + "/status", { method: "POST", body: JSON.stringify({ status: "ENDED" }) }).catch(() => undefined); }}
     >
       <LiveBroadcastView stream={stream} onEnd={endLive} error={error} setError={setError} />
     </LiveKitRoom>
