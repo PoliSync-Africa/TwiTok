@@ -155,7 +155,7 @@ export default function CreatePage() {
   async function publishReadyVideo() {
     if (!videoId) return;
     const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return setMessage("Sign in to publish this video.");
+    if (!token) { window.location.href = "/login"; return; }
     try {
       setMessage("Publishing your video…");
       const response = await fetch(API + "/video/" + encodeURIComponent(videoId) + "/publish", { method: "POST", headers: { Authorization: "Bearer " + token } });
@@ -329,7 +329,7 @@ export default function CreatePage() {
 
   async function searchSounds() {
     const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return setMessage("Sign in to browse sounds.");
+    if (!token) { window.location.href = "/login"; return; }
     setSoundLoading(true);
     try {
       const url = API + "/music/sounds?q=" + encodeURIComponent(soundQuery);
@@ -385,7 +385,7 @@ export default function CreatePage() {
   async function publishDraft() {
     if (!file) return;
     const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) return setMessage("Sign in to TwiTok before creating a post.");
+    if (!token) { window.location.href = "/login"; return; }
 
     setStep("UPLOADING");
     setMessage("Preparing secure upload…");
