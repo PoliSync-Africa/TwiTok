@@ -157,7 +157,7 @@ export default function CreatePage() {
   async function publishReadyVideo() {
     if (!videoId) return;
     const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) { window.location.href = "/login"; return; }
+    if (!token) { window.location.href = "/auth-required?next=" + encodeURIComponent(window.location.pathname + window.location.search); return; }
     try {
       setMessage("Publishing your video…");
       const response = await fetch(API + "/video/" + encodeURIComponent(videoId) + "/publish", { method: "POST", headers: { Authorization: "Bearer " + token } });
@@ -389,7 +389,7 @@ export default function CreatePage() {
 
   async function searchSounds() {
     const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) { window.location.href = "/login"; return; }
+    if (!token) { window.location.href = "/auth-required?next=" + encodeURIComponent(window.location.pathname + window.location.search); return; }
     setSoundLoading(true);
     try {
       const url = API + "/music/sounds?q=" + encodeURIComponent(soundQuery);
@@ -445,7 +445,7 @@ export default function CreatePage() {
   async function publishDraft() {
     if (!file) return;
     const token = window.localStorage.getItem("twitok_user_token");
-    if (!token) { window.location.href = "/login"; return; }
+    if (!token) { window.location.href = "/auth-required?next=" + encodeURIComponent(window.location.pathname + window.location.search); return; }
 
     setStep("UPLOADING");
     setMessage("Preparing secure upload…");
