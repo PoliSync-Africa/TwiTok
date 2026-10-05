@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { getAuthToken } from "../lib/auth";
+import { getAuthToken, requireAuth } from "../lib/auth";
 import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -22,8 +22,8 @@ export default function SoundsScreen() {
   async function load(q = query) {
     setLoading(true); setError("");
     try {
-      const token = await getAuthToken();
-      if (!token) throw new Error("Sign in to browse sounds.");
+      const token = await requireAuth();
+      if (!token) { setError("SIGN_IN_REQUIRED"); return; }
       const r = await fetch(API + "/music/sounds?q=" + encodeURIComponent(q), { headers: { Authorization: "Bearer " + token } });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Unable to load sounds");
@@ -52,7 +52,8 @@ export default function SoundsScreen() {
     if (busy) return;
     setBusy(sound._id); setError("");
     try {
-      const token = await getAuthToken();
+      const token = await requireAuth();
+      if (!token) return;
       if (!videoId && select === "1") { router.replace({ pathname: returnTo ? String(returnTo) : "/create", params: { soundId: sound._id, soundTitle: sound.title } }); return; }
       if (!videoId) return;
       const r = await fetch(API + "/music/videos/" + encodeURIComponent(videoId) + "/sound", {
@@ -85,7 +86,10 @@ export default function SoundsScreen() {
           </Pressable>
         ))}
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <View>
+        <Text style={styles.error}>{error === "SIGN_IN_REQUIRED" ? "Sign in to browse and use sounds." : error}</Text>
+        {error === "SIGN_IN_REQUIRED" ? <View style={{flexDirection:"row",justifyContent:"center",gap:16,paddingVertical:8}}><Pressable onPress={()=>router.push("/register")}><Text style={styles.authLink}>Sign up</Text></Pressable><Pressable onPress={()=>router.push("/login")}><Text style={styles.authLink}>Sign in</Text></Pressable></View> : null}
+      </View> : null}
       {loading ? <ActivityIndicator color="#fff" style={{ marginTop: 30 }} /> : (
         <FlatList
           data={visibleSounds}
@@ -125,6 +129,6 @@ const styles = StyleSheet.create({
   soundTitle:{color:"#fff",fontSize:15,fontWeight:"700"},
   artist:{color:"#999",fontSize:12,marginTop:4},
   actions:{flexDirection:"row",alignItems:"center",gap:10},preview:{width:38,height:38,borderRadius:19,backgroundColor:"#202020",alignItems:"center",justifyContent:"center"},previewText:{color:"#fff",fontWeight:"900"},use:{color:"#fff",fontWeight:"800",paddingHorizontal:10},
-  error:{color:"#ff6678",paddingHorizontal:16},
+  error:{color:"#ff6678",paddingHorizontal:16},authLink:{color:"#25f4ee",fontWeight:"900"},
   empty:{color:"#888",textAlign:"center",paddingTop:40}
 });
