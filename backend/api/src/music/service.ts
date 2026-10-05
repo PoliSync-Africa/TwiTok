@@ -42,10 +42,15 @@ export async function searchSounds(db: Db, q: string, countryCode?: string, limi
   // Audius exposes a free read-only catalog for discovery and streaming.
   // Community tracks are not marked as commercially licensed by TwiTok.
   try {
-    const params = new URLSearchParams({ query: q.trim() || "trending", limit: String(Math.min(limit, 20)) });
     const baseUrl = (process.env.AUDIUS_API_BASE_URL ?? "https://api.audius.co/v1").replace(/\/$/, "");
     const apiKey = process.env.AUDIUS_API_KEY;
-    const response = await fetch(baseUrl + "/tracks/search?" + params.toString(), { headers: apiKey ? { "X-API-Key": apiKey } : undefined });
+    const params = new URLSearchParams({ limit: String(Math.min(limit, 20)) });
+    const endpoint = q.trim()
+      ? baseUrl + "/tracks/search?" + new URLSearchParams({ query: q.trim(), limit: String(Math.min(limit, 20)) }).toString()
+      : baseUrl + "/tracks/trending?" + params.toString();
+    const response = await fetch(endpoint, {
+      headers: apiKey ? { "X-API-Key": apiKey } : undefined
+    });
     if (!response.ok) return local;
     const payload = await response.json() as any;
     const tracks = Array.isArray(payload?.data) ? payload.data : [];
