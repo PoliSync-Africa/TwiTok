@@ -9,7 +9,7 @@ const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api
 type Sound = { _id: string; title: string; artist: string; type: string; durationMs: number; usageCount: number; audioUrl?: string };
 
 export default function SoundsScreen() {
-  const { videoId, select } = useLocalSearchParams<{ videoId?: string; select?: string }>();
+  const { videoId, select, returnTo } = useLocalSearchParams<{ videoId?: string; select?: string; returnTo?: string }>();
   const [query, setQuery] = useState("");
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export default function SoundsScreen() {
     setBusy(sound._id); setError("");
     try {
       const token = await getAuthToken();
-      if (!videoId && select === "1") { router.replace({ pathname: "/create", params: { soundId: sound._id, soundTitle: sound.title } }); return; }
+      if (!videoId && select === "1") { router.replace({ pathname: returnTo ? String(returnTo) : "/create", params: { soundId: sound._id, soundTitle: sound.title } }); return; }
       if (!videoId) return;
       const r = await fetch(API + "/music/videos/" + encodeURIComponent(videoId) + "/sound", {
         method: "POST",
