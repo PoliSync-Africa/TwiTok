@@ -1,6 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 
-export type SoundType = "LICENSED" | "ORIGINAL" | "COMMERCIAL";
+export type SoundType = "LICENSED" | "ORIGINAL" | "COMMERCIAL" | "COMMUNITY";
 
 export interface Sound {
   _id?: ObjectId;
@@ -15,6 +15,9 @@ export interface Sound {
   status: "ACTIVE" | "REMOVED";
   createdAt: Date;
   updatedAt: Date;
+  source?: "TWITOK" | "AUDIUS";
+  sourceTrackId?: string;
+  licenseUrl?: string;
 }
 
 export async function ensureSoundIndexes(db: Db) {
@@ -23,7 +26,8 @@ export async function ensureSoundIndexes(db: Db) {
     db.collection<Sound>("sounds").createIndex({ countryCodes: 1, status: 1 }),
     db.collection<Sound>("sounds").createIndex({ usageCount: -1 }),
     db.collection("video_sounds").createIndex({ videoId: 1 }, { unique: true }),
-    db.collection("video_sounds").createIndex({ soundId: 1, createdAt: -1 })
+    db.collection("video_sounds").createIndex({ soundId: 1, createdAt: -1 }),
+    db.collection<Sound>("sounds").createIndex({ source: 1, sourceTrackId: 1 }, { unique: true, sparse: true })
   ]);
 }
 
@@ -31,7 +35,54 @@ export async function searchSounds(db: Db, q: string, countryCode?: string, limi
   const filter: any = { status: "ACTIVE" };
   if (q.trim()) filter.$text = { $search: q.trim() };
   if (countryCode) filter.countryCodes = { $in: [countryCode.toUpperCase(), "GLOBAL"] };
-  return db.collection<Sound>("sounds").find(filter).sort({ usageCount: -1 }).limit(Math.min(limit, 50)).toArray();
+
+  const local = await db.collection<Sound>("sounds").find(filter).sort({ usageCount: -1 }).limit(Math.min(limit, 50)).toArray();
+  if (local.length >= Math.min(limit, 20)) return local;
+
+  // Audius exposes a free read-only catalog for discovery and streaming.
+  // Community tracks are not marked as commercially licensed by TwiTok.
+  try {
+    const params = new URLSearchParams({ query: q.trim() || "trending", limit: String(Math.min(limit, 20)) });
+    const response = await fetch("https://api.audius.co/v1/tracks/search?" + params.toString());
+    if (!response.ok) return local;
+    const payload = await response.json() as any;
+    const tracks = Array.isArray(payload?.data) ? payload.data : [];
+    const imported: Sound[] = [];
+
+    for (const track of tracks) {
+      const sourceTrackId = String(track?.id ?? "").trim();
+      if (!sourceTrackId) continue;
+      const existing = await db.collection<Sound>("sounds").findOne({ source: "AUDIUS", sourceTrackId });
+      if (existing) { imported.push(existing); continue; }
+
+      const sound: Sound = {
+        _id: new ObjectId(),
+        title: String(track?.title ?? "Untitled").trim().slice(0, 200),
+        artist: String(track?.user?.name ?? track?.user?.handle ?? "Audius creator").trim().slice(0, 120),
+        type: "COMMUNITY",
+        countryCodes: ["GLOBAL"],
+        audioUrl: "https://api.audius.co/v1/tracks/" + encodeURIComponent(sourceTrackId) + "/stream",
+        coverUrl: typeof track?.artwork?.["480x480"] === "string" ? track.artwork["480x480"] : undefined,
+        durationMs: Math.max(0, Math.round(Number(track?.duration ?? 0) * 1000)),
+        usageCount: 0,
+        status: "ACTIVE",
+        source: "AUDIUS",
+        sourceTrackId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      try {
+        await db.collection<Sound>("sounds").insertOne(sound);
+        imported.push(sound);
+      } catch {
+        const raced = await db.collection<Sound>("sounds").findOne({ source: "AUDIUS", sourceTrackId });
+        if (raced) imported.push(raced);
+      }
+    }
+    return [...local, ...imported].slice(0, Math.min(limit, 50));
+  } catch {
+    return local;
+  }
 }
 
 export async function attachSound(db: Db, userId: ObjectId, videoId: string, soundId: string) {
