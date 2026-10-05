@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CameraView, getCameraPermissionsAsync, getMicrophonePermissionsAsync, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -86,12 +86,8 @@ export default function CameraStudioScreen() {
   useEffect(() => {
     const refreshPermissions = async () => {
       try {
-        const [camera, microphone] = await Promise.all([
-          getCameraPermissionsAsync(),
-          getMicrophonePermissionsAsync()
-        ]);
-        if (!camera.granted && camera.canAskAgain) void requestCameraPermission();
-        if (mode === "VIDEO" && !microphone.granted && microphone.canAskAgain) void requestMicrophonePermission();
+        if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) void requestCameraPermission();
+        if (mode === "VIDEO" && microphonePermission && !microphonePermission.granted && microphonePermission.canAskAgain) void requestMicrophonePermission();
       } catch {}
     };
     void refreshPermissions();
