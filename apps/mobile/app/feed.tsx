@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Image, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { getAuthToken } from "../lib/auth";
+import { getAuthToken, requireAuth } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
@@ -120,7 +120,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   }, []);
 
   async function action(kind: "like"|"save"|"share"|"repost") {
-    const token = await getAuthToken();
+    const token = await requireAuth();
     if (!token || busy) return;
     if (kind === "share") {
       try {
