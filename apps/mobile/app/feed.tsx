@@ -173,7 +173,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         </View>
         <Pressable onPress={() => router.push("/discover")} style={styles.searchButton}><Text style={styles.searchGlyph}>⌕</Text></Pressable>
       </View>
-      <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}>
+      <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}><Pressable style={styles.profileAction} onPress={() => item.owner?.username && router.push({ pathname:"/profile", params:{username:item.owner.username} })}><View style={styles.profileActionAvatar}><Text style={styles.profileActionText}>{(item.owner?.username||"T").slice(0,1).toUpperCase()}</Text></View><View style={styles.profilePlus}><Text style={styles.profilePlusText}>+</Text></View></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
@@ -310,11 +310,11 @@ const styles = StyleSheet.create({
   feedTabActive:{color:"#fff",fontSize:15,fontWeight:"900"},
   feedTabUnderline:{height:3,width:28,borderRadius:3,backgroundColor:"#fff",marginTop:5},
   searchGlyph:{color:"#fff",fontSize:28,fontWeight:"300"},
-  rightRail: { position: "absolute", right: 12, bottom: 105, alignItems: "center", gap: 17 },
+  rightRail: { position: "absolute", right: 10, bottom: 105, alignItems: "center", gap: 14 }, profileAction:{width:54,height:60,alignItems:"center",justifyContent:"flex-start"},profileActionAvatar:{width:48,height:48,borderRadius:24,borderWidth:2,borderColor:"#fff",backgroundColor:"#333",alignItems:"center",justifyContent:"center"},profileActionText:{color:"#fff",fontSize:18,fontWeight:"900"},profilePlus:{position:"absolute",bottom:2,width:22,height:22,borderRadius:11,backgroundColor:"#fe2c55",alignItems:"center",justifyContent:"center"},profilePlusText:{color:"#fff",fontSize:18,fontWeight:"900",lineHeight:20},
   action: { alignItems: "center", minWidth: 54, paddingVertical: 3 },
   actionIcon: { color: "#fff", fontSize: 32, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
-  activeIcon: { color: Colors.gold },
+  activeIcon: { color: "#fe2c55" },
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
   usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
   feedVerified:{width:20,height:20,alignItems:"center",justifyContent:"center",marginLeft:1},feedVerifiedSeal:{position:"absolute",color:"#20B2AA",fontSize:24,fontWeight:"900",lineHeight:24,textShadowColor:"rgba(0,0,0,0.28)",textShadowOffset:{width:0,height:1},textShadowRadius:1},feedVerifiedCheck:{color:"#fff",fontSize:10,fontWeight:"900",lineHeight:12,textShadowColor:"rgba(0,0,0,0.22)",textShadowOffset:{width:0,height:1},textShadowRadius:1},
