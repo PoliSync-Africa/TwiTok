@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -38,4 +38,4 @@ export default function LoginPage() {
     <p style={styles.bottom}>Don't have an account? <Link href="/register" style={styles.link}>Sign up</Link></p>
   </form></main>;
 }
-const styles:Record<string,React.CSSProperties>={page:{minHeight:"100vh",background:"#000",color:"#fff",display:"grid",placeItems:"center",padding:24},card:{width:"100%",maxWidth:460,background:"#111",border:"1px solid #292929",borderRadius:24,padding:32,boxShadow:"0 20px 80px rgba(0,0,0,.5)"},back:{color:"#25f4ee",textDecoration:"none"},h1:{fontSize:36},muted:{color:"#999",lineHeight:1.6},tabs:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,margin:"20px 0 10px"},tab:{background:"#1b1b1b",color:"#aaa",border:"1px solid #333",padding:11,borderRadius:10},tabActive:{background:"#fff",color:"#000",border:"1px solid #fff",padding:11,borderRadius:10},input:{width:"100%",boxSizing:"border-box",marginTop:10,padding:"14px 15px",borderRadius:12,border:"1px solid #333",background:"#181818",color:"#fff",outline:"none"},primary:{width:"100%",marginTop:16,padding:15,border:0,borderRadius:12,background:"#fe2c55",color:"#fff",fontWeight:900,fontSize:16},error:{color:"#ff6b7f",fontSize:13},bottom:{textAlign:"center",color:"#999",marginTop:20},link:{color:"#25f4ee",fontWeight:900}};
+const styles:Record<string,CSSProperties>={page:{minHeight:"100vh",background:"#000",color:"#fff",display:"grid",placeItems:"center",padding:24},card:{width:"100%",maxWidth:460,background:"#111",border:"1px solid #292929",borderRadius:24,padding:32,boxShadow:"0 20px 80px rgba(0,0,0,.5)"},back:{color:"#25f4ee",textDecoration:"none"},h1:{fontSize:36},muted:{color:"#999",lineHeight:1.6},tabs:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,margin:"20px 0 10px"},tab:{background:"#1b1b1b",color:"#aaa",border:"1px solid #333",padding:11,borderRadius:10},tabActive:{background:"#fff",color:"#000",border:"1px solid #fff",padding:11,borderRadius:10},input:{width:"100%",boxSizing:"border-box",marginTop:10,padding:"14px 15px",borderRadius:12,border:"1px solid #333",background:"#181818",color:"#fff",outline:"none"},primary:{width:"100%",marginTop:16,padding:15,border:0,borderRadius:12,background:"#fe2c55",color:"#fff",fontWeight:900,fontSize:16},error:{color:"#ff6b7f",fontSize:13},bottom:{textAlign:"center",color:"#999",marginTop:20},link:{color:"#25f4ee",fontWeight:900}};
