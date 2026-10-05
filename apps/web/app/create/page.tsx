@@ -235,18 +235,55 @@ export default function CreatePage() {
   }
 
   async function openBrowserCamera() {
+    if (typeof navigator === "undefined") return;
+    if (!window.isSecureContext) {
+      setMessage("Camera requires a secure HTTPS connection.");
+      setCameraActive(false);
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage("This browser does not provide camera access. Use the TwiTok mobile app or upload a video.");
+      setCameraActive(false);
+      return;
+    }
+
+    stopBrowserCamera();
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+      // Request video first so a microphone permission/device problem cannot
+      // make the entire camera preview fail.
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "user" }, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        audio: false
+      });
+
+      let stream = cameraStream;
+      try {
+        const microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        microphoneStream.getAudioTracks().forEach(track => stream.addTrack(track));
+      } catch {
+        // Camera remains usable without microphone; users can add a sound later.
+      }
+
       cameraStreamRef.current = stream;
       setCameraActive(true);
+      setMessage("");
       requestAnimationFrame(() => {
         if (cameraPreviewRef.current) {
           cameraPreviewRef.current.srcObject = stream;
           void cameraPreviewRef.current.play().catch(() => undefined);
         }
       });
-    } catch {
+    } catch (error) {
       setCameraActive(false);
+      const name = error instanceof DOMException ? error.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setMessage("Camera permission is blocked. Allow Camera for twitokapp.com in Safari Settings, then tap Flip to retry.");
+      } else if (name === "NotFoundError") {
+        setMessage("No camera was found on this device.");
+      } else {
+        setMessage("Unable to open the camera. Tap Flip to retry or choose Upload.");
+      }
     }
   }
 
