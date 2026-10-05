@@ -28,6 +28,12 @@ const demoVideos: FeedVideo[] = [
   { id: "demo-3", ownerUsername: "@zuri_daily", country: "Kenya", caption: "A morning in Nairobi.", hashtags: ["Kenya","Nairobi","TwiTok"] }
 ];
 
+const demoLocations = [
+  { city: "Accra", country: "Ghana", kicker: "GOLD COAST NIGHTS" },
+  { city: "Lagos", country: "Nigeria", kicker: "CITY LIGHTS" },
+  { city: "Nairobi", country: "Kenya", kicker: "EAST AFRICA" }
+];
+
 const tabs = [
   { label: "You", surface: "FOR_YOU" },
   { label: "Following", surface: "FOLLOWING" },
@@ -288,7 +294,7 @@ export default function Home() {
 
   return <main className="app">
     <aside className="rail">
-      <div className="logo">T<span>▶</span>iTok</div>
+      <div className="logo" aria-label="TwiTok"><span className="logo-word">TwiTok</span><span className="logo-mark" aria-hidden="true" /></div>
       <nav>
         <Link href="/">⌂ <span>Home</span></Link>
         <Link href="/discover">⌕ <span>Discover</span></Link>
@@ -296,16 +302,16 @@ export default function Home() {
         <Link href="/creator/studio">▣ <span>Creator Studio</span></Link>
         <Link href="/inbox">✉ <span>Inbox</span></Link>
       </nav>
-      <div className="rail-bottom"><Link className="primary" href="/create">＋ Create</Link><small>Africa's Video Platform</small></div>
+      <div className="rail-bottom"><Link className="primary" href="/create">＋ Create</Link><small>Global social video</small></div>
     </aside>
 
     <section className="feed">
       <header className="top">
-        <div className="mobile-logo">TwiTok</div>
+        <div className="mobile-logo" aria-label="TwiTok">TwiTok</div>
         <div className="tabs">{tabs.map(t =>
           <button key={t.surface} className={tab === t.surface ? "selected" : ""} onClick={() => setTab(t.surface)}>{t.label}</button>
         )}</div>
-        <div className="top-actions"><button className="notification-button" onClick={openNotifications} aria-label="Notifications">♧{unreadNotifications > 0 ? <span>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</button><button className="sound-toggle" onClick={() => setMuted(v => !v)}>{muted ? "🔇" : "🔊"}</button></div>
+        <div className="top-actions"><button className="notification-button" onClick={openNotifications} aria-label="Notifications"><span className="icon-bell" aria-hidden="true" />{unreadNotifications > 0 ? <span className="notification-count">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</button><button className={"sound-toggle " + (muted ? "is-muted" : "")} onClick={() => setMuted(v => !v)} aria-label={muted ? "Unmute videos" : "Mute videos"}><span className="icon-volume" aria-hidden="true" /></button></div>
       </header>
 
       {stories.length > 0 && <div className="story-tray" aria-label="Stories">
@@ -327,13 +333,13 @@ export default function Home() {
                     ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
                         {v.autoCaptionsUrl ? <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" /> : null}{Object.values(v.captionTracks ?? {}).map(captionTrack => <track key={captionTrack.language} kind="captions" src={captionTrack.url} srcLang={captionTrack.language} label={captionTrack.label} />)}
                       </video>
-                    : <div className={`video-art demo-art-${i % 3}`}><div className="demo-mark">TwiTok</div></div>}
+                    : <div className={`video-art demo-art-${i % 3}`}><div className="demo-atmosphere" /><div className="demo-aurora" /><div className="demo-grid" /><div className="demo-location-badge"><span>{demoLocations[i % demoLocations.length].kicker}</span><strong>{demoLocations[i % demoLocations.length].city}</strong><small>{demoLocations[i % demoLocations.length].country}</small></div><div className="demo-brand-stamp">TwiTok</div><div className="demo-horizon" /></div>}
               <div className="gradient"/>
               <div className="video-copy">
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
                 <h2>{v.caption ?? ""}</h2>
                 <p>{(v.hashtags ?? []).map(tag => `#${tag}`).join(" ")}</p>
-                  <div className="caption-language"><select value={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} onChange={e => { const lang = e.target.value; if (lang === "__translate__") return; setCaptionLanguage(prev => ({ ...prev, [v.id]: lang })); }}><option value={v.autoCaptionLanguage ?? ""}>Original captions</option>{Object.values(v.captionTracks ?? {}).map(track => <option key={track.language} value={track.language}>{track.label}</option>)}<option value="__translate__" disabled={translationBusy[v.id]}>Translate captions…</option></select><div className="caption-translate-buttons">{["en","fr","tw","ha","yo","ig","sw","ar"].filter(lang => lang !== (v.autoCaptionLanguage ?? "") && !v.captionTracks?.[lang]).map(lang => <button key={lang} type="button" disabled={translationBusy[v.id]} onClick={() => requestTranslation(v.id, lang)}>{translationBusy[v.id] ? "Translating…" : `+${lang.toUpperCase()}`}</button>)}</div></div>
+                  {!v.id.startsWith("demo-") && <div className="caption-language"><select value={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} onChange={e => { const lang = e.target.value; if (lang === "__translate__") return; setCaptionLanguage(prev => ({ ...prev, [v.id]: lang })); }}><option value={v.autoCaptionLanguage ?? ""}>Original captions</option>{Object.values(v.captionTracks ?? {}).map(track => <option key={track.language} value={track.language}>{track.label}</option>)}<option value="__translate__" disabled={translationBusy[v.id]}>Translate captions…</option></select><div className="caption-translate-buttons">{["en","fr","tw","ha","yo","ig","sw","ar"].filter(lang => lang !== (v.autoCaptionLanguage ?? "") && !v.captionTracks?.[lang]).map(lang => <button key={lang} type="button" disabled={translationBusy[v.id]} onClick={() => requestTranslation(v.id, lang)}>{translationBusy[v.id] ? "Translating…" : `+${lang.toUpperCase()}`}</button>)}</div></div>}
                 {soundMap[v.id] && <Link className="video-sound" href={`/sound/${soundMap[v.id]._id}`}>♪ {soundMap[v.id].title} — {soundMap[v.id].artist}</Link>}
               </div>
             </div>
