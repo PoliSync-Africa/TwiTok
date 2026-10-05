@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AudioSession, LiveKitRoom, VideoTrack, useRoomContext, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
-import { getAuthToken } from "../lib/auth";
+import { getAuthToken, requireAuth } from "../lib/auth";
 import { Colors, Typography } from "../theme/typography";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -34,6 +34,8 @@ export default function LiveScreen() {
   async function openLive() {
     setBusy(true); setError("");
     try {
+      const auth = await requireAuth();
+      if (!auth) return;
       const created = await request("/live/streams", { method: "POST", body: JSON.stringify({ title: title.trim() || "LIVE on TwiTok" }) });
       setStream(created);
       const credentials = await request("/live/streams/" + encodeURIComponent(created.streamId) + "/token", { method: "POST" });
