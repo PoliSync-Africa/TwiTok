@@ -4,6 +4,7 @@ import { getDb } from "../db/mongo.js";
 import { createLiveStream, setLiveStatus, inviteLiveGuest, respondToLiveGuestInvite, removeLiveGuest } from "../live/service.js";
 import { requireUser } from "../auth/middleware.js";
 import { rateLimit } from "../security/rate-limit.js";
+import { AccessToken } from "livekit-server-sdk";
 
 export const liveRouter = Router();
 const liveReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
@@ -37,6 +38,34 @@ liveRouter.post("/streams", requireUser, liveActionLimit, async (req, res) => {
       streamId: randomUUID(), hostUserId: req.userId!.toHexString(), title: title.trim(), category, coverUrl
     }));
   } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : "LIVE creation failed" }); }
+});
+
+liveRouter.post("/streams/:streamId/token", requireUser, liveActionLimit, async (req, res) => {
+  try {
+    const db = await getDb();
+    const streamId = String(req.params.streamId);
+    const stream = await db.collection("live_streams").findOne({ streamId });
+    if (!stream) return res.status(404).json({ error: "LIVE stream not found" });
+    if (String(stream.hostUserId) !== req.userId!.toHexString()) return res.status(403).json({ error: "Only the host can publish this LIVE stream" });
+    if (stream.status === "ENDED" || stream.status === "SUSPENDED") return res.status(409).json({ error: "This LIVE session is no longer available" });
+    const serverUrl = process.env.LIVEKIT_URL;
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    if (!serverUrl || !apiKey || !apiSecret) return res.status(503).json({ error: "LIVE transport is not configured yet" });
+
+    const roomName = "twitok-live-" + streamId;
+    const identity = "u-" + req.userId!.toHexString();
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity,
+      name: identity,
+      ttl: "2h",
+      metadata: JSON.stringify({ streamId, role: "host" })
+    });
+    token.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true, canPublishData: true });
+    return res.status(201).json({ serverUrl, participantToken: await token.toJwt(), roomName, streamId });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Unable to create LIVE transport token" });
+  }
 });
 
 liveRouter.post("/streams/:streamId/status", requireUser, liveActionLimit, async (req, res) => {
