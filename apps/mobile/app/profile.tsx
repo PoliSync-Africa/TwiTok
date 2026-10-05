@@ -217,8 +217,8 @@ export default function ProfileScreen() {
 
     setBusy(true);
     try {
-      const token = await getAuthToken();
-      if (!token) throw new Error("Sign in required");
+      const token = await requireAuth();
+      if (!token) return;
 
       const response = await fetch(
         API + "/video/" + encodeURIComponent(videoId) + "/publish",
