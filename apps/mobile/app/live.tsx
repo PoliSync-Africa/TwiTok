@@ -13,6 +13,9 @@ type Guest = { userId: string; status: "INVITED"|"ACCEPTED"|"DECLINED"|"REMOVED"
 
 export default function LiveScreen() {
   const insets = useSafeAreaInsets();
+  // LIVE control plane: the current backend creates/manages the session. A production
+  // broadcast transport is intentionally not faked here; Start LIVE reflects the
+  // server state and the actual media transport can be connected separately.
   const [title, setTitle] = useState("");
   const [username, setUsername] = useState("");
   const [stream, setStream] = useState<Stream | null>(null);
