@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { getAuthToken } from "../lib/auth";
+import { getAuthToken, requireAuth } from "../lib/auth";
 
 const API =
   process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
@@ -169,8 +169,8 @@ export default function ProfileScreen() {
 
     setBusy(true);
     try {
-      const token = await getAuthToken();
-      if (!token) throw new Error("Sign in required");
+      const token = await requireAuth();
+      if (!token) return;
 
       const method = profile.isFollowing ? "DELETE" : "POST";
       const response = await fetch(
@@ -398,12 +398,14 @@ export default function ProfileScreen() {
 
             <Pressable
               style={styles.messageButton}
-              onPress={() =>
+              onPress={async () => {
+                const token = await requireAuth();
+                if (!token) return;
                 router.push({
                   pathname: "/messages",
                   params: { username: profile.username },
-                })
-              }
+                });
+              }}
             >
               <><ProfileIcon name="message" size={17} /><Text style={styles.messageText}>Message</Text></>
             </Pressable>
