@@ -76,8 +76,16 @@ export default function CreatePage() {
   const [generatedCaptions, setGeneratedCaptions] = useState<Array<{text:string;startMs:number;endMs:number}>>([]);
   const [captionsLoading, setCaptionsLoading] = useState(false);
   const [captionsSaving, setCaptionsSaving] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraRecording, setCameraRecording] = useState(false);
+  const [cameraDurationLimit, setCameraDurationLimit] = useState<15 | 60 | 600>(60);
+  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const cameraRecorderRef = useRef<MediaRecorder | null>(null);
+  const cameraChunksRef = useRef<Blob[]>([]);
 
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); }, [preview]);
+  useEffect(() => { if (step !== "SELECT" || cameraActive || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return; void openBrowserCamera(); }, [step]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
 
   useEffect(() => () => { soundAudioRef.current?.pause(); }, []);
@@ -226,6 +234,54 @@ export default function CreatePage() {
     setMessage("");
   }
 
+  async function openBrowserCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+      cameraStreamRef.current = stream;
+      setCameraActive(true);
+      requestAnimationFrame(() => {
+        if (cameraPreviewRef.current) {
+          cameraPreviewRef.current.srcObject = stream;
+          void cameraPreviewRef.current.play().catch(() => undefined);
+        }
+      });
+    } catch {
+      setCameraActive(false);
+    }
+  }
+
+  function stopBrowserCamera() {
+    cameraRecorderRef.current?.stop();
+    cameraRecorderRef.current = null;
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+    cameraStreamRef.current = null;
+    setCameraActive(false);
+    setCameraRecording(false);
+  }
+
+  function recordBrowserVideo() {
+    const stream = cameraStreamRef.current;
+    if (!stream || cameraRecording) return;
+    const mimeType = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm";
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks: Blob[] = [];
+    cameraChunksRef.current = chunks;
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const extension = mimeType.includes("mp4") ? "mp4" : "webm";
+      const recorded = new File([blob], "twitok-camera-" + Date.now() + "." + extension, { type: mimeType });
+      stopBrowserCamera();
+      chooseFile(recorded);
+    };
+    recorder.start(250);
+    cameraRecorderRef.current = recorder;
+    setCameraRecording(true);
+    window.setTimeout(() => {
+      if (cameraRecorderRef.current === recorder && recorder.state === "recording") recorder.stop();
+    }, cameraDurationLimit * 1000);
+  }
+
   async function searchSounds() {
     const token = window.localStorage.getItem("twitok_user_token");
     if (!token) return setMessage("Sign in to browse sounds.");
@@ -352,10 +408,30 @@ export default function CreatePage() {
           {preview ? (
             <video ref={videoRef} src={preview} controls playsInline muted={muted} style={{ filter: effect === "VIBRANT" ? "saturate(1.35) contrast(1.08) brightness(1.02)" : effect === "WARM" ? "sepia(.18) saturate(1.08)" : effect === "COOL" ? "hue-rotate(8deg) saturate(.95)" : effect === "NOIR" ? "grayscale(1) contrast(1.2)" : effect === "VINTAGE" ? "sepia(.2) saturate(.72) contrast(.92)" : effect === "BRIGHT" ? "brightness(1.08) contrast(1.02)" : effect === "FADE" ? "contrast(.86) brightness(1.05) saturate(.82)" : "none" }} className="composer-video" onLoadedMetadata={onLoadedMetadata} />
           ) : (
-            <label className="dropzone">
-              <span className="plus">＋</span><b>Upload a video</b><small>MP4, MOV or WebM · up to 500 MB</small>
-              <input type="file" multiple accept="video/mp4,video/quicktime,video/webm" onChange={e => chooseFiles(e.target.files)} />
-            </label>
+            <div className="camera-create">
+              <div className="camera-stage">
+                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Allow camera access or choose a video from your device.</small></div>}
+                <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
+                <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
+                <div className="camera-side-tools">
+                  <button type="button" onClick={openBrowserCamera}>↻<small>Flip</small></button>
+                  <button type="button" onClick={() => setSpeed(v => v === 2 ? .5 : v === .5 ? 1 : v === 1 ? 1.5 : 2)}>{speed}×<small>Speed</small></button>
+                  <button type="button" onClick={() => setEffect(effect === "NONE" ? "VIBRANT" : "NONE")}>✦<small>Effects</small></button>
+                  <button type="button">◷<small>Timer</small></button>
+                </div>
+              </div>
+              <div className="camera-lengths">
+                {([["10m",600],["60s",60],["15s",15]] as const).map(([label,value]) => <button key={label} type="button" className={cameraDurationLimit===value?"selected":""} onClick={() => setCameraDurationLimit(value)}>{label}</button>)}
+                <button type="button">PHOTO</button><button type="button">TEXT</button>
+              </div>
+              <div className="camera-actions">
+                <label className="camera-upload">▣<small>Upload</small><input type="file" multiple accept="video/mp4,video/quicktime,video/webm" onChange={e => { stopBrowserCamera(); chooseFiles(e.target.files); }} /></label>
+                <button type="button" className={"camera-record " + (cameraRecording ? "recording" : "")} onClick={cameraRecording ? () => cameraRecorderRef.current?.stop() : recordBrowserVideo}><span /></button>
+                <button type="button" className="camera-effects" onClick={() => setEffect(effect === "NONE" ? "VIBRANT" : "NONE")}>✦<small>Effects</small></button>
+              </div>
+              <div className="camera-bottom-tabs"><span className="active">Camera</span><span>LIVE</span><span>Create</span></div>
+              {soundOpen && <div className="camera-sound-panel"><b>Add sound</b><input value={soundQuery} onChange={e => setSoundQuery(e.target.value)} placeholder="Search sounds" /><button type="button" onClick={searchSounds}>Search</button></div>}
+            </div>
           )}
         </div>
 
