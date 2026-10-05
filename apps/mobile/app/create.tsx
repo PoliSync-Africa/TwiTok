@@ -4,11 +4,28 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { ActivityIndicator, Alert, Animated, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { getAuthToken } from "../lib/auth";
 import UnifiedMediaStudio, { DEFAULT_STUDIO_PLAN, type StudioPlan } from "../components/unified-media-studio"; // TwiTok Studio
 import { Colors } from "../theme/typography";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+
+const CREATE_ICONS: Record<string, { ios: string; android: string; web: string }> = {
+  close: { ios: "xmark", android: "close", web: "close" },
+  video: { ios: "video.fill", android: "videocam", web: "videocam" },
+  photo: { ios: "photo.fill", android: "photo", web: "photo" },
+  text: { ios: "textformat", android: "text_fields", web: "text_fields" },
+  camera: { ios: "camera.fill", android: "camera_alt", web: "camera_alt" },
+  gallery: { ios: "photo.on.rectangle.angled", android: "photo_library", web: "photo_library" },
+  studio: { ios: "wand.and.stars", android: "auto_awesome", web: "auto_awesome" },
+  music: { ios: "music.note", android: "music_note", web: "music_note" },
+  draft: { ios: "tray.and.arrow.down.fill", android: "save_alt", web: "save_alt" },
+  plus: { ios: "plus", android: "add", web: "add" },
+};
+function CreateIcon({ name, size = 21, color = "#fff" }: { name: string; size?: number; color?: string }) {
+  return <SymbolView name={CREATE_ICONS[name] ?? CREATE_ICONS.plus} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+}
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
 type ClipSetting = { speed: number; volume: number; muted: boolean };
 type StickerOverlay = { stickerId: string; startMs: number; endMs: number; x: number; y: number; size: number; rotation: number };
@@ -362,16 +379,16 @@ export default function CreateScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
+        <Pressable style={styles.headerIcon} onPress={() => router.back()}><CreateIcon name="close" size={23} /></Pressable>
         <Text style={styles.title}>Create</Text>
         <Pressable onPress={() => { void publish(); }} disabled={(mode==="TEXT" ? !caption.trim() : !assets.length) || busy}><Text style={[styles.post, ((mode==="TEXT" ? !caption.trim() : !assets.length) || busy) && styles.disabled]}>Post</Text></Pressable>
       </View>
       <View style={styles.modeRow}>{["VIDEO","PHOTO","TEXT"].map(v=><Pressable key={v} style={[styles.mode,mode===v&&styles.modeSelected]} onPress={()=>{setMode(v as any);setAssets([])}}><Text style={styles.modeText}>{v==="VIDEO"?"Video":v==="PHOTO"?"Photo":"Text"}</Text></Pressable>)}</View>\n      <Pressable style={styles.liveButton} onPress={()=>router.push("/live")} accessibilityLabel="Go LIVE"><Text style={styles.liveButtonText}>LIVE</Text><Text style={styles.liveButtonSub}>Up to 15 guests</Text></Pressable>
       {mode !== "TEXT" ? <View style={styles.modeRow}>
-        <Pressable style={styles.mode} onPress={mode==="PHOTO"?recordPhoto:recordVideo}><Text style={styles.modeIcon}>●</Text><Text style={styles.modeText}>Camera</Text></Pressable>
-        <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><Text style={styles.modeIcon}>▣</Text><Text style={styles.modeText}>Gallery</Text></Pressable>
+        <Pressable style={styles.mode} onPress={mode==="PHOTO"?recordPhoto:recordVideo}><CreateIcon name="camera" size={25} /><Text style={styles.modeText}>Camera</Text></Pressable>
+        <Pressable style={styles.mode} onPress={mode==="PHOTO"?pickPhotos:pickGallery}><CreateIcon name="gallery" size={25} /><Text style={styles.modeText}>Gallery</Text></Pressable>
       </View> : null}
-      {mode !== "TEXT" && assets.length ? <Pressable style={styles.studioButton} onPress={() => setStudioVisible(true)}><Text style={styles.studioButtonTitle}>✦ Open TwiTok Studio</Text><Text style={styles.studioButtonSub}>Free AI enhancement • face filters • backgrounds • effects • transitions • pro quality</Text></Pressable> : null}\n      <ScrollView contentContainerStyle={styles.content}>
+      {mode !== "TEXT" && assets.length ? <Pressable style={styles.studioButton} onPress={() => setStudioVisible(true)}><CreateIcon name="studio" size={22} /><Text style={styles.studioButtonTitle}>Open TwiTok Studio</Text><Text style={styles.studioButtonSub}>Free AI enhancement • face filters • backgrounds • effects • transitions • pro quality</Text></Pressable> : null}\n      <ScrollView contentContainerStyle={styles.content}>
         <TextInput value={caption} onChangeText={setCaption} placeholder="Describe your post…" placeholderTextColor="#777" style={styles.caption} multiline maxLength={2200} />
         {mode !== "TEXT" ? <TextInput value={hashtags} onChangeText={setHashtags} placeholder="#Ghana #TwiTok #Africa" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} /> : null}
         <TextInput value={mentions} onChangeText={setMentions} placeholder="@username @creator" placeholderTextColor="#777" style={styles.input} autoCapitalize="none" maxLength={500} />
@@ -545,7 +562,7 @@ export default function CreateScreen() {
            <Pressable style={styles.small} onPress={()=>setStickers([])}><Text style={styles.choiceText}>Clear</Text></Pressable>
          </View> : null}
          <Text style={styles.section}>Sound</Text>
-        <Pressable style={styles.soundButton} onPress={chooseSound}><Text style={styles.choiceText}>{soundId ? `♫ ${soundTitle || soundId}` : "Add sound"}</Text></Pressable>
+        <Pressable style={styles.soundButton} onPress={chooseSound}><CreateIcon name="music" size={20} color={Colors.gold} /><Text style={styles.choiceText}>{soundId ? soundTitle || soundId : "Add sound"}</Text></Pressable>
         {soundId ? <Pressable onPress={()=>{setSoundId("");setSoundTitle("");}}><Text style={styles.clearSound}>Remove sound</Text></Pressable> : null}
         <Text style={styles.helper}>Audio mix</Text><Text style={styles.label}>Original audio {Math.round(originalVolume*100)}%</Text><View style={styles.row}>{[0,0.25,0.5,0.75,1].map(v=><Pressable key={"o"+v} style={[styles.choice,originalVolume===v&&styles.selected]} onPress={()=>setOriginalVolume(v)}><Text style={styles.choiceText}>{Math.round(v*100)}%</Text></Pressable>)}</View><Text style={styles.label}>Added sound {Math.round(addedSoundVolume*100)}%</Text><View style={styles.row}>{[0,0.25,0.5,0.75,1].map(v=><Pressable key={"a"+v} style={[styles.choice,addedSoundVolume===v&&styles.selected]} onPress={()=>setAddedSoundVolume(v)}><Text style={styles.choiceText}>{Math.round(v*100)}%</Text></Pressable>)}</View>
         <Text style={styles.section}>Cover</Text>
@@ -555,7 +572,7 @@ export default function CreateScreen() {
         <Pressable style={[styles.choice,{marginHorizontal:16,marginTop:4},autoCaptions&&styles.selected]} onPress={()=>setAutoCaptions(v=>!v)}><Text style={styles.choiceText}>Auto captions: {autoCaptions?"On":"Off"}</Text></Pressable>
         <View style={styles.row}>{["PUBLIC","FOLLOWERS","PRIVATE"].map(v=><Pressable key={v} style={[styles.choice,visibility===v&&styles.selected]} onPress={()=>setVisibility(v)}><Text style={styles.choiceText}>{v}</Text></Pressable>)}</View>
         <View style={styles.row}>{[[comments,"Comments"],[duet,"Duet"],[stitch,"Stitch"]].map(([on,label])=><Pressable key={String(label)} style={[styles.choice,on&&styles.selected]} onPress={()=>{ if(label==="Comments") setComments(!comments); else if(label==="Duet") setDuet(!duet); else setStitch(!stitch); }}><Text style={styles.choiceText}>{label}: {on?"On":"Off"}</Text></Pressable>)}</View>
-        {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
+        {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><CreateIcon name="draft" size={19} color={Colors.gold} /><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
         {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
       </ScrollView>
       <UnifiedMediaStudio visible={studioVisible} mode={mode === "PHOTO" ? "PHOTO" : "VIDEO"} value={studioPlan} onChange={setStudioPlan} onClose={() => setStudioVisible(false)} onRunAI={() => { const uri = assets[selectedClip]?.uri; if (uri) { setStudioVisible(false); router.push({ pathname: "/media-studio", params: { uri, mimeType: assets[selectedClip]?.mimeType ?? "", mode, duration: String(assets[selectedClip]?.duration ?? ""), soundId, soundTitle } }); } }} />
