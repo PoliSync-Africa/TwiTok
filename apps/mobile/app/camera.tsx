@@ -89,7 +89,7 @@ export default function CameraStudioScreen() {
     setRecording(true);
     recordingStartedRef.current = true;
     const started = Date.now();
-    recordingRef.current = cameraRef.current.recordAsync({ maxDuration: durationLimit, progressUpdateInterval: 0.25 });
+    recordingRef.current = cameraRef.current.recordAsync({ maxDuration: durationLimit });
     try {
       const result = await recordingRef.current;
       if (!result?.uri) throw new Error("Camera did not return a video.");
