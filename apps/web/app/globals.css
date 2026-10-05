@@ -411,3 +411,12 @@ body{background:radial-gradient(1200px 600px at 70% -15%,rgba(226,189,98,.10),tr
 .profile-tile-placeholder{width:100%;height:100%;display:grid;place-items:center;color:#777}
 .profile-empty{grid-column:1/-1;min-height:280px;display:grid;place-items:center;color:#777}
 @media(max-width:600px){.profile-hero{padding:24px 16px 18px}.profile-top{gap:15px}.profile-avatar{width:82px;height:82px;font-size:28px}.profile-identity h1{font-size:21px}.profile-stats{gap:24px}.profile-tabs{gap:40px}}
+
+
+.camera-unavailable { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:28px; text-align:center; min-height:360px; }
+.camera-unavailable b { font-size:28px; }
+.camera-unavailable small { max-width:420px; line-height:1.5; opacity:.75; }
+.camera-enable, .camera-phone-capture { border:0; border-radius:999px; padding:13px 22px; font-weight:800; cursor:pointer; background:#fff; color:#111; }
+.camera-enable:disabled { opacity:.55; cursor:wait; }
+.camera-phone-capture { background:#2b2b2b; color:#fff; position:relative; overflow:hidden; }
+.camera-phone-capture input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
