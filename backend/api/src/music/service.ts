@@ -44,12 +44,13 @@ export async function searchSounds(db: Db, q: string, countryCode?: string, limi
   try {
     const baseUrl = (process.env.AUDIUS_API_BASE_URL ?? "https://api.audius.co/v1").replace(/\/$/, "");
     const apiKey = process.env.AUDIUS_API_KEY;
+    const bearerToken = process.env.AUDIUS_BEARER_TOKEN;
     const params = new URLSearchParams({ limit: String(Math.min(limit, 20)) });
     const endpoint = q.trim()
       ? baseUrl + "/tracks/search?" + new URLSearchParams({ query: q.trim(), limit: String(Math.min(limit, 20)) }).toString()
       : baseUrl + "/tracks/trending?" + params.toString();
     const response = await fetch(endpoint, {
-      headers: apiKey ? { "X-API-Key": apiKey } : undefined
+      headers: apiKey || bearerToken ? { ...(apiKey ? { "X-API-Key": apiKey } : {}), ...(bearerToken ? { Authorization: "Bearer " + bearerToken } : {}) } : undefined
     });
     if (!response.ok) return local;
     const payload = await response.json() as any;
@@ -68,7 +69,7 @@ export async function searchSounds(db: Db, q: string, countryCode?: string, limi
         artist: String(track?.user?.name ?? track?.user?.handle ?? "Audius creator").trim().slice(0, 120),
         type: "COMMUNITY",
         countryCodes: ["GLOBAL"],
-        audioUrl: "https://api.audius.co/v1/tracks/" + encodeURIComponent(sourceTrackId) + "/stream",
+        audioUrl: baseUrl + "/tracks/" + encodeURIComponent(sourceTrackId) + "/stream" + (apiKey ? "?api_key=" + encodeURIComponent(apiKey) : ""),
         coverUrl: typeof track?.artwork?.["480x480"] === "string" ? track.artwork["480x480"] : undefined,
         durationMs: Math.max(0, Math.round(Number(track?.duration ?? 0) * 1000)),
         usageCount: 0,
