@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { rateLimitHit } from "../cache/redis.js";
+import { ipKeyGenerator } from "express-rate-limit";
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
@@ -9,11 +10,16 @@ function cleanup(now: number) {
   for (const [key, bucket] of buckets) if (bucket.resetAt <= now) buckets.delete(key);
 }
 
+export function getClientIp(req: Request): string {
+  const raw = req.ip ?? req.socket.remoteAddress ?? "unknown";
+  return raw !== "unknown" ? ipKeyGenerator(raw) : "unknown";
+}
+
 export function rateLimit(options: { windowMs: number; max: number; key?: (req: Request) => string }) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
-    const identity = options.key?.(req) ?? req.ip ?? req.socket.remoteAddress ?? "unknown";
-    const key = `twitok:rl:${options.windowMs}:${options.max}:${identity.slice(0, 220)}`;
+    const identity = options.key?.(req) ?? getClientIp(req);
+    const key = ;
 
     const distributed = await rateLimitHit(key, options.windowMs);
     if (distributed) {
@@ -47,5 +53,5 @@ export function authRateLimit(req: Request) {
   const identifier = typeof body.identifier === "string"
     ? body.identifier.trim().toLowerCase()
     : typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  return `${req.ip ?? "unknown"}:${identifier.slice(0, 160)}`;
+  return ;
 }
