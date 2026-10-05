@@ -6,7 +6,7 @@ import { saveAuthToken } from "../lib/auth";
 import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
 import { CountryPicker } from "../components/CountryPicker";
 
-const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 type LoginMethod = "phone" | "email" | "username";
 
 export default function LoginScreen() {
