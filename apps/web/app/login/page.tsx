@@ -32,7 +32,7 @@ export default function LoginPage() {
 
   return <main style={styles.page}><form onSubmit={submit} style={styles.card}>
     <Link href="/" style={styles.back}>← TwiTok</Link>
-    <h1>Sign in</h1><p style={styles.muted}>Welcome back. Sign in to like, comment, follow, message, create and go LIVE.</p>
+    <h1>Sign in</h1><p style={styles.muted}>Sign in to your TwiTok account.</p>
     <div style={styles.tabs}>{(["email","phone","username"] as const).map(item=><button type="button" key={item} onClick={()=>setMethod(item)} style={method===item?styles.tabActive:styles.tab}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div>
     {method==="phone" ? <div style={{display:"grid",gridTemplateColumns:"90px 1fr",gap:8}}><input value={countryCode} onChange={e=>setCountryCode(e.target.value.toUpperCase())} maxLength={3} style={styles.input} placeholder="GH"/><input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder="Phone number" required/></div> : <input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder={method==="email"?"Email address":"Username"} required autoCapitalize="none"/>}
     <input value={password} onChange={e=>setPassword(e.target.value)} style={styles.input} placeholder="Password" type="password" required minLength={8}/>
