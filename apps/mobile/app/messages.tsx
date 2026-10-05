@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { getAuthToken } from "../lib/auth";
+import { getAuthToken, requireAuth } from "../lib/auth";
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 const WS = API.replace(/^http/, "ws").replace(/\/api\/v1$/, "") + "/realtime";
@@ -107,8 +107,8 @@ export default function MessagesScreen() {
   const startedParam = useRef(false);
 
   async function request(path: string, init: RequestInit = {}) {
-    const token = await getAuthToken();
-    if (!token) throw new Error("Sign in required");
+    const token = await requireAuth();
+    if (!token) throw new Error("SIGN_IN_REQUIRED");
     const headers: Record<string, string> = { Authorization: "Bearer " + token };
     if (init.body) headers["Content-Type"] = "application/json";
     const response = await fetch(API + path, { ...init, headers: { ...headers, ...(init.headers as Record<string, string> | undefined) } });
@@ -289,7 +289,13 @@ export default function MessagesScreen() {
           <Pressable style={styles.headerIcon}><Icon name="settings" /></Pressable>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <View>
+          <Text style={styles.error}>{error === "SIGN_IN_REQUIRED" ? "Sign in to use messages." : error}</Text>
+          {error === "SIGN_IN_REQUIRED" ? <View style={{flexDirection:"row",justifyContent:"center",gap:10}}>
+            <Pressable onPress={() => router.push("/register")}><Text style={styles.markRead}>Sign up</Text></Pressable>
+            <Pressable onPress={() => router.push("/login")}><Text style={styles.markRead}>Sign in</Text></Pressable>
+          </View> : null}
+        </View> : null}
 
         <ScrollView contentContainerStyle={styles.chatList}>
           {messages.map(item => {
