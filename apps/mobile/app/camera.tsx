@@ -196,8 +196,18 @@ export default function CameraStudioScreen() {
         <Pressable
           style={styles.primary}
           onPress={async () => {
-            if (cameraBlocked) await requestCameraPermission();
-            if (mode === "VIDEO" && microphoneBlocked) await requestMicrophonePermission();
+            setError("");
+            try {
+              if (cameraBlocked) {
+                const result = await requestCameraPermission();
+                if (!result.granted) return;
+              }
+              if (mode === "VIDEO" && microphoneBlocked) {
+                await requestMicrophonePermission();
+              }
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Unable to request camera permission.");
+            }
           }}
         >
           <Text style={styles.primaryText}>Allow access</Text>
@@ -344,7 +354,6 @@ export default function CameraStudioScreen() {
       </View> : null}
 
       {teleprompter ? <View style={styles.teleprompter}><Text style={styles.teleprompterTitle}>Teleprompter</Text><Text style={styles.teleprompterText}>Add your script before recording.</Text><Pressable onPress={() => setTeleprompter(false)} style={styles.teleprompterClose}><Text style={styles.teleprompterCloseText}>Close</Text></Pressable></View> : null}
-      </View>
     </View>
   );
 }
