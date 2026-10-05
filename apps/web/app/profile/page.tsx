@@ -53,7 +53,7 @@ export default function ProfilePage() {
 
   return <main className="profile-page">
     <section className="profile-shell">
-      <header className="profile-header"><Link href="/" className="profile-icon"><Icon path="M19 12H5m7 7-7-7 7-7" /></Link><strong>@{profile.username}</strong><div className="profile-header-actions"><Link href="/settings" className="profile-icon"><Icon path="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm0-12v2m0 13v2m7.07-9.5 1.73-1m-15.6 9 1.73-1m12.14-5.5 1.73 1M3.93 6l1.73 1"/></Link></div></header>
+      <header className="profile-header"><Link href="/" className="profile-icon"><Icon path="M19 12H5m7 7-7-7 7-7" /></Link><strong>@{profile.username}</strong><div className="profile-header-actions"><button className="profile-icon" aria-label="More profile options"><Icon path="M5 12h.01M12 12h.01M19 12h.01"/></button></div></header>
       <div className="profile-hero">
         <div className="profile-top">
           <div className="profile-avatar">{profile.profilePhotoUrl ? <img src={profile.profilePhotoUrl} alt="" /> : (profile.nickname || profile.username).slice(0,1).toUpperCase()}</div>
