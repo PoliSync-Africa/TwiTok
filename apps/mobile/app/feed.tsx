@@ -41,7 +41,7 @@ const FEED_ICONS: Record<string, { ios: string; android: string; web: string }> 
   plus: { ios: "plus", android: "add", web: "add" },
 };
 function FeedIcon({ name, size = 22, color = "#fff" }: { name: string; size?: number; color?: string }) {
-  return <SymbolView name={FEED_ICONS[name] ?? FEED_ICONS.more as any} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+  return <SymbolView name={(FEED_ICONS[name] ?? FEED_ICONS.more) as any} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
 }
 const { height, width } = Dimensions.get("window");
 
