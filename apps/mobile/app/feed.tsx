@@ -34,6 +34,9 @@ const FEED_ICONS: Record<string, { ios: string; android: string; web: string }> 
   music: { ios: "music.note", android: "music_note", web: "music_note" },
   share: { ios: "arrowshape.turn.up.right.fill", android: "share", web: "share" },
   more: { ios: "ellipsis", android: "more_vert", web: "more_vert" },
+  comment: { ios: "bubble.left.fill", android: "chat_bubble", web: "chat_bubble" },
+  bookmark: { ios: "bookmark.fill", android: "bookmark", web: "bookmark" },
+  repost: { ios: "arrow.2.squarepath", android: "repeat", web: "repeat" },
   home: { ios: "house.fill", android: "home", web: "home" },
   friends: { ios: "person.2.fill", android: "group", web: "group" },
   inbox: { ios: "tray.fill", android: "inbox", web: "inbox" },
@@ -190,11 +193,11 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         </View>
         <Pressable onPress={() => router.push("/discover")} style={styles.searchButton}><FeedIcon name="search" size={22} /></Pressable>
       </View>
-      <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}><Pressable style={styles.profileAction} onPress={() => item.owner?.username && router.push({ pathname:"/profile", params:{username:item.owner.username} })}><View style={styles.profileActionAvatar}><Text style={styles.profileActionText}>{(item.owner?.username||"T").slice(0,1).toUpperCase()}</Text></View><View style={styles.profilePlus}><Text style={styles.profilePlusText}>+</Text></View></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("repost")}><Text style={[styles.actionIcon, engagement?.reposted && styles.activeIcon]}>↻</Text><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
+      <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}><Pressable style={styles.profileAction} onPress={() => item.owner?.username && router.push({ pathname:"/profile", params:{username:item.owner.username} })}><View style={styles.profileActionAvatar}><Text style={styles.profileActionText}>{(item.owner?.username||"T").slice(0,1).toUpperCase()}</Text></View><View style={styles.profilePlus}><FeedIcon name="plus" size={13} color="#fff" /></View></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("like")}><FeedIcon name="heart" size={25} color={engagement?.liked ? "#fe2c55" : "#fff"} /><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={onComments}><FeedIcon name="comment" size={25} /><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("save")}><FeedIcon name="bookmark" size={25} color={engagement?.saved ? "#fe2c55" : "#fff"} /><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("repost")}><FeedIcon name="repost" size={25} color={engagement?.reposted ? "#fe2c55" : "#fff"} /><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><FeedIcon name="music" size={25} /><Text style={styles.actionLabel}>Sound</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("share")}><FeedIcon name="share" size={25} /><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onNotInterested}><FeedIcon name="more" size={25} /><Text style={styles.actionLabel}>More</Text></Pressable>
