@@ -2,9 +2,12 @@ name: TwiTok CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - feature/twitok-media-suite-clean-2026-09-30
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
