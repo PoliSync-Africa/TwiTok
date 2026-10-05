@@ -38,7 +38,7 @@ const port = Number(process.env.PORT ?? 4000);
 
 app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
 app.use(helmet());
-const allowedOrigins = (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean);
+const allowedOrigins = Array.from(new Set((process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean).concat(["https://twitokapp.com", "https://www.twitokapp.com", "https://twitok-web.onrender.com"])));
 if (!allowedOrigins.length) throw new Error("ALLOWED_WEB_ORIGINS or ADMIN_WEB_ORIGIN must be configured");
 app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error("CORS origin denied")), credentials: true }));
 app.use((req, res, next) => {
