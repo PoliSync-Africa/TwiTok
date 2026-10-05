@@ -144,6 +144,8 @@ export default function Home() {
   }
 
   async function openNotifications() {
+    const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
+    if (!token) { window.location.href = "/login"; return; }
     setNotificationsOpen(true);
     try {
       const response = await authFetch(api + "/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -181,6 +183,8 @@ export default function Home() {
 
   async function engage(videoId: string, action: "like" | "save" | "share" | "repost") {
     if (videoId.startsWith("demo-")) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
+    if (!token) { window.location.href = "/login"; return; }
     try {
       if (action === "share" && typeof navigator.share === "function") {
         await navigator.share({ title: "TwiTok", text: "Watch this video on TwiTok", url: window.location.origin + "/video/" + videoId });
@@ -200,6 +204,8 @@ export default function Home() {
 
   async function remixVideo(videoId: string, mode: "DUET" | "STITCH") {
     if (videoId.startsWith("demo-")) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
+    if (!token) { window.location.href = "/login"; return; }
     try {
       const response = await authFetch(api + "/video/" + encodeURIComponent(videoId) + "/remix", {
         method: "POST",
@@ -216,6 +222,8 @@ export default function Home() {
 
   async function openComments(videoId: string) {
     if (videoId.startsWith("demo-")) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
+    if (!token) { window.location.href = "/login"; return; }
     setCommentsVideoId(videoId);
     setCommentsBusy(true);
     try {
@@ -225,6 +233,8 @@ export default function Home() {
   }
 
   async function submitComment() {
+    const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
+    if (!token) { window.location.href = "/login"; return; }
     if (!commentsVideoId || !commentDraft.trim()) return;
     const text = commentDraft.trim().slice(0, 500);
     setCommentsBusy(true);
