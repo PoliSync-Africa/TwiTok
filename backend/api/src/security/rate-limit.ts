@@ -19,7 +19,7 @@ export function rateLimit(options: { windowMs: number; max: number; key?: (req: 
   return async (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
     const identity = options.key?.(req) ?? getClientIp(req);
-    const key = ;
+    const key = `twitok:rl:${options.windowMs}:${options.max}:${identity.slice(0, 220)}`;
 
     const distributed = await rateLimitHit(key, options.windowMs);
     if (distributed) {
@@ -53,5 +53,5 @@ export function authRateLimit(req: Request) {
   const identifier = typeof body.identifier === "string"
     ? body.identifier.trim().toLowerCase()
     : typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  return ;
+  return `${getClientIp(req)}:${identifier.slice(0, 160)}`;
 }
