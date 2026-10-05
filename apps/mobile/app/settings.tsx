@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { Typography, Colors } from "../theme/typography";
 import { clearAuthToken, getAuthToken } from "../lib/auth";
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 export default function SettingsScreen(){
   const [allowComments,setAllowComments]=useState(true);
@@ -24,7 +24,20 @@ export default function SettingsScreen(){
     } catch(e){ Alert.alert("Error",e instanceof Error?e.message:"Unable to save"); }
     finally{setSaving(false);}
   }
-  async function logout(){ await clearAuthToken(); router.replace("/"); }
+  async function logout(){
+    try {
+      const token = await getAuthToken();
+      if (token) {
+        await fetch(API + "/auth/logout", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+        }).catch(() => undefined);
+      }
+    } finally {
+      await clearAuthToken();
+      router.replace("/login");
+    }
+  }
   return <ScrollView style={styles.container} contentContainerStyle={styles.content}>
     <Text style={styles.title}>Settings</Text>
     <Text style={styles.section}>Comments</Text>
