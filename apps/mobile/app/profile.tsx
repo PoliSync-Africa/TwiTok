@@ -261,6 +261,7 @@ export default function ProfileScreen() {
         <Text style={styles.errorText}>
           {error || "Profile unavailable"}
         </Text>
+        {error.toLowerCase().includes("sign in") ? <View style={{flexDirection:"row",gap:18}}><Pressable onPress={() => router.push("/register")}><Text style={styles.linkText}>Sign up</Text></Pressable><Pressable onPress={() => router.push("/login")}><Text style={styles.linkText}>Sign in</Text></Pressable></View> : null}
         <Pressable onPress={() => router.back()}>
           <Text style={styles.linkText}>Go back</Text>
         </Pressable>
