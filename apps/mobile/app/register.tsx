@@ -6,7 +6,7 @@ import { saveAuthToken } from "../lib/auth";
 import { DEFAULT_COUNTRY, type Country } from "../lib/countries";
 import { CountryPicker } from "../components/CountryPicker";
 
-const API=process.env.EXPO_PUBLIC_TWITOK_API_URL??"http://localhost:4000/api/v1";
+const API=process.env.EXPO_PUBLIC_TWITOK_API_URL??"https://twitok-api-sfig.onrender.com/api/v1";
 
 export default function RegisterScreen(){
  const [email,setEmail]=useState("");const [phone,setPhone]=useState("");const [password,setPassword]=useState("");const [dateOfBirth,setDateOfBirth]=useState("");const [country,setCountry]=useState<Country>(DEFAULT_COUNTRY);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
