@@ -371,6 +371,7 @@ export default function ProfileScreen() {
             <Pressable
               style={styles.iconButton}
               accessibilityLabel="Settings"
+              onPress={() => router.push("/settings")}
             >
               <ProfileIcon name="settings" size={21} />
             </Pressable>
