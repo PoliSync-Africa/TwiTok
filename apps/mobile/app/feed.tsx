@@ -164,6 +164,18 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
   return (
     <>
       <View style={styles.scrim} />
+      <View style={styles.feedTop}>
+        <Image source={require("../assets/images/twitok-logo.png")} style={styles.feedLogo} resizeMode="contain" />
+        <View style={styles.feedTabs}>
+          {(["FOLLOWING","FOR_YOU","AFRICA"] as const).map(tab => (
+            <Pressable key={tab} onPress={() => onSurface(tab)} style={styles.feedTab}>
+              <Text style={surface===tab ? styles.feedTabActive : styles.feedTabText}>{tab==="FOR_YOU"?"For You":tab==="FOLLOWING"?"Following":"Africa"}</Text>
+              {surface===tab ? <View style={styles.feedTabUnderline} /> : null}
+            </Pressable>
+          ))}
+        </View>
+        <Pressable onPress={() => router.push("/discover")}><Text style={styles.searchGlyph}>⌕</Text></Pressable>
+      </View>
       <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
@@ -293,11 +305,19 @@ const styles = StyleSheet.create({
   heartBurst: { color: "#fff", fontSize: 92, fontWeight: "900", textShadowColor: "#ff2d55", textShadowRadius: 16, opacity: 0.95 },
   speedBadge: { backgroundColor: "rgba(0,0,0,0.68)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22 },
   speedBadgeText: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  rightRail: { position: "absolute", right: 14, bottom: 105, alignItems: "center", gap: 18 },
-  action: { alignItems: "center", minWidth: 52 },
-  actionIcon: { color: "#fff", fontSize: 34, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
+  feedTop:{position:"absolute",top:48,left:14,right:14,zIndex:8,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},
+  feedLogo:{width:42,height:42},
+  feedTabs:{flex:1,flexDirection:"row",justifyContent:"center",gap:22},
+  feedTab:{alignItems:"center",paddingHorizontal:3,paddingVertical:5},
+  feedTabText:{color:"rgba(255,255,255,.72)",fontSize:14,fontWeight:"800"},
+  feedTabActive:{color:"#fff",fontSize:15,fontWeight:"900"},
+  feedTabUnderline:{height:3,width:28,borderRadius:3,backgroundColor:Colors.gold,marginTop:5},
+  searchGlyph:{color:"#fff",fontSize:28,fontWeight:"300"},
+  rightRail: { position: "absolute", right: 12, bottom: 105, alignItems: "center", gap: 17 },
+  action: { alignItems: "center", minWidth: 54, paddingVertical: 3 },
+  actionIcon: { color: "#fff", fontSize: 32, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
   actionLabel: { color: "#fff", fontSize: 11, marginTop: 2, textShadowColor: "#000", textShadowRadius: 4 },
-  activeIcon: { color: "#ff2d55" },
+  activeIcon: { color: Colors.gold },
   meta: { position: "absolute", left: 16, right: 82, bottom: 92 },
   usernameRow:{flexDirection:"row",alignItems:"center",gap:5},
   feedVerified:{width:20,height:20,alignItems:"center",justifyContent:"center",marginLeft:1},feedVerifiedSeal:{position:"absolute",color:"#20B2AA",fontSize:24,fontWeight:"900",lineHeight:24,textShadowColor:"rgba(0,0,0,0.28)",textShadowOffset:{width:0,height:1},textShadowRadius:1},feedVerifiedCheck:{color:"#fff",fontSize:10,fontWeight:"900",lineHeight:12,textShadowColor:"rgba(0,0,0,0.22)",textShadowOffset:{width:0,height:1},textShadowRadius:1},
@@ -310,11 +330,11 @@ const styles = StyleSheet.create({
   bottomTabs: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", height: 54, alignItems: "center", paddingHorizontal: 18 },
   bottomTab: { alignItems: "center", justifyContent: "center", minWidth: 54, gap: 2 },
   bottomIcon: { color: Colors.textSecondary, fontSize: 21, lineHeight: 22 },
-  bottomIconActive: { color: Colors.text, fontSize: 21, lineHeight: 22 },
+  bottomIconActive: { color: Colors.gold, fontSize: 21, lineHeight: 22 },
   bottomLabel: { color: Colors.textSecondary, ...Typography.captionMedium },
-  bottomLabelActive: { color: Colors.text, ...Typography.captionMedium },
-  createButton: { width: 48, height: 34, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  createPlus: { color: "#000", fontSize: 25, lineHeight: 28, fontWeight: "700" },
+  bottomLabelActive: { color: Colors.gold, ...Typography.captionMedium },
+  createButton: { width: 50, height: 36, borderRadius: 10, backgroundColor: Colors.gold, alignItems: "center", justifyContent: "center" },
+  createPlus: { color: "#050505", fontSize: 25, lineHeight: 28, fontWeight: "900" },
   tabActive: { color: Colors.text, ...Typography.tab },
   promotedBadge:{alignSelf:"flex-start",backgroundColor:"rgba(0,0,0,0.72)",borderRadius:7,paddingHorizontal:9,paddingVertical:5,marginBottom:7},
   promotedText:{color:"#fff",fontSize:12,fontWeight:"800"},
