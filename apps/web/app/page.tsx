@@ -145,7 +145,7 @@ export default function Home() {
 
   async function openNotifications() {
     const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
-    if (!token) { window.location.href = "/login"; return; }
+    if (!token) { window.location.href = "/auth-required?next=" + encodeURIComponent(window.location.pathname + window.location.search); return; }
     setNotificationsOpen(true);
     try {
       const response = await authFetch(api + "/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
