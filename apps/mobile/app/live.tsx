@@ -43,7 +43,18 @@ export default function LiveScreen() {
     } finally { setBusy(false); }
   }
 
-  useEffect(() => {\n    let active = true;\n    void (async () => {\n      try {\n        await AudioSession.startAudioSession();\n        if (active) await openLive();\n      } catch (e) {\n        if (active) setError(e instanceof Error ? e.message : "Unable to start LIVE audio session.");\n      }\n    })();\n    return () => { active = false; void AudioSession.stopAudioSession(); };\n  }, []);
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        await AudioSession.startAudioSession();
+        if (active) await openLive();
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Unable to start LIVE audio session.");
+      }
+    })();
+    return () => { active = false; void AudioSession.stopAudioSession(); };
+  }, []);
 
   async function endLive() {
     if (!stream) { router.back(); return; }
