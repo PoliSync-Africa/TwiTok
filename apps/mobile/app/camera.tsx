@@ -153,6 +153,9 @@ export default function CameraStudioScreen() {
           aiOutputUri: first.uri,
           aiOutputMode: "PHOTO",
           aiOutputMimeType: first.mimeType ?? "image/jpeg",
+          soundId,
+          soundTitle,
+          autoStudio: "1",
         },
       });
     } else {
@@ -163,6 +166,9 @@ export default function CameraStudioScreen() {
           recordedDuration: String(first.duration ?? 0),
           recordedEffect: effect,
           recordedSpeed: String(speed),
+          soundId,
+          soundTitle,
+          autoStudio: "1",
         },
       });
     }
