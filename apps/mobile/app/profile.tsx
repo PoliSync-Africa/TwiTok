@@ -27,7 +27,7 @@ const PROFILE_ICONS: Record<string, { ios: string; android: string; web: string 
 };
 
 function ProfileIcon({ name, size = 22, color = "#fff" }: { name: string; size?: number; color?: string }) {
-  return <SymbolView name={PROFILE_ICONS[name] ?? PROFILE_ICONS.settings} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+  return <SymbolView name={PROFILE_ICONS[name] ?? PROFILE_ICONS.settings as any} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
 }
 
 type Video = {
