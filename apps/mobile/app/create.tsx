@@ -24,7 +24,7 @@ const CREATE_ICONS: Record<string, { ios: string; android: string; web: string }
   plus: { ios: "plus", android: "add", web: "add" },
 };
 function CreateIcon({ name, size = 21, color = "#fff" }: { name: string; size?: number; color?: string }) {
-  return <SymbolView name={CREATE_ICONS[name] ?? CREATE_ICONS.plus} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+  return <SymbolView name={(CREATE_ICONS[name] ?? CREATE_ICONS.plus) as any} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
 }
 type Asset = { uri: string; mimeType?: string | null; duration?: number | null; fileSize?: number | null; fileName?: string | null };
 type ClipSetting = { speed: number; volume: number; muted: boolean };
