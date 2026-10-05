@@ -182,6 +182,14 @@ export default function CreatePage() {
       .catch(() => undefined);
   }, []);
 
+  // Opening /create is the explicit user action that enters TwiTok's creator camera.
+  // Request camera + microphone automatically on supported secure browsers.
+  useEffect(() => {
+    if (file || cameraActive || cameraStarting) return;
+    const timer = window.setTimeout(() => { void openBrowserCamera(); }, 80);
+    return () => window.clearTimeout(timer);
+  }, []); 
+
   async function toggleSoundPreview(sound: Sound) {
     if (!sound.audioUrl) return setMessage("This sound does not have a preview available yet.");
     if (!soundAudioRef.current) soundAudioRef.current = new Audio();
@@ -517,7 +525,7 @@ export default function CreatePage() {
               <div className="camera-stage">
                 {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>{cameraStarting ? "Starting camera…" : "Camera unavailable"}</b><small>{cameraPermission === "denied" ? "Camera permission is blocked for this site. Enable Camera for Chrome in iPhone Settings, return here, refresh, then retry." : "TwiTok is requesting camera access. If the browser does not show a prompt, use Retry camera or Record with phone."}</small><button type="button" className="camera-enable" disabled={cameraStarting} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void openBrowserCamera(); }}>{cameraStarting ? "Opening…" : "Retry camera"}</button><label className="camera-phone-capture">▣ Record with phone<input type="file" accept="video/*" capture="user" onChange={e => { stopBrowserCamera(); chooseFiles(e.target.files); }} /></label></div>}
                 <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
-                <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
+                <button type="button" className="camera-sound" onClick={() => { window.location.href = "/sound"; }}>♫ Add sound</button>
                 <div className="camera-side-tools">
                   <button type="button" onClick={() => { const next = cameraFacingMode === "user" ? "environment" : "user"; void openBrowserCamera(next); }}>↻<small>Flip</small></button>
                   <button type="button" onClick={() => setSpeed(v => v === 2 ? .5 : v === .5 ? 1 : v === 1 ? 1.5 : 2)}>{speed}×<small>Speed</small></button>
