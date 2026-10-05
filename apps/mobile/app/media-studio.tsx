@@ -7,7 +7,7 @@ import UnifiedMediaStudio, { DEFAULT_STUDIO_PLAN, StudioPlan } from "../componen
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
 export default function MediaStudioScreen() {
-  const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mode?: string; duration?: string }>();
+  const params = useLocalSearchParams<{ uri?: string; mimeType?: string; mode?: string; duration?: string; soundId?: string; soundTitle?: string }>();
   const mode = String(params.mode ?? "VIDEO").toUpperCase() === "PHOTO" ? "PHOTO" : "VIDEO";
   const [plan, setPlan] = useState<StudioPlan>(DEFAULT_STUDIO_PLAN);
   const [capabilities, setCapabilities] = useState<Set<string> | undefined>(undefined);
@@ -80,7 +80,7 @@ export default function MediaStudioScreen() {
         }
       }
       if(!outputUrl) throw new Error("AI Studio is still processing. Please try again shortly.");
-      router.replace({pathname:"/create",params:{aiOutputUri:outputUrl,aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??""),aiOutputMode:mode}});
+      router.replace({pathname:"/create",params:{aiOutputUri:outputUrl,aiOutputMimeType:mode==="PHOTO"?"image/jpeg":"video/mp4",aiOutputDuration:String(params.duration??""),aiOutputMode:mode,soundId:String(params.soundId ?? ""),soundTitle:String(params.soundTitle ?? "")}});
     } catch(e) { Alert.alert("AI Studio",e instanceof Error?e.message:"Unable to process media."); }
   }
 
