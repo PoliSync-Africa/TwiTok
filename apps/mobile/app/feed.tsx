@@ -269,7 +269,7 @@ export default function FeedScreen() {
 
   if (loading) return <View style={styles.center}><ActivityIndicator color="#fff" /><Text style={styles.muted}>Loading For You…</Text></View>;
 
-  if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><Text style={styles.muted}>Return to the home screen and sign in to continue.</Text></View>;
+  if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text>{error.toLowerCase().includes("sign in") ? <View style={{flexDirection:"row",gap:18}}><Pressable onPress={() => router.push("/register")}><Text style={styles.muted}>Sign up</Text></Pressable><Pressable onPress={() => router.push("/login")}><Text style={styles.muted}>Sign in</Text></Pressable></View> : <Text style={styles.muted}>Return to the home screen and try again.</Text>}</View>;
 
   async function loadMore() {
     if (loading || loadingMore || !nextCursor) return;
