@@ -10,10 +10,25 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { getAuthToken } from "../lib/auth";
 
 const API =
   process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+
+const PROFILE_ICONS: Record<string, { ios: string; android: string; web: string }> = {
+  back: { ios: "chevron.left", android: "arrow_back", web: "arrow_back" },
+  share: { ios: "square.and.arrow.up", android: "share", web: "share" },
+  verify: { ios: "checkmark.seal.fill", android: "verified", web: "verified" },
+  settings: { ios: "gearshape.fill", android: "settings", web: "settings" },
+  add: { ios: "person.badge.plus", android: "person_add", web: "person_add" },
+  message: { ios: "message.fill", android: "chat_bubble", web: "chat_bubble" },
+  live: { ios: "dot.radiowaves.left.and.right", android: "live_tv", web: "live_tv" },
+};
+
+function ProfileIcon({ name, size = 22, color = "#fff" }: { name: string; size?: number; color?: string }) {
+  return <SymbolView name={PROFILE_ICONS[name] ?? PROFILE_ICONS.settings} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+}
 
 type Video = {
   id: string;
@@ -266,14 +281,14 @@ export default function ProfileScreen() {
           style={styles.topIcon}
           accessibilityLabel="Go back"
         >
-          <Text style={styles.topIconText}>‹</Text>
+          <ProfileIcon name="back" size={22} />
         </Pressable>
 
         <Text style={styles.topTitle}>Profile</Text>
 
         <View style={styles.topRight}>
           <Pressable style={styles.topIcon} accessibilityLabel="Share profile">
-            <Text style={styles.topIconText}>↗</Text>
+            <ProfileIcon name="share" size={21} />
           </Pressable>
         </View>
       </View>
@@ -350,14 +365,14 @@ export default function ProfileScreen() {
               onPress={() => router.push("/verification")}
               accessibilityLabel="Verification"
             >
-              <Text style={styles.actionIcon}>✓</Text>
+              <ProfileIcon name="verify" size={21} color="#25f4ee" />
             </Pressable>
 
             <Pressable
               style={styles.iconButton}
               accessibilityLabel="Settings"
             >
-              <Text style={styles.actionIcon}>⚙</Text>
+              <ProfileIcon name="settings" size={21} />
             </Pressable>
           </View>
         ) : (
@@ -389,14 +404,14 @@ export default function ProfileScreen() {
                 })
               }
             >
-              <Text style={styles.messageText}>Message</Text>
+              <><ProfileIcon name="message" size={17} /><Text style={styles.messageText}>Message</Text></>
             </Pressable>
 
             <Pressable
               style={styles.iconButton}
               accessibilityLabel="More profile actions"
             >
-              <Text style={styles.actionIcon}>＋</Text>
+              <ProfileIcon name="add" size={21} />
             </Pressable>
           </View>
         )}
@@ -407,7 +422,7 @@ export default function ProfileScreen() {
           style={styles.livePill}
           onPress={() => router.push("/live")}
         >
-          <Text style={styles.liveDot}>●</Text>
+          <ProfileIcon name="live" size={16} color="#fe2c55" />
           <Text style={styles.liveText}>LIVE</Text>
         </Pressable>
 
