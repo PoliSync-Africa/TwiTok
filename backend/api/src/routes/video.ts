@@ -2,11 +2,12 @@ import { Router } from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { requireUser } from "../auth/middleware.js";
-import { completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, createVideoRemixUpload, getVideoRemixPlayback, publishVideo, createPhotoUploadSession, completePhotoUpload, createPhotoPost, createTextPost } from "../video/service.js";
+import { handleCloudflareStreamWebhook, completeUpload, createUploadSession, createVideoDraft, createVideoRemix, getVideoRemix, updateVideoRemix, completeVideoRemix, createVideoRemixUpload, getVideoRemixPlayback, publishVideo, createPhotoUploadSession, completePhotoUpload, createPhotoPost, createTextPost } from "../video/service.js";
 import { createMultipartUpload, createPresignedUploadPart, completeMultipartUpload, verifyMediaObject } from "../media/storage.js";
 import { queueTranscription, getTranscription, updateCaptions } from "../video/transcription.js";
 import { queueCaptionTranslation, getCaptionTracks, TRANSLATION_LANGUAGES } from "../video/translation.js";
 import { listStickers } from "../video/stickers.js";
+import { verifyCloudflareWebhookSignature } from "../media/cloudflare-stream.js";
 
 export const videoRouter = Router();
 
@@ -272,4 +273,19 @@ videoRouter.get("/:videoId/caption-tracks", requireUser, async (req, res) => {
 
 videoRouter.get("/stickers", requireUser, async (req, res) => {
   res.json({ stickers: listStickers(typeof req.query.category === "string" ? req.query.category : undefined) });
+});
+
+videoRouter.post("/webhooks/cloudflare-stream", async (req, res) => {
+  try {
+    const signature = String(req.headers["webhook-signature"] ?? "");
+    const rawBody = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
+    if (signature && !verifyCloudflareWebhookSignature(signature, rawBody)) {
+      return res.status(401).json({ error: "Invalid webhook signature" });
+    }
+    const result = await handleCloudflareStreamWebhook(await getDb(), req.body);
+    res.json(result);
+  } catch (err) {
+    console.error("[CloudflareStream Webhook Error]:", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "Webhook processing failed" });
+  }
 });

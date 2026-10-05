@@ -1,3 +1,4 @@
+import { cloudflareStreamConfigured, createDirectStreamUpload, getStreamPlaybackUrls } from "../media/cloudflare-stream.js";
 import crypto from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { evaluateText } from "../safety/engine.js";
@@ -123,6 +124,33 @@ export async function createUploadSession(db: Db, userId: ObjectId, input: {
     uploadId, userId, objectKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes,
     durationMs: input.durationMs ?? null, status: "UPLOADING", createdAt: now, updatedAt: now
   });
+  if (cloudflareStreamConfigured()) {
+    try {
+      const maxSeconds = Math.min(3600, Math.ceil((input.durationMs ?? 3600000) / 1000));
+      const streamUpload = await createDirectStreamUpload({
+        creatorId: userId.toHexString(),
+        uploadId,
+        maxDurationSeconds: maxSeconds
+      });
+      await db.collection("video_uploads").updateOne(
+        { uploadId },
+        { $set: { streamUid: streamUpload.uid, provider: "CLOUDFLARE_STREAM" } }
+      );
+      return {
+        uploadId,
+        objectKey,
+        status: "UPLOADING",
+        uploadUrl: streamUpload.uploadUrl,
+        streamUid: streamUpload.uid,
+        provider: "CLOUDFLARE_STREAM",
+        expiresInSeconds: 3600,
+        storageConfigured: true
+      };
+    } catch (err) {
+      console.error("[CloudflareStream] Failed to create direct upload:", err);
+    }
+  }
+
   const signed = mediaConfigured()
     ? await createPresignedUpload({ objectKey, mimeType: input.mimeType, expiresInSeconds: 900 })
     : null;
@@ -404,4 +432,59 @@ export async function updateVideoRemix(db: Db, userId: ObjectId, remixId: string
   );
   if (!result) throw new Error("Remix draft not found");
   return getVideoRemix(db, userId, remixId);
+}
+
+export async function handleCloudflareStreamWebhook(db: Db, payload: any) {
+  const uid = payload?.uid || payload?.data?.uid;
+  const status = payload?.status?.state || payload?.data?.status?.state;
+  const meta = payload?.meta || payload?.data?.meta || {};
+  const uploadId = meta.uploadId;
+
+  if (!uid) return { processed: false, reason: "Missing uid" };
+
+  const playback = getStreamPlaybackUrls(uid);
+  const now = new Date();
+
+  if (uploadId) {
+    if (status === "ready") {
+      await db.collection("video_uploads").updateOne(
+        { uploadId },
+        {
+          $set: {
+            status: "READY",
+            streamUid: uid,
+            hlsUrl: playback.hlsUrl,
+            dashUrl: playback.dashUrl,
+            thumbnailUrl: playback.thumbnailUrl,
+            durationSeconds: payload?.duration || payload?.data?.duration,
+            updatedAt: now
+          }
+        }
+      );
+
+      // Update any draft or published video associated with this upload
+      await db.collection("videos").updateMany(
+        { uploadId },
+        {
+          $set: {
+            status: "PUBLISHED",
+            hlsUrl: playback.hlsUrl,
+            dashUrl: playback.dashUrl,
+            videoUrl: playback.hlsUrl,
+            thumbnailUrl: playback.thumbnailUrl,
+            previewGifUrl: playback.previewGifUrl,
+            streamUid: uid,
+            updatedAt: now
+          }
+        }
+      );
+    } else if (status === "error") {
+      await db.collection("video_uploads").updateOne(
+        { uploadId },
+        { $set: { status: "FAILED", errorMessage: payload?.status?.errorReasonText || "Encoding failed", updatedAt: now } }
+      );
+    }
+  }
+
+  return { processed: true, uid, status };
 }
