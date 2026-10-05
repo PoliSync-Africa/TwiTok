@@ -3,6 +3,7 @@ import { ActivityIndicator, Dimensions, FlatList, Image, Platform, Pressable, Sh
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
 import { Typography, Colors } from "../theme/typography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +27,22 @@ type Video = {
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+
+const FEED_ICONS: Record<string, { ios: string; android: string; web: string }> = {
+  search: { ios: "magnifyingglass", android: "search", web: "search" },
+  heart: { ios: "heart.fill", android: "favorite", web: "favorite" },
+  music: { ios: "music.note", android: "music_note", web: "music_note" },
+  share: { ios: "arrowshape.turn.up.right.fill", android: "share", web: "share" },
+  more: { ios: "ellipsis", android: "more_vert", web: "more_vert" },
+  home: { ios: "house.fill", android: "home", web: "home" },
+  friends: { ios: "person.2.fill", android: "group", web: "group" },
+  inbox: { ios: "tray.fill", android: "inbox", web: "inbox" },
+  profile: { ios: "person.crop.circle.fill", android: "account_circle", web: "account_circle" },
+  plus: { ios: "plus", android: "add", web: "add" },
+};
+function FeedIcon({ name, size = 22, color = "#fff" }: { name: string; size?: number; color?: string }) {
+  return <SymbolView name={FEED_ICONS[name] ?? FEED_ICONS.more} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size }}>•</Text>} />;
+}
 const { height, width } = Dimensions.get("window");
 
 function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onNotInterested: () => void }) {
@@ -140,7 +157,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   }, [active, player, source]);
 
   if (item.mediaType === "PHOTO") {
-    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFill} />{heartBurst ? <Text pointerEvents="none" style={styles.heartBurst}>♥</Text> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
+    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFill} />{heartBurst ? <FeedIcon name="heart" size={72} color="#fe2c55" /> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
   }
 
   if (item.mediaType === "TEXT") {
@@ -171,16 +188,16 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
           <Pressable onPress={() => onSurface("FOLLOWING")} style={styles.feedTab}><Text style={surface==="FOLLOWING" ? styles.feedTabActive : styles.feedTabText}>Following</Text>{surface==="FOLLOWING" ? <View style={styles.feedTabUnderline} /> : null}</Pressable>
           <Pressable onPress={() => onSurface("FOR_YOU")} style={styles.feedTab}><Text style={surface==="FOR_YOU" ? styles.feedTabActive : styles.feedTabText}>For You</Text>{surface==="FOR_YOU" ? <View style={styles.feedTabUnderline} /> : null}</Pressable>
         </View>
-        <Pressable onPress={() => router.push("/discover")} style={styles.searchButton}><Text style={styles.searchGlyph}>⌕</Text></Pressable>
+        <Pressable onPress={() => router.push("/discover")} style={styles.searchButton}><FeedIcon name="search" size={22} /></Pressable>
       </View>
       <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}><Pressable style={styles.profileAction} onPress={() => item.owner?.username && router.push({ pathname:"/profile", params:{username:item.owner.username} })}><View style={styles.profileActionAvatar}><Text style={styles.profileActionText}>{(item.owner?.username||"T").slice(0,1).toUpperCase()}</Text></View><View style={styles.profilePlus}><Text style={styles.profilePlusText}>+</Text></View></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={onComments}><Text style={styles.actionIcon}>○</Text><Text style={styles.actionLabel}>{engagement?.commentCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("save")}><Text style={[styles.actionIcon, engagement?.saved && styles.activeIcon]}>▱</Text><Text style={styles.actionLabel}>{engagement?.saveCount ?? 0}</Text></Pressable>
         <Pressable style={styles.action} onPress={() => onAction("repost")}><Text style={[styles.actionIcon, engagement?.reposted && styles.activeIcon]}>↻</Text><Text style={styles.actionLabel}>{engagement?.repostCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.actionIcon}>♫</Text><Text style={styles.actionLabel}>Sound</Text></Pressable>
-        <Pressable style={styles.action} onPress={() => onAction("share")}><Text style={styles.actionIcon}>↗</Text><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
-        <Pressable style={styles.action} onPress={onNotInterested}><Text style={styles.actionIcon}>⋯</Text><Text style={styles.actionLabel}>More</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><FeedIcon name="music" size={25} /><Text style={styles.actionLabel}>Sound</Text></Pressable>
+        <Pressable style={styles.action} onPress={() => onAction("share")}><FeedIcon name="share" size={25} /><Text style={styles.actionLabel}>{engagement?.shareCount ?? 0}</Text></Pressable>
+        <Pressable style={styles.action} onPress={onNotInterested}><FeedIcon name="more" size={25} /><Text style={styles.actionLabel}>More</Text></Pressable>
       </View>
       <View style={[styles.meta, { bottom: 92 + insets.bottom }]}>
         {item.promoted ? <View style={styles.promotedBadge}><Text style={styles.promotedText}>Sponsored · Promoted</Text></View> : null}
@@ -188,7 +205,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
-      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><Text style={surface==="FOR_YOU"?styles.bottomIconActive:styles.bottomIcon}>⌂</Text><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")} style={styles.bottomTab}><Text style={styles.bottomIcon}>♟</Text><Text style={styles.bottomLabel}>Friends</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/camera")} accessibilityLabel="Create"><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => router.push("/messages")} style={styles.bottomTab}><Text style={styles.bottomIcon}>▢</Text><Text style={styles.bottomLabel}>Inbox</Text></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><Text style={styles.bottomIcon}>♙</Text><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
+      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><Text style={surface==="FOR_YOU"?styles.bottomIconActive:styles.bottomIcon}>⌂</Text><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")} style={styles.bottomTab}><FeedIcon name="friends" size={22} /><Text style={styles.bottomLabel}>Friends</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/camera")} accessibilityLabel="Create"><FeedIcon name="plus" size={27} color="#000" /></Pressable><Pressable onPress={() => router.push("/messages")} style={styles.bottomTab}><FeedIcon name="inbox" size={22} /><Text style={styles.bottomLabel}>Inbox</Text></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><FeedIcon name="profile" size={22} /><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
     </>
   );
 }
