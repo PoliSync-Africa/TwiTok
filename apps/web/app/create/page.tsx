@@ -78,6 +78,7 @@ export default function CreatePage() {
   const [captionsSaving, setCaptionsSaving] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraRecording, setCameraRecording] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
   const [cameraDurationLimit, setCameraDurationLimit] = useState<15 | 60 | 600>(60);
   const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
@@ -85,7 +86,7 @@ export default function CreatePage() {
   const cameraChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); }, [preview]);
-  useEffect(() => { if (step !== "SELECT" || cameraActive || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return; void openBrowserCamera(); }, [step]);
+  // iPhone/Safari camera permission is requested from an explicit user action.
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
 
   useEffect(() => () => { soundAudioRef.current?.pause(); }, []);
@@ -234,7 +235,7 @@ export default function CreatePage() {
     setMessage("");
   }
 
-  async function openBrowserCamera() {
+  async function openBrowserCamera(nextFacingMode: "user" | "environment" = cameraFacingMode) {
     if (typeof navigator === "undefined") return;
     if (!window.isSecureContext) {
       setMessage("Camera requires a secure HTTPS connection.");
@@ -253,7 +254,7 @@ export default function CreatePage() {
       // Request video first so a microphone permission/device problem cannot
       // make the entire camera preview fail.
       const cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "user" }, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        video: { facingMode: { ideal: nextFacingMode }, width: { ideal: 1080 }, height: { ideal: 1920 } },
         audio: false
       });
 
@@ -266,6 +267,7 @@ export default function CreatePage() {
       }
 
       cameraStreamRef.current = stream;
+      setCameraFacingMode(nextFacingMode);
       setCameraActive(true);
       setMessage("");
       requestAnimationFrame(() => {
@@ -278,7 +280,7 @@ export default function CreatePage() {
       setCameraActive(false);
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "SecurityError") {
-        setMessage("Camera permission is blocked. Allow Camera for twitokapp.com in Safari Settings, then tap Flip to retry.");
+        setMessage("Camera permission is blocked. Allow Camera for twitokapp.com in Safari, then tap Enable camera to retry.");
       } else if (name === "NotFoundError") {
         setMessage("No camera was found on this device.");
       } else {
@@ -288,8 +290,11 @@ export default function CreatePage() {
   }
 
   function stopBrowserCamera() {
-    cameraRecorderRef.current?.stop();
+    const recorder = cameraRecorderRef.current;
     cameraRecorderRef.current = null;
+    if (recorder && recorder.state !== "inactive") {
+      try { recorder.stop(); } catch { /* already stopped */ }
+    }
     cameraStreamRef.current?.getTracks().forEach(track => track.stop());
     cameraStreamRef.current = null;
     setCameraActive(false);
@@ -308,7 +313,11 @@ export default function CreatePage() {
       const blob = new Blob(chunks, { type: mimeType });
       const extension = mimeType.includes("mp4") ? "mp4" : "webm";
       const recorded = new File([blob], "twitok-camera-" + Date.now() + "." + extension, { type: mimeType });
-      stopBrowserCamera();
+      cameraRecorderRef.current = null;
+      cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+      cameraStreamRef.current = null;
+      setCameraActive(false);
+      setCameraRecording(false);
       chooseFile(recorded);
     };
     recorder.start(250);
@@ -447,11 +456,11 @@ export default function CreatePage() {
           ) : (
             <div className="camera-create">
               <div className="camera-stage">
-                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Allow camera access or choose a video from your device.</small></div>}
+                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Tap Enable camera to give Safari permission, or upload a video.</small><button type="button" className="camera-enable" onClick={() => void openBrowserCamera()}>Enable camera</button></div>}
                 <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
                 <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
                 <div className="camera-side-tools">
-                  <button type="button" onClick={openBrowserCamera}>↻<small>Flip</small></button>
+                  <button type="button" onClick={() => { const next = cameraFacingMode === "user" ? "environment" : "user"; void openBrowserCamera(next); }}>↻<small>Flip</small></button>
                   <button type="button" onClick={() => setSpeed(v => v === 2 ? .5 : v === .5 ? 1 : v === 1 ? 1.5 : 2)}>{speed}×<small>Speed</small></button>
                   <button type="button" onClick={() => setEffect(effect === "NONE" ? "VIBRANT" : "NONE")}>✦<small>Effects</small></button>
                   <button type="button">◷<small>Timer</small></button>
