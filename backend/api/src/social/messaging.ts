@@ -65,15 +65,32 @@ export async function getOrCreateDirectConversation(db: Db, userId: ObjectId, ot
 export async function listConversations(db: Db, userId: ObjectId) {
   const conversations = await db.collection("conversations").find({ memberIds: userId }).sort({ updatedAt: -1 }).limit(100).toArray();
   const otherIds = conversations.flatMap(c => (c.memberIds as ObjectId[]).filter(id => !id.equals(userId)));
-  const users = await db.collection("users").find({ _id: { $in: otherIds } }, { projection: { username: 1, nickname: 1 } }).toArray();
+  const users = await db.collection("users").find(
+    { _id: { $in: otherIds } },
+    { projection: { username: 1, nickname: 1, profilePhotoUrl: 1 } }
+  ).toArray();
   const byId = new Map(users.map(u => [u._id.toHexString(), u]));
-  return conversations.map(c => ({
-    id: c._id.toHexString(),
-    otherUser: byId.get((c.memberIds as ObjectId[]).find(id => !id.equals(userId))?.toHexString() ?? "") ?? null,
-    lastMessagePreview: c.lastMessagePreview ?? null,
-    lastMessageAt: c.lastMessageAt ?? null,
-    updatedAt: c.updatedAt
-  }));
+
+  const conversationIds = conversations.map(c => c._id);
+  const unreadRows = conversationIds.length
+    ? await db.collection("messages").aggregate([
+        { $match: { conversationId: { $in: conversationIds }, recipientId: userId, status: { $in: ["SENT", "DELIVERED"] } } },
+        { $group: { _id: "$conversationId", count: { $sum: 1 } } }
+      ]).toArray()
+    : [];
+  const unreadByConversation = new Map(unreadRows.map(row => [row._id.toHexString(), Number(row.count ?? 0)]));
+
+  return conversations.map(c => {
+    const otherId = (c.memberIds as ObjectId[]).find(id => !id.equals(userId))?.toHexString() ?? "";
+    return {
+      id: c._id.toHexString(),
+      otherUser: byId.get(otherId) ?? null,
+      lastMessagePreview: c.lastMessagePreview ?? null,
+      lastMessageAt: c.lastMessageAt ?? null,
+      updatedAt: c.updatedAt,
+      unreadCount: unreadByConversation.get(c._id.toHexString()) ?? 0
+    };
+  });
 }
 
 export async function listMessages(db: Db, userId: ObjectId, conversationId: ObjectId, before?: Date) {
