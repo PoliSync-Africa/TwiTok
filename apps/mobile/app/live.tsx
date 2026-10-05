@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LiveKitRoom, VideoTrack, useRoomContext, useTracks } from "@livekit/react-native";
+import { AudioSession, LiveKitRoom, VideoTrack, useRoomContext, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { getAuthToken } from "../lib/auth";
 import { Colors, Typography } from "../theme/typography";
@@ -43,7 +43,7 @@ export default function LiveScreen() {
     } finally { setBusy(false); }
   }
 
-  useEffect(() => { void openLive(); }, []);
+  useEffect(() => {\n    let active = true;\n    void (async () => {\n      try {\n        await AudioSession.startAudioSession();\n        if (active) await openLive();\n      } catch (e) {\n        if (active) setError(e instanceof Error ? e.message : "Unable to start LIVE audio session.");\n      }\n    })();\n    return () => { active = false; void AudioSession.stopAudioSession(); };\n  }, []);
 
   async function endLive() {
     if (!stream) { router.back(); return; }
