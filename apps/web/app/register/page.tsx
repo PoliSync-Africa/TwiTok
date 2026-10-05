@@ -4,7 +4,7 @@ import { FormEvent, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 
 export default function RegisterPage() {
   const router=useRouter(); const [email,setEmail]=useState(""); const [phone,setPhone]=useState(""); const [password,setPassword]=useState(""); const [dob,setDob]=useState(""); const [countryCode,setCountryCode]=useState("GH"); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
