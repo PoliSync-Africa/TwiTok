@@ -174,11 +174,11 @@ function Tool({ label, icon, onPress }: { label: string; icon: string; onPress: 
 
 const styles = StyleSheet.create({
   root:{flex:1,backgroundColor:"#000"},
-  video:{...StyleSheet.absoluteFillObject},
-  videoFallback:{...StyleSheet.absoluteFillObject,backgroundColor:"#090909",alignItems:"center",justifyContent:"center",gap:10},
+  video:{...StyleSheet.absoluteFill},
+  videoFallback:{...StyleSheet.absoluteFill,backgroundColor:"#090909",alignItems:"center",justifyContent:"center",gap:10},
   fallbackText:{color:"#fff",fontWeight:"800"},
-  beautyOverlay:{...StyleSheet.absoluteFillObject,backgroundColor:"rgba(255,235,220,.035)"},
-  filterOverlay:{...StyleSheet.absoluteFillObject,backgroundColor:"#8b6f62"},
+  beautyOverlay:{...StyleSheet.absoluteFill,backgroundColor:"rgba(255,235,220,.035)"},
+  filterOverlay:{...StyleSheet.absoluteFill,backgroundColor:"#8b6f62"},
   loading:{flex:1,backgroundColor:"#000",alignItems:"center",justifyContent:"center",padding:28},
   loadingText:{color:"#fff",fontSize:22,fontWeight:"900",marginTop:16},
   loadingHint:{color:"#aaa",textAlign:"center",marginTop:8,maxWidth:320},
