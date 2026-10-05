@@ -48,7 +48,7 @@ export default function CreateScreen() {
   const [trimEndMs, setTrimEndMs] = useState(0);
   const [originalVolume, setOriginalVolume] = useState(1);
   const [addedSoundVolume, setAddedSoundVolume] = useState(1);
-  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, aiOutputUri, aiOutputMimeType, aiOutputDuration, aiOutputMode } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; aiOutputUri?: string; aiOutputMimeType?: string; aiOutputDuration?: string; aiOutputMode?: string }>();
+  const { soundId: incomingSoundId, soundTitle: incomingSoundTitle, recordedUri, recordedDuration, recordedEffect, recordedSpeed, autoStudio, aiOutputUri, aiOutputMimeType, aiOutputDuration, aiOutputMode } = useLocalSearchParams<{ soundId?: string; soundTitle?: string; recordedUri?: string; recordedDuration?: string; recordedEffect?: string; recordedSpeed?: string; aiOutputUri?: string; aiOutputMimeType?: string; aiOutputDuration?: string; aiOutputMode?: string; autoStudio?: string }>();
   const [soundId, setSoundId] = useState(String(incomingSoundId ?? ""));
   const [soundTitle, setSoundTitle] = useState(String(incomingSoundTitle ?? ""));
   useEffect(() => {
@@ -80,7 +80,11 @@ export default function CreateScreen() {
     if (recordedEffect && ["NONE","VIBRANT","WARM","COOL","NOIR","VINTAGE"].includes(String(recordedEffect))) {
       setEffect(String(recordedEffect));
     }
-  }, [recordedUri, recordedDuration, recordedEffect, recordedSpeed]);
+    if (String(autoStudio ?? "") === "1") {
+      const timer = setTimeout(() => setStudioVisible(true), 180);
+      return () => clearTimeout(timer);
+    }
+  }, [recordedUri, recordedDuration, recordedEffect, recordedSpeed, autoStudio]);
   const [overlayText, setOverlayText] = useState("");
   const [overlayStartMs, setOverlayStartMs] = useState(0);
   const [overlayEndMs, setOverlayEndMs] = useState(3000);
@@ -544,7 +548,7 @@ export default function CreateScreen() {
         {mode === "VIDEO" && assets.length ? <Pressable style={styles.draftButton} onPress={()=>publish(false)} disabled={busy}><Text style={styles.draftText}>Save to Drafts</Text></Pressable> : null}
         {busy ? <View style={styles.progress}><ActivityIndicator color="#fff" /><Text style={styles.status}>{status}</Text></View> : null}
       </ScrollView>
-      <UnifiedMediaStudio visible={studioVisible} mode={mode === "PHOTO" ? "PHOTO" : "VIDEO"} value={studioPlan} onChange={setStudioPlan} onClose={() => setStudioVisible(false)} onRunAI={() => { const uri = assets[selectedClip]?.uri; if (uri) { setStudioVisible(false); router.push({ pathname: "/media-studio", params: { uri, mimeType: assets[selectedClip]?.mimeType ?? "", mode, duration: String(assets[selectedClip]?.duration ?? "") } }); } }} />
+      <UnifiedMediaStudio visible={studioVisible} mode={mode === "PHOTO" ? "PHOTO" : "VIDEO"} value={studioPlan} onChange={setStudioPlan} onClose={() => setStudioVisible(false)} onRunAI={() => { const uri = assets[selectedClip]?.uri; if (uri) { setStudioVisible(false); router.push({ pathname: "/media-studio", params: { uri, mimeType: assets[selectedClip]?.mimeType ?? "", mode, duration: String(assets[selectedClip]?.duration ?? ""), soundId, soundTitle } }); } }} />
     </View>
   );
 }
