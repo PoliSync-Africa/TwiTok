@@ -2,12 +2,13 @@
 
 import { FormEvent, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [method,setMethod]=useState<"phone"|"email"|"username">("email");
   const [identifier,setIdentifier]=useState("");
   const [password,setPassword]=useState("");
@@ -22,7 +23,9 @@ export default function LoginPage() {
       const data=await response.json().catch(()=>({}));
       if(!response.ok || !data.token) throw new Error(data.error ?? "Unable to sign in");
       localStorage.setItem("twitok_user_token",data.token);
-      router.replace(data.user?.profileSetupComplete===false?"/profile-setup":"/");
+      const next = searchParams.get("next");
+      const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : (data.user?.profileSetupComplete===false?"/profile-setup":"/");
+      router.replace(destination);
     } catch(e) { setError(e instanceof Error?e.message:"Unable to sign in"); }
     finally { setBusy(false); }
   }
