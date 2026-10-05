@@ -732,7 +732,7 @@ export default function CreatePage() {
           {file && <>
             <div className="file-pill"><b>{file.name}</b><span>{sizeText}</span></div>
 
-            <button type="button" className="sound-button" onClick={() => setSoundOpen(v => !v)}>
+            <button type="button" className="sound-button" onClick={() => { window.location.href = "/sound"; }}>
               ♪ {selectedSound ? selectedSound.title + " — " + selectedSound.artist : "Add sound"}{soundInitialized ? " ✓" : ""}
             </button>
 
