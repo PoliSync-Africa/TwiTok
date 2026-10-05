@@ -15,7 +15,7 @@ export default function SoundsScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<"TRENDING"|"ORIGINAL"|"LICENSED"|"COMMERCIAL">("TRENDING");
+  const [filter, setFilter] = useState<"TRENDING"|"ORIGINAL"|"LICENSED"|"COMMERCIAL"|"COMMUNITY">("TRENDING");
   const [playingId, setPlayingId] = useState("");
   const playerRef = useRef<AudioPlayer | null>(null);
 
@@ -79,9 +79,9 @@ export default function SoundsScreen() {
         <Pressable style={styles.search} onPress={() => load(query)}><Text style={styles.searchText}>Search</Text></Pressable>
       </View>
       <View style={styles.filters}>
-        {(["TRENDING","ORIGINAL","LICENSED","COMMERCIAL"] as const).map(item => (
+        {(["TRENDING","ORIGINAL","LICENSED","COMMERCIAL","COMMUNITY"] as const).map(item => (
           <Pressable key={item} style={[styles.filter, filter === item && styles.filterActive]} onPress={() => setFilter(item)}>
-            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item === "TRENDING" ? "🔥 Trending" : item === "ORIGINAL" ? "🎤 Original" : item === "LICENSED" ? "🎵 Licensed" : "💼 Commercial"}</Text>
+            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item === "TRENDING" ? "🔥 Trending" : item === "ORIGINAL" ? "🎤 Original" : item === "LICENSED" ? "🎵 Licensed" : item === "COMMUNITY" ? "🌐 Community" : "💼 Commercial"}</Text>
           </Pressable>
         ))}
       </View>
