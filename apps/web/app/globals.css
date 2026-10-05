@@ -325,3 +325,54 @@ body{background:radial-gradient(1200px 600px at 70% -15%,rgba(226,189,98,.10),tr
 .camera-bottom-tabs span{color:rgba(255,255,255,.6)}.camera-bottom-tabs .active{color:#fff;border-bottom:2px solid #fff;padding-bottom:4px}
 .camera-sound-panel{position:absolute;z-index:10;left:14px;right:14px;bottom:150px;background:rgba(15,15,15,.96);border:1px solid #333;border-radius:16px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:8px}
 .camera-sound-panel b{grid-column:1/-1}.camera-sound-panel input{background:#222;color:#fff;border:1px solid #444;border-radius:9px;padding:10px}.camera-sound-panel button{border:0;border-radius:9px;background:#fff;color:#000;font-weight:800}
+
+
+/* TikTok-style inbox */
+.inbox-page{min-height:100vh;background:#000;color:#fff;padding:0}
+.inbox-shell{width:min(760px,100%);min-height:100vh;margin:0 auto;background:#000;border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column}
+.inbox-header{height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #1f1f1f;position:sticky;top:0;z-index:4;background:rgba(0,0,0,.94);backdrop-filter:blur(14px)}
+.inbox-header h1{font-size:19px;letter-spacing:-.02em;margin:0}
+.icon-btn{width:42px;height:42px;border:0;background:transparent;color:#fff;display:grid;place-items:center;border-radius:999px;text-decoration:none}
+.icon-btn:hover{background:#181818}
+.chat-user{display:flex;align-items:center;gap:10px;min-width:0}
+.chat-user small{display:block;color:#777;font-size:11px;margin-top:2px}
+.avatar{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#292929,#121212);display:grid;place-items:center;flex:0 0 auto;font-weight:900;font-size:17px;overflow:hidden}
+.chat-user .avatar{width:38px;height:38px;font-size:14px}
+.inbox-tabs{height:54px;display:flex;align-items:flex-end;justify-content:center;gap:34px;border-bottom:1px solid #1f1f1f}
+.inbox-tabs button{position:relative;height:54px;border:0;background:transparent;color:#777;font-weight:800;font-size:14px;padding:0 4px;cursor:pointer}
+.inbox-tabs button.active{color:#fff;border-bottom:2px solid #fff}
+.inbox-tabs button span{position:absolute;top:7px;right:-20px;min-width:18px;height:18px;border-radius:9px;background:#fe2c55;color:#fff;font-size:9px;display:grid;place-items:center;padding:0 4px}
+.new-chat{display:flex;gap:8px;padding:12px}
+.search{height:44px;flex:1;border-radius:12px;background:#181818;color:#777;display:flex;align-items:center;gap:8px;padding:0 12px}
+.search input{flex:1;border:0;outline:0;background:transparent;color:#fff;font-size:14px}
+.new-chat>button{width:44px;height:44px;border:0;border-radius:12px;background:#fe2c55;color:#fff;display:grid;place-items:center;cursor:pointer}
+.inbox-list{flex:1}
+.inbox-row{width:100%;min-height:76px;display:flex;align-items:center;gap:12px;padding:11px 16px;border:0;border-bottom:1px solid #181818;background:transparent;color:#fff;text-align:left;cursor:pointer}
+.inbox-row:hover{background:#0d0d0d}
+.row-main{flex:1;min-width:0}
+.row-main>div{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.row-main b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-main p{margin:5px 0 0;color:#888;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-main time{color:#666;font-size:11px;flex:0 0 auto}
+.badge{min-width:22px;height:22px;border-radius:11px;background:#fe2c55;color:#fff;font-size:9px;display:grid;place-items:center;padding:0 5px}
+.activity-icon{width:50px;height:50px;border-radius:50%;background:#191919;display:grid;place-items:center;flex:0 0 auto}
+.inbox-row.activity.unread{background:#050505}
+.dot{width:8px;height:8px;border-radius:50%;background:#fe2c55;flex:0 0 auto}
+.activity-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;color:#fff}
+.activity-head button{border:0;background:transparent;color:#25f4ee;font-weight:800;cursor:pointer}
+.inbox-error{text-align:center;color:#ff7184;font-size:12px;padding:8px 16px;margin:0}
+.loading,.empty{padding:70px 24px;text-align:center;color:#777}
+.empty h2{color:#fff;font-size:18px;margin:14px 0 6px}
+.empty p{margin:0;line-height:1.5}
+.chat-shell{height:100vh}
+.chat-messages{flex:1;overflow:auto;padding:18px 14px}
+.bubble-row{display:flex;margin:0 0 10px}
+.bubble-row.mine{justify-content:flex-end}
+.bubble{max-width:min(72%,520px);background:#252525;border-radius:18px 18px 18px 5px;padding:10px 13px;color:#fff;line-height:1.45}
+.bubble-row.mine .bubble{background:#fe2c55;border-radius:18px 18px 5px 18px}
+.bubble small{display:block;text-align:right;color:rgba(255,255,255,.55);font-size:9px;margin-top:4px}
+.chat-composer{display:flex;gap:8px;padding:10px;border-top:1px solid #222;background:#000}
+.chat-composer input{flex:1;min-height:42px;max-height:110px;border:0;border-radius:22px;background:#191919;color:#fff;outline:0;padding:10px 15px;font-size:15px}
+.send-btn{width:42px;height:42px;border:0;border-radius:50%;background:#fe2c55;color:#fff;display:grid;place-items:center;cursor:pointer}
+.send-btn:disabled{opacity:.35;cursor:default}
+@media(max-width:700px){.inbox-shell{border:0}.inbox-tabs{gap:22px}.row-main b{font-size:14px}}
