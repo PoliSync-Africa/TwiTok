@@ -79,7 +79,7 @@ export async function completePhotoUpload(db: Db, userId: ObjectId, uploadId: st
   return { uploadId, status: "READY" };
 }
 
-export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean }) {
+export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadIds: unknown; caption?: string; hashtags?: unknown; mentions?: unknown; location?: string; visibility?: VideoVisibility; allowComments?: boolean; allowDuet?: boolean; allowStitch?: boolean; soundId?: string; originalVolume?: number; addedSoundVolume?: number }) {
   const uploadIds = Array.isArray(input.uploadIds) ? [...new Set(input.uploadIds.map(String).filter(Boolean))].slice(0, 35) : [];
   if (!uploadIds.length) throw new Error("At least one photo is required");
   const uploads = await db.collection("photo_uploads").find({ uploadId: { $in: uploadIds }, userId, status: "READY" }).toArray();
@@ -95,6 +95,21 @@ export async function createPhotoPost(db: Db, userId: ObjectId, input: { uploadI
     visibility: input.visibility ?? "PUBLIC", allowComments: input.allowComments !== false, allowDuet: input.allowDuet !== false, allowStitch: input.allowStitch !== false,
     status: "PUBLISHED", playback: null, thumbnail: null, publishedAt: now, createdAt: now, updatedAt: now
   });
+  if (input.soundId) {
+    if (!ObjectId.isValid(input.soundId)) throw new Error("Invalid sound id");
+    const sound = await db.collection("sounds").findOne({ _id: new ObjectId(input.soundId), status: "ACTIVE" });
+    if (!sound) throw new Error("Selected sound is unavailable");
+    await db.collection("video_sounds").updateOne(
+      { videoId: postId },
+      { $set: {
+        videoId: postId, soundId: sound._id,
+        originalVolume: Math.max(0, Math.min(1, Number(input.originalVolume ?? 1))),
+        addedSoundVolume: Math.max(0, Math.min(1, Number(input.addedSoundVolume ?? 1))),
+        updatedAt: now
+      }, $setOnInsert: { createdAt: now } },
+      { upsert: true }
+    );
+  }
   return { postId: postId.toHexString(), status: "PUBLISHED", mediaType: "PHOTO", photoCount: uploads.length };
 }
 
