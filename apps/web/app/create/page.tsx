@@ -78,6 +78,8 @@ export default function CreatePage() {
   const [captionsSaving, setCaptionsSaving] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraRecording, setCameraRecording] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [cameraPermission, setCameraPermission] = useState<"unknown" | "granted" | "prompt" | "denied">("unknown");
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
   const [cameraDurationLimit, setCameraDurationLimit] = useState<15 | 60 | 600>(60);
   const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
@@ -234,6 +236,17 @@ export default function CreatePage() {
     setMessage("");
   }
 
+  async function refreshCameraPermission() {
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return;
+    try {
+      const result = await navigator.permissions.query({ name: "camera" as PermissionName });
+      setCameraPermission(result.state as "granted" | "prompt" | "denied");
+      result.onchange = () => setCameraPermission(result.state as "granted" | "prompt" | "denied");
+    } catch {
+      // Safari/Chrome iOS may not expose camera through Permissions API.
+    }
+  }
+
   async function openBrowserCamera(nextFacingMode: "user" | "environment" = cameraFacingMode) {
     if (typeof navigator === "undefined") return;
     if (!window.isSecureContext) {
@@ -247,26 +260,42 @@ export default function CreatePage() {
       return;
     }
 
+    setCameraStarting(true);
     stopBrowserCamera();
 
     try {
-      // Request video first so a microphone permission/device problem cannot
-      // make the entire camera preview fail.
+      // Keep the first request deliberately minimal for iPhone/WebKit. We
+      // add the microphone only after video is working, and apply preferred
+      // resolution after the track exists instead of making it a requirement.
       const cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: nextFacingMode }, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        video: { facingMode: nextFacingMode },
         audio: false
       });
+
+      const videoTrack = cameraStream.getVideoTracks()[0];
+      if (videoTrack?.applyConstraints) {
+        try {
+          await videoTrack.applyConstraints({
+            width: { ideal: 1080 },
+            height: { ideal: 1920 },
+            frameRate: { ideal: 30, max: 60 }
+          });
+        } catch {
+          // Keep the camera running at the device's native supported settings.
+        }
+      }
 
       let stream = cameraStream;
       try {
         const microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         microphoneStream.getAudioTracks().forEach(track => stream.addTrack(track));
       } catch {
-        // Camera remains usable without microphone; users can add a sound later.
+        // Camera remains fully usable without microphone permission.
       }
 
       cameraStreamRef.current = stream;
       setCameraFacingMode(nextFacingMode);
+      setCameraPermission("granted");
       if (cameraPreviewRef.current) {
         cameraPreviewRef.current.srcObject = stream;
         cameraPreviewRef.current.muted = true;
@@ -279,14 +308,45 @@ export default function CreatePage() {
       setCameraActive(false);
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "SecurityError") {
-        setMessage("Camera permission is blocked. Allow Camera for twitokapp.com in your browser settings, then tap Enable camera to retry.");
+        setCameraPermission("denied");
+        setMessage("Camera access is blocked. In iPhone Settings, open Chrome and turn Camera on. Then return to TwiTok, refresh this page, and tap Retry camera.");
       } else if (name === "NotFoundError") {
-        setMessage("No camera was found on this device.");
+        setMessage("No camera was found on this device. You can still use Upload.");
+      } else if (name === "NotReadableError") {
+        setMessage("The camera is busy in another app or browser tab. Close other camera/video apps and tap Retry camera.");
+      } else if (name === "OverconstrainedError") {
+        setMessage("This camera does not support the requested mode. TwiTok will retry with the device default camera.");
+        try {
+          const fallback = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          cameraStreamRef.current = fallback;
+          setCameraPermission("granted");
+          if (cameraPreviewRef.current) {
+            cameraPreviewRef.current.srcObject = fallback;
+            cameraPreviewRef.current.muted = true;
+            cameraPreviewRef.current.setAttribute("playsinline", "true");
+            try { await cameraPreviewRef.current.play(); } catch {}
+          }
+          setCameraActive(true);
+        } catch {
+          setCameraActive(false);
+        }
       } else {
-        setMessage("Unable to open the camera. Tap Flip to retry or choose Upload.");
+        setMessage("Unable to open the camera. Tap Retry camera or use Record with phone.");
       }
+    } finally {
+      setCameraStarting(false);
+      void refreshCameraPermission();
     }
   }
+
+  useEffect(() => {
+    if (preview || cameraActive) return;
+    void refreshCameraPermission();
+    const timer = window.setTimeout(() => {
+      void openBrowserCamera("user");
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function stopBrowserCamera() {
     const recorder = cameraRecorderRef.current;
@@ -455,7 +515,7 @@ export default function CreatePage() {
           ) : (
             <div className="camera-create">
               <div className="camera-stage">
-                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>Camera unavailable</b><small>Tap Enable camera to request permission. If permission was previously denied, allow Camera for this site in browser settings and try again.</small><button type="button" className="camera-enable" onClick={(event) => { event.preventDefault(); event.stopPropagation(); void openBrowserCamera(); }}>Enable camera</button></div>}
+                {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>{cameraStarting ? "Starting camera…" : "Camera unavailable"}</b><small>{cameraPermission === "denied" ? "Camera permission is blocked for this site. Enable Camera for Chrome in iPhone Settings, return here, refresh, then retry." : "TwiTok is requesting camera access. If the browser does not show a prompt, use Retry camera or Record with phone."}</small><button type="button" className="camera-enable" disabled={cameraStarting} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void openBrowserCamera(); }}>{cameraStarting ? "Opening…" : "Retry camera"}</button><label className="camera-phone-capture">▣ Record with phone<input type="file" accept="video/*" capture="user" onChange={e => { stopBrowserCamera(); chooseFiles(e.target.files); }} /></label></div>}
                 <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
                 <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
                 <div className="camera-side-tools">
@@ -470,7 +530,7 @@ export default function CreatePage() {
                 <button type="button">PHOTO</button><button type="button">TEXT</button>
               </div>
               <div className="camera-actions">
-                <label className="camera-upload">▣<small>Upload</small><input type="file" multiple accept="video/mp4,video/quicktime,video/webm" onChange={e => { stopBrowserCamera(); chooseFiles(e.target.files); }} /></label>
+                <label className="camera-upload">▣<small>Upload</small><input type="file" multiple accept="video/*" onChange={e => { stopBrowserCamera(); chooseFiles(e.target.files); }} /></label>
                 <button type="button" className={"camera-record " + (cameraRecording ? "recording" : "")} onClick={cameraRecording ? () => cameraRecorderRef.current?.stop() : recordBrowserVideo}><span /></button>
                 <button type="button" className="camera-effects" onClick={() => setEffect(effect === "NONE" ? "VIBRANT" : "NONE")}>✦<small>Effects</small></button>
               </div>
