@@ -68,7 +68,7 @@ export default function LiveScreen() {
       connect
       audio
       video
-      options={{ adaptiveStream: { pixelDensity: "screen" }, dynacast: true }}
+      options={{ adaptiveStream: true, dynacast: true }}
       onConnected={() => {
         void request("/live/streams/" + encodeURIComponent(token.streamId) + "/status", { method: "POST", body: JSON.stringify({ status: "LIVE" }) })
           .then(setStream)
