@@ -135,43 +135,32 @@ export default function CameraStudioScreen() {
   }
 
   async function uploadFromGallery() {
-    const mediaTypes = mode === "PHOTO" ? "images" : "videos";
+    setError("");
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes,
-      allowsMultipleSelection: mode === "PHOTO",
-      selectionLimit: mode === "PHOTO" ? 35 : 10,
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: false,
       quality: 1,
       videoMaxDuration: 600,
     });
     if (result.canceled || !result.assets.length) return;
     const first = result.assets[0];
-
-    if (mode === "PHOTO") {
-      router.replace({
-        pathname: "/create",
-        params: {
-          aiOutputUri: first.uri,
-          aiOutputMode: "PHOTO",
-          aiOutputMimeType: first.mimeType ?? "image/jpeg",
-          soundId,
-          soundTitle,
-          autoStudio: "1",
-        },
-      });
-    } else {
-      router.replace({
-        pathname: "/create",
-        params: {
-          recordedUri: first.uri,
-          recordedDuration: String(first.duration ?? 0),
-          recordedEffect: effect,
-          recordedSpeed: String(speed),
-          soundId,
-          soundTitle,
-          autoStudio: "1",
-        },
-      });
+    const isPhoto = first.type === "image";
+    if (isPhoto) {
+      router.replace({ pathname: "/create", params: {
+        aiOutputUri: first.uri,
+        aiOutputMode: "PHOTO",
+        aiOutputMimeType: first.mimeType ?? "image/jpeg",
+        soundId, soundTitle, autoStudio: "1"
+      }});
+      return;
     }
+    router.replace({ pathname: "/create", params: {
+      recordedUri: first.uri,
+      recordedDuration: String(first.duration ?? 0),
+      recordedEffect: effect,
+      recordedSpeed: String(speed),
+      soundId, soundTitle, autoStudio: "1"
+    }});
   }
 
   function selectMode(next: Mode) {
