@@ -165,16 +165,13 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
     <>
       <View style={styles.scrim} />
       <View style={styles.feedTop}>
-        <Image source={require("../assets/images/twitok-logo.png")} style={styles.feedLogo} resizeMode="contain" />
+        <Pressable style={styles.liveTop} onPress={() => router.push("/live")}><Text style={styles.liveIcon}>LIVE</Text></Pressable>
         <View style={styles.feedTabs}>
-          {(["FOLLOWING","FOR_YOU","AFRICA"] as const).map(tab => (
-            <Pressable key={tab} onPress={() => onSurface(tab)} style={styles.feedTab}>
-              <Text style={surface===tab ? styles.feedTabActive : styles.feedTabText}>{tab==="FOR_YOU"?"For You":tab==="FOLLOWING"?"Following":"Africa"}</Text>
-              {surface===tab ? <View style={styles.feedTabUnderline} /> : null}
-            </Pressable>
-          ))}
+          <Pressable onPress={() => onSurface("AFRICA")} style={styles.feedTab}><Text style={surface==="AFRICA" ? styles.feedTabText : styles.feedTabText}>Community</Text></Pressable>
+          <Pressable onPress={() => onSurface("FOLLOWING")} style={styles.feedTab}><Text style={surface==="FOLLOWING" ? styles.feedTabActive : styles.feedTabText}>Following</Text>{surface==="FOLLOWING" ? <View style={styles.feedTabUnderline} /> : null}</Pressable>
+          <Pressable onPress={() => onSurface("FOR_YOU")} style={styles.feedTab}><Text style={surface==="FOR_YOU" ? styles.feedTabActive : styles.feedTabText}>For You</Text>{surface==="FOR_YOU" ? <View style={styles.feedTabUnderline} /> : null}</Pressable>
         </View>
-        <Pressable onPress={() => router.push("/discover")}><Text style={styles.searchGlyph}>⌕</Text></Pressable>
+        <Pressable onPress={() => router.push("/discover")} style={styles.searchButton}><Text style={styles.searchGlyph}>⌕</Text></Pressable>
       </View>
       <View style={[styles.rightRail, { bottom: 105 + insets.bottom }]}>
         <Pressable style={styles.action} onPress={() => onAction("like")}><Text style={[styles.actionIcon, engagement?.liked && styles.activeIcon]}>♥</Text><Text style={styles.actionLabel}>{engagement?.likeCount ?? 0}</Text></Pressable>
@@ -191,7 +188,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><Text style={styles.soundDisc}>♫</Text><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
-      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><Text style={surface==="FOR_YOU"?styles.bottomIconActive:styles.bottomIcon}>⌂</Text><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => router.push("/discover")} style={styles.bottomTab}><Text style={styles.bottomIcon}>⌕</Text><Text style={styles.bottomLabel}>Discover</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/create")} accessibilityLabel="Create"><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => router.push("/messages")} style={styles.bottomTab}><Text style={styles.bottomIcon}>▢</Text><Text style={styles.bottomLabel}>Inbox</Text></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><Text style={styles.bottomIcon}>♙</Text><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
+      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><Text style={surface==="FOR_YOU"?styles.bottomIconActive:styles.bottomIcon}>⌂</Text><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")} style={styles.bottomTab}><Text style={styles.bottomIcon}>♟</Text><Text style={styles.bottomLabel}>Friends</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/camera")} accessibilityLabel="Create"><Text style={styles.createPlus}>＋</Text></Pressable><Pressable onPress={() => router.push("/messages")} style={styles.bottomTab}><Text style={styles.bottomIcon}>▢</Text><Text style={styles.bottomLabel}>Inbox</Text></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><Text style={styles.bottomIcon}>♙</Text><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
     </>
   );
 }
