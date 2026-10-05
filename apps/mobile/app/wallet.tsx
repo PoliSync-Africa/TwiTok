@@ -43,7 +43,7 @@ export default function WalletScreen() {
     setLoading(true);
     try{
       const token=await getAuthToken();
-      if(!token){ Alert.alert("Sign in","Please sign in to view your wallet."); router.back(); return; }
+      if(!token){ Alert.alert("Sign in required","Please sign in or create a TwiTok account to use your wallet.",[{text:"Cancel",style:"cancel"},{text:"Sign up",onPress:()=>router.push("/register")},{text:"Sign in",onPress:()=>router.push("/login")}]); return; }
       const h={Authorization:"Bearer "+token};
       const rc=await fetch(API+"/wallet/revenuecat/config",{headers:h});
       const rcJson=await rc.json().catch(()=>({}));
