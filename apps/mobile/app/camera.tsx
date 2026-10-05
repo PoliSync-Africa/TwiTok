@@ -32,7 +32,7 @@ const ICONS: Record<string, { ios: string; android: string; web: string }> = {
 
 function Icon({ name, size = 24, color = "#fff" }: { name: string; size?: number; color?: string }) {
   const icon = ICONS[name] ?? { ios: "circle", android: "circle", web: "circle" };
-  return <SymbolView name={icon} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size, lineHeight: size }}>•</Text>} />;
+  return <SymbolView name={icon as any} tintColor={color} size={size} fallback={<Text style={{ color, fontSize: size, lineHeight: size }}>•</Text>} />;
 }
 
 export default function CameraStudioScreen() {
