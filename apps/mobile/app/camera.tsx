@@ -269,6 +269,14 @@ export default function CameraStudioScreen() {
       {recording ? <View style={[styles.recordingProgress, { top: insets.top }]}><View style={styles.recordingProgressFill} /></View> : null}
       {error ? <View style={styles.errorBox}><Text style={styles.error}>{error}</Text></View> : null}
 
+      <View style={styles.quickActions}>
+        <Pressable style={[styles.quickAction, mode === "PHOTO" && styles.quickActionActive]} onPress={() => selectMode("PHOTO")} accessibilityLabel="Photo mode"><Icon name="camera.fill" size={21} /><Text style={styles.quickActionText}>Photo</Text></Pressable>
+        <Pressable style={[styles.quickAction, mode === "VIDEO" && styles.quickActionActive]} onPress={() => selectMode("VIDEO")} accessibilityLabel="Video mode"><Icon name="camera.fill" size={21} /><Text style={styles.quickActionText}>Video</Text></Pressable>
+        <Pressable style={styles.quickAction} onPress={uploadFromGallery} accessibilityLabel="Gallery upload"><Icon name="photo.on.rectangle" size={21} /><Text style={styles.quickActionText}>Gallery</Text></Pressable>
+        <Pressable style={styles.quickAction} onPress={() => router.push("/create")} accessibilityLabel="Create"><Icon name="wand.and.stars" size={21} /><Text style={styles.quickActionText}>Create</Text></Pressable>
+        <Pressable style={styles.quickAction} onPress={() => router.push("/live")} accessibilityLabel="LIVE"><Text style={styles.liveDot}>LIVE</Text><Text style={styles.quickActionText}>LIVE</Text></Pressable>
+      </View>
+
       <View style={styles.bottomPanel}>
         <View style={styles.lengthRow}>
           {([["10m", 600], ["60s", 60], ["15s", 15]] as const).map(([label, value]) => (
@@ -337,6 +345,11 @@ const styles = StyleSheet.create({
   toolText:{color:"#fff",fontSize:10,fontWeight:"800",marginTop:3,textShadowColor:"#000",textShadowRadius:5},
   speedText:{color:"#fff",fontSize:16,fontWeight:"900",textShadowColor:"#000",textShadowRadius:6},
   bottomPanel:{position:"absolute",left:0,right:0,bottom:0,paddingBottom:18,paddingTop:12,backgroundColor:"rgba(0,0,0,.30)",zIndex:20},
+  quickActions:{position:"absolute",left:10,right:10,bottom:205,flexDirection:"row",justifyContent:"space-around",alignItems:"center",paddingVertical:8,paddingHorizontal:6,borderRadius:18,backgroundColor:"rgba(0,0,0,.52)"},
+  quickAction:{minWidth:58,alignItems:"center",justifyContent:"center",paddingVertical:6,paddingHorizontal:5,borderRadius:12},
+  quickActionActive:{backgroundColor:"rgba(255,255,255,.18)"},
+  quickActionText:{color:"#fff",fontSize:10,fontWeight:"900",marginTop:3},
+  liveDot:{color:"#fe2c55",fontSize:11,fontWeight:"900"},
   lengthRow:{flexDirection:"row",justifyContent:"center",alignItems:"center",gap:16,marginBottom:16},
   lengthItem:{paddingHorizontal:4,paddingVertical:5},
   lengthText:{color:"rgba(255,255,255,.75)",fontSize:14,fontWeight:"800"},
