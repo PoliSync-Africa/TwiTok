@@ -55,6 +55,14 @@
           "microphonePermission": "Allow TwiTok to record audio with your videos.",
           "recordAudioAndroid": true
         }
+      ],
+      "@livekit/react-native-expo-plugin",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow TwiTok to use your camera for LIVE video.",
+          "microphonePermission": "Allow TwiTok to use your microphone for LIVE audio."
+        }
       ]
     ]
   }
