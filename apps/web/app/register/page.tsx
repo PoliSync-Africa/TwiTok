@@ -94,25 +94,18 @@ export default function RegisterPage() {
         <label style={styles.label}>Email address</label>
         <input value={email} onChange={event => setEmail(event.target.value)} style={styles.input} placeholder="Email address" type="email" autoCapitalize="none" autoComplete="email" />
 
-        <label style={styles.label}>Country</label>
-        <div style={styles.countrySelectWrap}>
-          {selectedCountry ? <span aria-hidden="true" style={styles.flag}>{countryFlag(selectedCountry.alpha2)}</span> : null}
-          <select value={countryCode} onChange={event => setCountryCode(event.target.value)} style={styles.select} aria-label="Select country">
-            <option value="">Select country</option>
-            {TWITOK_COUNTRIES.map(country => (
-              <option key={country.alpha2} value={country.alpha2}>
-                {country.alpha3} {countryFlag(country.alpha2)} {country.dialCode} — {country.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <label style={styles.label}>Phone number</label>
         <div style={styles.phoneRow}>
-          <div style={styles.phonePrefix} aria-label={selectedCountry ? selectedCountry.alpha3 + " " + selectedCountry.dialCode : "Country code"}>
-            <span>{selectedCountry ? countryFlag(selectedCountry.alpha2) : "🌐"}</span>
-            <strong>{selectedCountry?.alpha3 ?? "CODE"}</strong>
-            <span>{selectedCountry?.dialCode ?? "+—"}</span>
+          <div style={styles.phonePrefix}>
+            <span className="twitok-country-flag" aria-hidden="true">{selectedCountry ? countryFlag(selectedCountry.alpha2) : "🌐"}</span>
+            <select value={countryCode} onChange={event => setCountryCode(event.target.value)} style={styles.phoneCountrySelect} aria-label="Select country and international calling code">
+              <option value="">Country / code</option>
+              {TWITOK_COUNTRIES.map(country => (
+                <option key={country.alpha2} value={country.alpha2}>
+                  {countryFlag(country.alpha2)} {country.dialCode} — {country.name}
+                </option>
+              ))}
+            </select>
           </div>
           <input
             value={phone}
@@ -160,11 +153,9 @@ const styles: Record<string, CSSProperties> = {
   muted: { color: "#a1a1a1", lineHeight: 1.55, marginBottom: 20 },
   label: { display: "block", margin: "14px 0 7px", color: "#d8d8d8", fontWeight: 700, fontSize: 14 },
   input: { width: "100%", boxSizing: "border-box", padding: "15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16 },
-  countrySelectWrap: { position: "relative" },
-  flag: { position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", zIndex: 1, fontSize: 22, pointerEvents: "none" },
-  select: { width: "100%", boxSizing: "border-box", padding: "15px 44px 15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", fontSize: 16, outline: "none" },
-  phoneRow: { display: "grid", gridTemplateColumns: "minmax(132px, 0.42fr) 1fr", gap: 8 },
-  phonePrefix: { minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "0 10px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", fontSize: 14 },
+  phoneRow: { display: "grid", gridTemplateColumns: "minmax(150px, 0.48fr) 1fr", gap: 8 },
+  phonePrefix: { minWidth: 0, display: "grid", gridTemplateColumns: "30px 1fr", alignItems: "center", gap: 4, padding: "0 8px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", fontSize: 14 },
+  phoneCountrySelect: { width: "100%", minWidth: 0, border: 0, outline: "none", background: "transparent", color: "#fff", fontSize: 14, appearance: "auto" },
   phoneInput: { width: "100%", boxSizing: "border-box", padding: "15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16 },
   passwordWrap: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: 4, borderRadius: 14, border: "1px solid #383838", background: "#181818" },
   passwordInput: { width: "100%", boxSizing: "border-box", padding: "11px 12px", border: 0, outline: "none", background: "transparent", color: "#fff", fontSize: 16 },
