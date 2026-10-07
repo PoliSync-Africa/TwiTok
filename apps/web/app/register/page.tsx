@@ -108,10 +108,7 @@ export default function RegisterPage() {
       const response = await fetch(API + "/auth/verification/verify", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: "Bearer " + token } : {})
-        },
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
         body: JSON.stringify({ code })
       });
 
@@ -131,12 +128,8 @@ export default function RegisterPage() {
     try {
       const token = localStorage.getItem("twitok_user_token");
       const response = await fetch(API + "/auth/verification/send", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: "Bearer " + token } : {})
-        },
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
         body: JSON.stringify({ channel: method })
       });
       const data = await response.json().catch(() => ({}));
@@ -146,10 +139,6 @@ export default function RegisterPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function social(provider: "google" | "apple") {
-    setError(`${provider[0].toUpperCase() + provider.slice(1)} signup is not connected yet. Configure the provider credentials to enable it.`);
   }
 
   const formSubmit = step === "contact" ? continueFromContact : step === "details" ? createAccount : verifyCode;
@@ -178,7 +167,7 @@ export default function RegisterPage() {
                 <input value={phone} onChange={event => setPhone(event.target.value.replace(/[^0-9+\s().-]/g, ""))} style={styles.input} placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" autoFocus />
               </div>
             ) : method === "email" ? (
-              <input value={email} onChange={event => setEmail(event.target.value)} style={styles.input} placeholder="Email address" type="email" autoComplete="email" autoFocus />
+              <input value={email} onChange={event => setEmail(event.target.value)} style={styles.input} placeholder="Email address" type="email" autoCapitalize="none" autoComplete="email" autoFocus />
             ) : (
               <input value={username} onChange={event => setUsername(event.target.value.replace(/[^a-zA-Z0-9._]/g, "").toLowerCase().slice(0, 24))} style={styles.input} placeholder="Username" autoCapitalize="none" autoComplete="username" autoFocus />
             )}
@@ -188,11 +177,11 @@ export default function RegisterPage() {
 
             <button type="submit" style={styles.continueButton}>Continue</button>
 
-            <div style={styles.divider}><span>or continue with</span></div>
-            <div style={styles.socialStack}>
-              <button type="button" onClick={() => social("google")} style={styles.social}>Continue with Google</button>
-              <button type="button" onClick={() => social("apple")} style={styles.social}>Continue with Apple</button>
+            <div style={styles.legal}>
+              Continuing with an account located in {selectedCountry?.name ?? "your country"} means you agree to our <Link href="/terms" style={styles.link}>Terms of Service</Link> and acknowledge that you have read our <Link href="/privacy" style={styles.link}>Privacy Policy</Link>.
             </div>
+
+            <div style={styles.helpRow}><Link href="/feedback" style={styles.link}>? Feedback and Help</Link></div>
 
             <p style={styles.bottom}>Already have an account? <Link href="/login" style={styles.link}>Sign in</Link></p>
           </>
@@ -218,6 +207,7 @@ export default function RegisterPage() {
             <input value={dob} onChange={event => setDob(event.target.value)} style={styles.input} type="date" max={maxDob} required />
 
             {error ? <p role="alert" style={styles.error}>{error}</p> : null}
+
             <div className="kente-button-wrap">
               <button disabled={busy} className="auth-primary auth-signup-primary" style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>
                 {busy ? "Creating account…" : "Create account"}
@@ -265,7 +255,6 @@ const styles: Record<string, CSSProperties> = {
   codeInput: { width: "100%", boxSizing: "border-box", padding: "18px 14px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 30, letterSpacing: 8, textAlign: "center" },
   resend: { color: "#999", textAlign: "center", marginTop: 18 },
   linkButton: { border: 0, background: "transparent", color: "#25f4ee", fontWeight: 800, cursor: "pointer", padding: 0 },
-  divider: { display: "flex", alignItems: "center", gap: 10, margin: "22px 0 12px", color: "#777", fontSize: 12 },
-  socialStack: { display: "grid", gap: 8 },
-  social: { border: "1px solid #333", background: "#181818", color: "#fff", padding: 12, borderRadius: 10, fontWeight: 800 }
+  legal: { color: "#777", fontSize: 12, lineHeight: 1.55, textAlign: "center", marginTop: 18 },
+  helpRow: { textAlign: "center", marginTop: 16 }
 };
