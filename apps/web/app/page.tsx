@@ -59,7 +59,8 @@ export default function Home() {
         const response = await authFetch(api + "/feed/" + tab + "?limit=10", { headers: {}, cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
-        const items = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];
+        const rawItems = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];
+        const items = rawItems.filter((item: FeedVideo) => !String(item.id ?? "").startsWith("demo-"));
         if (!cancelled) { setVideos(items); setFeedCursor(data.nextCursor ?? null); }
       } catch {} finally { if (!cancelled) setFeedLoading(false); }
     }
@@ -75,7 +76,7 @@ export default function Home() {
       const response = await authFetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor), { headers: {}, cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
-      const items = Array.isArray(data.videos) ? data.videos : [];
+      const items = (Array.isArray(data.videos) ? data.videos : []).filter((item: FeedVideo) => !String(item.id ?? "").startsWith("demo-"));
       setVideos(current => [...current, ...items]);
       setFeedCursor(data.nextCursor ?? null);
     } catch {} finally { setFeedLoading(false); }
@@ -150,7 +151,7 @@ export default function Home() {
   }, [videos, api]);
 
   async function track(videoId: string, type: string, watchMs = 0) {
-    if (videoId.startsWith("demo-")) return;
+    if (!videoId || videoId.startsWith("demo-")) return;
     try {
       await authFetch(`${api}/feed/events`, {
         method: "POST",
@@ -170,7 +171,7 @@ export default function Home() {
   }, [videos, captionLanguage]);
 
   async function engage(videoId: string, action: "like" | "save" | "share" | "repost") {
-    if (videoId.startsWith("demo-")) return;
+    if (!videoId || videoId.startsWith("demo-")) return;
     const token = typeof window !== "undefined" ? localStorage.getItem("twitok_user_token") : null;
     if (!token) { window.location.href = "/login"; return; }
     try {
