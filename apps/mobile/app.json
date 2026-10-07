@@ -9,7 +9,10 @@
     "icon": "./assets/images/twitok-logo.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.twitokapp"
+      "bundleIdentifier": "com.twitokapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.twitokapp"
