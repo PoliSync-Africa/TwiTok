@@ -1,0 +1,126 @@
+/* TwiTok brand palette — based on the approved sign-in reference */
+/* Primary: black/charcoal + white + cyan/turquoise + vivid pink/red */
+
+:root{
+  --tt-bg:#050505;
+  --tt-surface:#101010;
+  --tt-surface-2:#181818;
+  --tt-border:rgba(255,255,255,.12);
+  --tt-muted:rgba(255,255,255,.62);
+  --tt-cyan:#25F4EE;
+  --tt-cyan-deep:#12DDE0;
+  --tt-pink:#FE2C55;
+  --tt-pink-bright:#FF3B63;
+  --tt-white:#FFFFFF;
+  --tt-black:#000000;
+  --tt-gold:var(--tt-cyan);
+  --tt-gold-bright:var(--tt-cyan);
+  --tt-gold-deep:var(--tt-cyan-deep);
+  --tt-shadow:rgba(0,0,0,.55);
+}
+
+html,body{background:var(--tt-bg)!important;color:var(--tt-white)}
+body{background:var(--tt-bg)!important}
+
+a{color:inherit}
+.logo span{color:var(--tt-cyan)!important}
+.logo-word,.mobile-logo{
+  background:none!important;
+  -webkit-text-fill-color:var(--tt-white)!important;
+  color:var(--tt-white)!important;
+  text-shadow:none!important;
+}
+.logo-mark{background:var(--tt-cyan)!important;box-shadow:0 0 0 4px rgba(37,244,238,.10),0 0 24px rgba(37,244,238,.42)!important}
+
+.primary,
+.rail-bottom button,
+.publish-button{
+  background:var(--tt-pink)!important;
+  color:var(--tt-white)!important;
+  box-shadow:0 8px 24px rgba(254,44,85,.20)!important;
+}
+.primary:hover,.publish-button:hover{background:var(--tt-pink-bright)!important}
+
+.tabs .selected::after,
+.studio-nav .active,
+.range.active{
+  background:var(--tt-cyan)!important;
+  border-color:var(--tt-cyan)!important;
+  box-shadow:0 0 16px rgba(37,244,238,.25)!important;
+}
+.tabs .selected{color:var(--tt-white)!important;text-shadow:none!important}
+
+.back,
+.composer-brand,
+.dropzone .plus,
+.toggle-row b,
+.notification-category,
+.comment-item a{
+  color:var(--tt-cyan)!important;
+}
+
+.progress span,
+.earning-track i{
+  background:var(--tt-cyan)!important;
+}
+
+.comment-form button,
+.mobile-create{
+  background:var(--tt-pink)!important;
+  color:var(--tt-white)!important;
+  box-shadow:0 7px 20px rgba(254,44,85,.20)!important;
+}
+
+.actions .active .action-icon{
+  color:var(--tt-pink)!important;
+  text-shadow:0 0 18px rgba(254,44,85,.38)!important;
+}
+
+.story-bubble span{
+  background:linear-gradient(135deg,var(--tt-pink),var(--tt-cyan))!important;
+}
+
+.top,
+.rail,
+.studio,
+.composer-page,
+.discover-page,
+.playlist-page{
+  background-color:var(--tt-bg)!important;
+}
+
+.top{border-bottom-color:rgba(37,244,238,.12)!important}
+.rail{border-right-color:rgba(37,244,238,.12)!important}
+
+.notification-button:hover,
+.sound-toggle:hover{
+  background:rgba(37,244,238,.08)!important;
+  border-color:rgba(37,244,238,.24)!important;
+}
+
+.notification-count{
+  background:var(--tt-pink)!important;
+  color:var(--tt-white)!important;
+}
+
+.notification-button span{background:var(--tt-pink)!important}
+.icon-bell::after{background:var(--tt-cyan)!important}
+
+.composer-panel,
+.studio-panel,
+.metrics article{
+  border-color:var(--tt-border)!important;
+}
+
+.dropzone{border-color:rgba(37,244,238,.32)!important}
+.caption-language select,
+.caption-translate-buttons button{
+  border-color:rgba(37,244,238,.24)!important;
+}
+
+.mobile-nav{
+  border-top-color:rgba(37,244,238,.12)!important;
+}
+.mobile-nav-item.active{color:var(--tt-cyan)!important}
+
+.video-sound{color:var(--tt-cyan)!important}
