@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { signOut } from "../../lib/auth";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
 
@@ -61,7 +62,7 @@ export default function ProfilePage() {
         </div>
         <div className="profile-stats"><span><b>{profile.following}</b><small>Following</small></span><span><b>{profile.followers}</b><small>Followers</small></span><span><b>{profile.likes}</b><small>Likes</small></span></div>
         {profile.bio ? <p className="profile-bio">{profile.bio}</p> : null}
-        <div className="profile-actions"><Link href="/edit-profile" className="profile-primary">Edit profile</Link><Link href="/create" className="profile-secondary">Create</Link><button className="profile-secondary" onClick={() => { navigator.clipboard?.writeText(window.location.href); }}>Share</button><button className="profile-secondary" onClick={async () => { await fetch(API+"/auth/logout",{method:"POST",credentials:"include"}).catch(()=>{}); localStorage.removeItem("twitok_user_token"); window.location.href="/"; }}>Sign out</button></div>
+        <div className="profile-actions"><Link href="/edit-profile" className="profile-primary">Edit profile</Link><Link href="/create" className="profile-secondary">Create</Link><button className="profile-secondary" onClick={() => { navigator.clipboard?.writeText(window.location.href); }}>Share</button><Link href="/settings" className="profile-secondary">Settings</Link><button className="profile-secondary" onClick={() => void signOut().then(() => { window.location.href="/"; })}>Sign out</button></div>
       </div>
       <nav className="profile-tabs">
         {(["videos","reposts","liked","saved"] as const).map(key => <button key={key} className={tab === key ? "active" : ""} onClick={() => { setTab(key); void loadVideos(profile.username, key); }}>{key === "videos" ? "Posts" : key[0].toUpperCase() + key.slice(1)}</button>)}
