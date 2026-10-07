@@ -179,3 +179,5 @@ a{color:inherit}
 }
 .kente-button-wrap .auth-secondary{background:#181818!important;color:#fff!important;padding:15px 18px;}
 .kente-button-wrap:hover{filter:none;}
+
+.auth-signup-wrap{margin-top:20px;}
