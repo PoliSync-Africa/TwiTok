@@ -72,13 +72,22 @@ export default function RegisterPage() {
 
     setBusy(true);
     try {
+      const normalizedPhone = method === "phone"
+        ? [selectedCountry?.dialCode, phone.replace(/\D/g, "").replace(/^0+/, "")].filter(Boolean).join("")
+        : undefined;
+      if (method === "phone" && !/^\+[0-9]{7,15}$/.test(normalizedPhone ?? "")) {
+        setError("Enter a valid phone number for the selected country.");
+        setBusy(false);
+        return;
+      }
+
       const response = await fetch(API + "/auth/register", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: method === "email" ? email.trim() : undefined,
-          phone: method === "phone" ? phone.trim() : undefined,
+          phone: normalizedPhone,
           password,
           dateOfBirth: dob,
           countryCode: selectedCountry?.alpha2 ?? countryCode
