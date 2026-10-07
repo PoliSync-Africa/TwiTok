@@ -3,13 +3,14 @@
 import { FormEvent, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import CountryCodePicker from "../../components/CountryCodePicker";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [method,setMethod]=useState<"phone"|"email"|"username">("email");
+  const [method,setMethod]=useState<"phone"|"email"|"username">("phone");
   const [identifier,setIdentifier]=useState("");
   const [password,setPassword]=useState("");
   const [countryCode,setCountryCode]=useState("GH");
@@ -34,7 +35,7 @@ export default function LoginPage() {
     <Link href="/" style={styles.back}>← TwiTok</Link>
     <h1>Sign in</h1><p style={styles.muted}>Sign in to your TwiTok account.</p>
     <div style={styles.tabs}>{(["email","phone","username"] as const).map(item=><button type="button" key={item} onClick={()=>setMethod(item)} style={method===item?styles.tabActive:styles.tab}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div>
-    {method==="phone" ? <div style={{display:"grid",gridTemplateColumns:"90px 1fr",gap:8}}><input value={countryCode} onChange={e=>setCountryCode(e.target.value.toUpperCase())} maxLength={3} style={styles.input} placeholder="GH"/><input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder="Phone number" required/></div> : <input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder={method==="email"?"Email address":"Username"} required autoCapitalize="none"/>}
+    {method==="phone" ? <div style={styles.phoneRow}><CountryCodePicker value={countryCode} onChange={setCountryCode} /><input value={identifier} onChange={e=>setIdentifier(e.target.value.replace(/[^0-9+\s().-]/g, ""))} style={styles.input} placeholder="Phone number" type="tel" inputMode="tel" required autoComplete="tel"/></div> : <input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder={method==="email"?"Email address":"Username"} required autoCapitalize="none"/>}
     <input value={password} onChange={e=>setPassword(e.target.value)} style={styles.input} placeholder="Password" type="password" required minLength={8}/>
     {error?<p style={styles.error}>{error}</p>:null}
     <div className="kente-button-wrap"><button disabled={busy} className="auth-primary" style={styles.primary}>{busy?"Signing in…":"Sign in"}</button></div>
