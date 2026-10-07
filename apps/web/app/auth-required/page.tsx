@@ -13,8 +13,8 @@ export default function AuthRequiredPage() {
         <h1 style={{fontSize:30,margin:"0 0 10px"}}>Sign in to continue</h1>
         <p style={{color:"#aaa",lineHeight:1.6}}>Sign in or create an account to continue.</p>
         <div className="auth-choice-buttons">
-          <Link href={"/login?next="+encodeURIComponent(safeNext)} className="kente-button-wrap"><Link href={"/login?next="+encodeURIComponent(safeNext)} className="auth-primary">Sign in</Link></div>
-          <Link href={"/register?next="+encodeURIComponent(safeNext)} className="kente-button-wrap"><Link href={"/register?next="+encodeURIComponent(safeNext)} className="auth-secondary">Sign up</Link></div>
+          <div className="kente-button-wrap"><Link href={"/login?next="+encodeURIComponent(safeNext)} className="auth-primary">Sign in</Link></div>
+          <div className="kente-button-wrap"><Link href={"/register?next="+encodeURIComponent(safeNext)} className="auth-secondary">Sign up</Link></div>
           <Link href={safeNext} style={{display:"block",padding:12,color:"#aaa",textDecoration:"none"}}>Cancel</Link>
         </div>
       </section>
