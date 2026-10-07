@@ -13,8 +13,19 @@ export function normalizeInternationalPhone(value: unknown, country?: string) {
   const cleaned = raw.replace(/[\\s().-]/g, "");
   const iso = String(country ?? "").trim().toUpperCase();
   const dial = COUNTRY_DIAL_CODES[iso];
-  const withCode = cleaned.startsWith("+") ? cleaned : dial ? dial + cleaned.replace(/^0+/, "") : cleaned;
-  if (!/^\\+[0-9]{7,15}$/.test(withCode)) throw new Error("Enter a valid international phone number");
+
+  // The UI supplies a national number after the country picker. Accept that
+  // input and normalize it server-side; also accept an already-E.164 value.
+  let withCode = cleaned;
+  if (withCode.startsWith("00")) withCode = "+" + withCode.slice(2);
+  if (!withCode.startsWith("+") && dial) {
+    const national = withCode.replace(/^0+/, "");
+    withCode = national.startsWith(dial.slice(1)) ? "+" + national : dial + national;
+  }
+
+  if (!/^\\+[0-9]{7,15}$/.test(withCode)) {
+    throw new Error("Enter a valid phone number for the selected country");
+  }
   return withCode;
 }
 
