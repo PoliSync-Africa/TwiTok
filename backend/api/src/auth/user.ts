@@ -36,12 +36,13 @@ async function dropLegacyUniqueIndex(collection: Collection<Document>, name: str
 
 export async function ensureUserIndexes(db: Db) {
   const users = db.collection("users");
-  await Promise.all([dropLegacyUniqueIndex(users, "email_1"), dropLegacyUniqueIndex(users, "phone_1"), dropLegacyUniqueIndex(users, "username_1"), dropLegacyUniqueIndex(users, "createdAt_-1")]);
+  await Promise.all([dropLegacyUniqueIndex(users, "email_1"), dropLegacyUniqueIndex(users, "phone_1"), dropLegacyUniqueIndex(users, "username_1"), dropLegacyUniqueIndex(users, "createdAt_-1"), dropLegacyUniqueIndex(users, "googleId_1")]);
   await Promise.all([
     users.createIndex({ email: 1 }, { name: "users_email_unique", unique: true, partialFilterExpression: { email: { $type: "string" } } }),
     users.createIndex({ phone: 1 }, { name: "users_phone_unique", unique: true, partialFilterExpression: { phone: { $type: "string" } } }),
     users.createIndex({ username: 1 }, { name: "users_username_unique", unique: true, partialFilterExpression: { username: { $type: "string" } } }),
-    users.createIndex({ createdAt: -1 }, { name: "users_createdAt_desc" })
+    users.createIndex({ createdAt: -1 }, { name: "users_createdAt_desc" }),
+    users.createIndex({ googleId: 1 }, { name: "users_google_unique", unique: true, partialFilterExpression: { googleId: { $type: "string" } } })
   ]);
 }
 
