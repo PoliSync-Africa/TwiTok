@@ -23,7 +23,6 @@ export default function RegisterPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [verificationUnavailable, setVerificationUnavailable] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -110,7 +109,6 @@ export default function RegisterPage() {
       });
       const verificationData = await verificationResponse.json().catch(() => ({}));
       if (!verificationResponse.ok) {
-        setVerificationUnavailable(true);
         setError(verificationData.error ?? "Verification delivery is temporarily unavailable.");
       }
       setStep("verify");
@@ -162,7 +160,6 @@ export default function RegisterPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "Unable to resend code");
-      setVerificationUnavailable(false);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to resend code");
@@ -232,11 +229,7 @@ export default function RegisterPage() {
             <p style={styles.muted}>Your code was sent to <strong style={{ color: "#fff" }}>{contact}</strong>.</p>
             <input value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} style={styles.codeInput} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus />
             {error ? <p role="alert" style={styles.error}>{error}</p> : null}
-            {!verificationUnavailable ? (
-              <button disabled={busy} type="submit" style={styles.continueButton}>{busy ? "Verifying…" : "Continue"}</button>
-            ) : (
-              <button disabled={busy} type="button" onClick={() => router.replace("/profile-setup")} style={styles.continueButton}>Continue</button>
-            )}
+            <button disabled={busy} type="submit" style={styles.continueButton}>{busy ? "Verifying…" : "Verify phone number"}</button>
             <p style={styles.resend}>Didn't get a code? <button type="button" disabled={busy} style={styles.linkButton} onClick={resendCode}>Resend code</button></p>
           </>
         )}
