@@ -18,7 +18,7 @@
     "react": "19.2.3",
     "react-native": "0.86.3",
     "expo-video": "~57.0.4",
-    "expo-secure-store": "~57.0.5",
+    "expo-secure-store": "~57.0.4",
     "expo-image-picker": "~57.0.17",
     "expo-audio": "~57.0.5",
     "expo-camera": "~57.0.6",
