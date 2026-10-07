@@ -3,7 +3,8 @@
 import { FormEvent, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TWITOK_COUNTRIES, countryFlag, type TwiTokCountry } from "@twitok/types";
+import { TWITOK_COUNTRIES, type TwiTokCountry } from "@twitok/types";
+import CountryCodePicker from "../../components/CountryCodePicker";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 
@@ -96,17 +97,7 @@ export default function RegisterPage() {
 
         <label style={styles.label}>Phone number</label>
         <div style={styles.phoneRow}>
-          <div style={styles.phonePrefix}>
-            <span className="twitok-country-flag" aria-hidden="true">{selectedCountry ? countryFlag(selectedCountry.alpha2) : "🌐"}</span>
-            <select value={countryCode} onChange={event => setCountryCode(event.target.value)} style={styles.phoneCountrySelect} aria-label="Select country and international calling code">
-              <option value="">Country / code</option>
-              {TWITOK_COUNTRIES.map(country => (
-                <option key={country.alpha2} value={country.alpha2}>
-                  {countryFlag(country.alpha2)} {country.dialCode} — {country.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CountryCodePicker value={countryCode} onChange={setCountryCode} />
           <input
             value={phone}
             onChange={event => setPhone(event.target.value.replace(/[^0-9+\s().-]/g, ""))}
@@ -154,8 +145,7 @@ const styles: Record<string, CSSProperties> = {
   label: { display: "block", margin: "14px 0 7px", color: "#d8d8d8", fontWeight: 700, fontSize: 14 },
   input: { width: "100%", boxSizing: "border-box", padding: "15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16 },
   phoneRow: { display: "grid", gridTemplateColumns: "minmax(150px, 0.48fr) 1fr", gap: 8 },
-  phonePrefix: { minWidth: 0, display: "grid", gridTemplateColumns: "30px 1fr", alignItems: "center", gap: 4, padding: "0 8px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", fontSize: 14 },
-  phoneCountrySelect: { width: "100%", minWidth: 0, border: 0, outline: "none", background: "transparent", color: "#fff", fontSize: 14, appearance: "auto" },
+  
   phoneInput: { width: "100%", boxSizing: "border-box", padding: "15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16 },
   passwordWrap: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: 4, borderRadius: 14, border: "1px solid #383838", background: "#181818" },
   passwordInput: { width: "100%", boxSizing: "border-box", padding: "11px 12px", border: 0, outline: "none", background: "transparent", color: "#fff", fontSize: 16 },
