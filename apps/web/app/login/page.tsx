@@ -37,6 +37,7 @@ export default function LoginPage() {
     {method==="phone" ? <div style={{display:"grid",gridTemplateColumns:"90px 1fr",gap:8}}><input value={countryCode} onChange={e=>setCountryCode(e.target.value.toUpperCase())} maxLength={3} style={styles.input} placeholder="GH"/><input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder="Phone number" required/></div> : <input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder={method==="email"?"Email address":"Username"} required autoCapitalize="none"/>}
     <input value={password} onChange={e=>setPassword(e.target.value)} style={styles.input} placeholder="Password" type="password" required minLength={8}/>
     {error?<p style={styles.error}>{error}</p>:null}
+    <button type="button" onClick={() => { window.location.href = API + "/auth/google/start"; }} style={{...styles.primary, background:"#fff", color:"#111", marginTop:12}}>Continue with Google</button>
     <button disabled={busy} style={styles.primary}>{busy?"Signing in…":"Sign in"}</button>
     <p style={styles.bottom}>Don't have an account? <Link href="/register" style={styles.link}>Sign up</Link></p>
   </form></main>;
