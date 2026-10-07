@@ -128,8 +128,8 @@ a{color:inherit}
 /* Thin continuous Kente-inspired trim for primary authentication actions. */
 .kente-button-wrap{
   display:block;
-  padding:2px;
-  border-radius:16px;
+  padding:1px;
+  border-radius:15px;
   background:repeating-linear-gradient(90deg,#d6ad60 0 7px,#8b1e3f 7px 14px,#151515 14px 21px,#2f7d5a 21px 28px,#d6ad60 28px 35px);
   box-sizing:border-box;
   margin-top:20px;
