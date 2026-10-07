@@ -24,6 +24,8 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [verificationUnavailable, setVerificationUnavailable] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const selectedCountry: TwiTokCountry | undefined = useMemo(
     () => TWITOK_COUNTRIES.find(country => country.alpha2 === countryCode),
@@ -200,12 +202,12 @@ export default function RegisterPage() {
 
             <label style={styles.label}>Password</label>
             <div style={styles.passwordWrap}>
-              <input value={password} onChange={event => setPassword(event.target.value)} style={styles.passwordInput} placeholder="Password (minimum 8 characters)" type={showPasswordType(password, confirmPassword) ? "text" : "password"} minLength={8} required autoComplete="new-password" />
-              <button type="button" onClick={() => setPassword(value => value)} style={styles.eye}>8+</button>
+              <input value={password} onChange={event => setPassword(event.target.value)} style={styles.passwordInput} placeholder="Password (minimum 8 characters)" type={showPassword ? "text" : "password"} minLength={8} required autoComplete="new-password" />
+              <button type="button" onClick={() => setShowPassword(value => !value)} style={styles.eye}>{showPassword ? "Hide" : "Show"}</button>
             </div>
 
             <label style={styles.label}>Confirm password</label>
-            <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} style={styles.input} placeholder="Confirm password" type="password" minLength={8} required autoComplete="new-password" />
+            <div style={styles.passwordWrap}><input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} style={styles.passwordInput} placeholder="Confirm password" type={showConfirmPassword ? "text" : "password"} minLength={8} required autoComplete="new-password" /><button type="button" onClick={() => setShowConfirmPassword(value => !value)} style={styles.eye}>{showConfirmPassword ? "Hide" : "Show"}</button></div>
 
             <label style={styles.label}>Date of birth</label>
             <input value={dob} onChange={event => setDob(event.target.value)} style={styles.input} type="date" max={maxDob} required aria-label="Date of birth" />
@@ -234,9 +236,6 @@ export default function RegisterPage() {
   );
 }
 
-function showPasswordType(_password: string, _confirmPassword: string) {
-  return false;
-}
 
 const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "#000", color: "#fff", display: "grid", placeItems: "center", padding: "24px 16px" },
