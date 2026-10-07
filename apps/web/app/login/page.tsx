@@ -4,6 +4,11 @@ import { FormEvent, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import CountryCodePicker from "../../components/CountryCodePicker";
+import { TWITOK_COUNTRIES } from "@twitok/types";
+
+function countryDialCode(alpha2: string) {
+  return TWITOK_COUNTRIES.find(country => country.alpha2 === alpha2)?.dialCode ?? "";
+}
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 
