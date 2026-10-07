@@ -6,7 +6,6 @@
     "scheme": "twitok",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "icon": "./assets/images/twitok-logo.png",
     "ios": {
       "supportsTablet": true,
