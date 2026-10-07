@@ -1,4 +1,5 @@
 "use client";
+import "./settings.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCurrentUser, signOut, type TwiTokUser } from "../../lib/auth";
