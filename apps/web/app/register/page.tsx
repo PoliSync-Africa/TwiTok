@@ -8,45 +8,53 @@ import CountryCodePicker from "../../components/CountryCodePicker";
 
 const API = process.env.NEXT_PUBLIC_TWITOK_API_URL ?? "https://twitok-api-sfig.onrender.com/api/v1";
 
+type Step = "contact" | "details" | "verify";
+
 export default function RegisterPage() {
   const router = useRouter();
+  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [step, setStep] = useState<Step>("contact");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [dob, setDob] = useState("");
-  const [countryCode, setCountryCode] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [countryCode, setCountryCode] = useState("GH");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [verificationUnavailable, setVerificationUnavailable] = useState(false);
 
   const selectedCountry: TwiTokCountry | undefined = useMemo(
     () => TWITOK_COUNTRIES.find(country => country.alpha2 === countryCode),
     [countryCode]
   );
   const maxDob = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const contact = method === "phone"
+    ? [selectedCountry?.dialCode, phone.trim()].filter(Boolean).join(" ")
+    : email.trim();
 
-  async function submit(event: FormEvent) {
+  function continueFromContact(event: FormEvent) {
     event.preventDefault();
     setError("");
+    if (method === "phone" && !selectedCountry) {
+      setError("Select your country and international calling code.");
+      return;
+    }
+    if (method === "phone" && !phone.trim()) {
+      setError("Enter your phone number.");
+      return;
+    }
+    if (method === "email" && !email.trim()) {
+      setError("Enter your email address.");
+      return;
+    }
+    setStep("details");
+  }
 
-    if (!email.trim() && !phone.trim()) {
-      setError("Enter an email address or phone number.");
-      return;
-    }
-    if (email.trim() && phone.trim()) {
-      setError("Use either an email address or a phone number to create your account.");
-      return;
-    }
-    if (!countryCode) {
-      setError("Select your country.");
-      return;
-    }
-    if (phone.trim() && !selectedCountry) {
-      setError("Select a valid country for your phone number.");
-      return;
-    }
+  async function createAccount(event: FormEvent) {
+    event.preventDefault();
+    setError("");
     if (password.length < 8) {
       setError("Password must contain at least 8 characters.");
       return;
@@ -67,17 +75,34 @@ export default function RegisterPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim() || undefined,
-          phone: phone.trim() || undefined,
+          email: method === "email" ? email.trim() : undefined,
+          phone: method === "phone" ? phone.trim() : undefined,
           password,
           dateOfBirth: dob,
-          countryCode
+          countryCode: selectedCountry?.alpha2 ?? countryCode
         })
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.token) throw new Error(data.error ?? "Unable to create account");
+      if (!response.ok || !data.token) {
+        throw new Error(data.error ?? "Unable to create account");
+      }
       localStorage.setItem("twitok_user_token", data.token);
-      router.replace("/profile-setup");
+
+      const verificationResponse = await fetch(API + "/auth/verification/send", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + data.token
+        },
+        body: JSON.stringify({ channel: method })
+      });
+      const verificationData = await verificationResponse.json().catch(() => ({}));
+      if (!verificationResponse.ok) {
+        setVerificationUnavailable(true);
+        setError(verificationData.error ?? "Verification delivery is temporarily unavailable.");
+      }
+      setStep("verify");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create account");
     } finally {
@@ -85,77 +110,158 @@ export default function RegisterPage() {
     }
   }
 
+  async function verifyCode(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    if (!/^\d{6}$/.test(code)) {
+      setError("Enter the 6-digit verification code.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch(API + "/auth/verification/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Verification failed");
+      router.replace("/profile-setup");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    setError("");
+    setBusy(true);
+    try {
+      const token = localStorage.getItem("twitok_user_token");
+      const response = await fetch(API + "/auth/verification/send", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: "Bearer " + token } : {})
+        },
+        body: JSON.stringify({ channel: method })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Unable to resend code");
+      setVerificationUnavailable(false);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to resend code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const formSubmit = step === "contact" ? continueFromContact : step === "details" ? createAccount : verifyCode;
+
   return (
     <main style={styles.page}>
-      <form onSubmit={submit} style={styles.card}>
+      <form onSubmit={formSubmit} style={styles.card}>
         <Link href="/" style={styles.back}>← TwiTok</Link>
-        <h1 style={styles.title}>Create your TwiTok account</h1>
-        <p style={styles.muted}>Choose your country, secure your password, and enter your date of birth.</p>
 
-        <label style={styles.label}>Email address</label>
-        <input value={email} onChange={event => setEmail(event.target.value)} style={styles.input} placeholder="Email address" type="email" autoCapitalize="none" autoComplete="email" />
+        {step === "contact" ? (
+          <>
+            <h1 style={styles.title}>Create account</h1>
+            <p style={styles.muted}>Choose how you want to create your TwiTok account.</p>
 
-        <label style={styles.label}>Phone number</label>
-        <div style={styles.phoneRow}>
-          <CountryCodePicker value={countryCode} onChange={setCountryCode} />
-          <input
-            value={phone}
-            onChange={event => setPhone(event.target.value.replace(/[^0-9+\s().-]/g, ""))}
-            style={styles.phoneInput}
-            placeholder="Phone number"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-          />
-        </div>
+            <div style={styles.methodRow}>
+              <button type="button" onClick={() => { setMethod("phone"); setError(""); }} style={method === "phone" ? styles.methodActive : styles.method}>Phone</button>
+              <button type="button" onClick={() => { setMethod("email"); setError(""); }} style={method === "email" ? styles.methodActive : styles.method}>Email</button>
+            </div>
 
-        <label style={styles.label}>Password</label>
-        <div style={styles.passwordWrap}>
-          <input value={password} onChange={event => setPassword(event.target.value)} style={styles.passwordInput} placeholder="Password (minimum 8 characters)" type={showPassword ? "text" : "password"} minLength={8} required autoComplete="new-password" />
-          <button type="button" onClick={() => setShowPassword(value => !value)} style={styles.eye} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "Hide" : "Show"}</button>
-        </div>
+            {method === "phone" ? (
+              <div style={styles.phoneRow}>
+                <CountryCodePicker value={countryCode} onChange={setCountryCode} />
+                <input value={phone} onChange={event => setPhone(event.target.value.replace(/[^0-9+\s().-]/g, ""))} style={styles.input} placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" autoFocus />
+              </div>
+            ) : (
+              <input value={email} onChange={event => setEmail(event.target.value)} style={styles.input} placeholder="Email address" type="email" autoCapitalize="none" autoComplete="email" autoFocus />
+            )}
 
-        <label style={styles.label}>Confirm password</label>
-        <div style={styles.passwordWrap}>
-          <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} style={styles.passwordInput} placeholder="Confirm password" type={showConfirmPassword ? "text" : "password"} minLength={8} required autoComplete="new-password" />
-          <button type="button" onClick={() => setShowConfirmPassword(value => !value)} style={styles.eye} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}>{showConfirmPassword ? "Hide" : "Show"}</button>
-        </div>
+            <p style={styles.privacy}>We’ll send a verification code to this contact before finishing your account setup.</p>
+            {error ? <p role="alert" style={styles.error}>{error}</p> : null}
 
-        <label style={styles.label}>Date of birth</label>
-        <div style={styles.dateWrap}>
-          <input value={dob} onChange={event => setDob(event.target.value)} style={styles.dateInput} type="date" max={maxDob} required aria-label="Date of birth" />
-          <span style={styles.calendarHint}>📅</span>
-        </div>
-        <p style={styles.hint}>Tap the date field to open the calendar and choose your birth date.</p>
+            <button type="submit" style={styles.continueButton}>Continue</button>
+            <p style={styles.bottom}>Already have an account? <Link href="/login" style={styles.link}>Sign in</Link></p>
+          </>
+        ) : step === "details" ? (
+          <>
+            <button type="button" onClick={() => setStep("contact")} style={styles.backButton}>← Back</button>
+            <h1 style={styles.title}>Finish creating your account</h1>
+            <p style={styles.muted}>{contact}</p>
 
-        {error ? <p role="alert" style={styles.error}>{error}</p> : null}
-        <div className="kente-button-wrap"><button disabled={busy} className="auth-primary" style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>{busy ? "Creating account…" : "Sign up"}</button></div>
-        <p style={styles.bottom}>Already have an account? <Link href="/login" style={styles.link}>Sign in</Link></p>
+            <label style={styles.label}>Password</label>
+            <div style={styles.passwordWrap}>
+              <input value={password} onChange={event => setPassword(event.target.value)} style={styles.passwordInput} placeholder="Password (minimum 8 characters)" type={showPasswordType(password, confirmPassword) ? "text" : "password"} minLength={8} required autoComplete="new-password" />
+              <button type="button" onClick={() => setPassword(value => value)} style={styles.eye}>8+</button>
+            </div>
+
+            <label style={styles.label}>Confirm password</label>
+            <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} style={styles.input} placeholder="Confirm password" type="password" minLength={8} required autoComplete="new-password" />
+
+            <label style={styles.label}>Date of birth</label>
+            <input value={dob} onChange={event => setDob(event.target.value)} style={styles.input} type="date" max={maxDob} required aria-label="Date of birth" />
+            <p style={styles.hint}>Your date of birth helps us apply age-appropriate safety settings.</p>
+
+            {error ? <p role="alert" style={styles.error}>{error}</p> : null}
+            <div className="kente-button-wrap"><button disabled={busy} className="auth-primary" style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>{busy ? "Creating account…" : "Create account"}</button></div>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={() => setStep("details")} style={styles.backButton}>← Back</button>
+            <h1 style={styles.title}>Enter code</h1>
+            <p style={styles.muted}>Your code was sent to <strong style={{ color: "#fff" }}>{contact}</strong>.</p>
+            <input value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} style={styles.codeInput} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus />
+            {error ? <p role="alert" style={styles.error}>{error}</p> : null}
+            {!verificationUnavailable ? (
+              <button disabled={busy} type="submit" style={styles.continueButton}>{busy ? "Verifying…" : "Continue"}</button>
+            ) : (
+              <button disabled={busy} type="button" onClick={() => router.replace("/profile-setup")} style={styles.continueButton}>Continue</button>
+            )}
+            <p style={styles.resend}>Didn't get a code? <button type="button" disabled={busy} style={styles.linkButton} onClick={resendCode}>Resend code</button></p>
+          </>
+        )}
       </form>
     </main>
   );
 }
 
+function showPasswordType(_password: string, _confirmPassword: string) {
+  return false;
+}
+
 const styles: Record<string, CSSProperties> = {
-  page: { minHeight: "100vh", background: "#000", color: "#fff", display: "grid", placeItems: "center", padding: "28px 18px" },
+  page: { minHeight: "100vh", background: "#000", color: "#fff", display: "grid", placeItems: "center", padding: "24px 16px" },
   card: { width: "100%", maxWidth: 520, boxSizing: "border-box", background: "#111", border: "1px solid #292929", borderRadius: 24, padding: "30px 28px", boxShadow: "0 18px 60px rgba(0,0,0,.35)" },
   back: { color: "#25f4ee", textDecoration: "none", fontWeight: 800 },
-  title: { fontSize: "clamp(28px, 5vw, 42px)", lineHeight: 1.08, margin: "22px 0 10px" },
+  backButton: { border: 0, background: "transparent", color: "#aaa", padding: "8px 0", cursor: "pointer", fontSize: 15 },
+  title: { fontSize: "clamp(30px, 7vw, 44px)", lineHeight: 1.05, margin: "18px 0 10px" },
   muted: { color: "#a1a1a1", lineHeight: 1.55, marginBottom: 20 },
-  label: { display: "block", margin: "14px 0 7px", color: "#d8d8d8", fontWeight: 700, fontSize: 14 },
+  methodRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 },
+  method: { border: "1px solid #383838", background: "#181818", color: "#aaa", padding: 13, borderRadius: 13, fontWeight: 800, cursor: "pointer" },
+  methodActive: { border: "1px solid #fff", background: "#fff", color: "#000", padding: 13, borderRadius: 13, fontWeight: 900, cursor: "pointer" },
+  phoneRow: { display: "grid", gridTemplateColumns: "132px 1fr", gap: 8 },
   input: { width: "100%", boxSizing: "border-box", padding: "15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16 },
-  phoneRow: { display: "grid", gridTemplateColumns: "minmax(150px, 0.48fr) 1fr", gap: 8 },
-  
-  phoneInput: { width: "100%", boxSizing: "border-box", padding: "15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16 },
+  label: { display: "block", margin: "14px 0 7px", color: "#d8d8d8", fontWeight: 700, fontSize: 14 },
   passwordWrap: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: 4, borderRadius: 14, border: "1px solid #383838", background: "#181818" },
   passwordInput: { width: "100%", boxSizing: "border-box", padding: "11px 12px", border: 0, outline: "none", background: "transparent", color: "#fff", fontSize: 16 },
   eye: { border: 0, background: "transparent", color: "#25f4ee", fontWeight: 800, padding: "10px 12px", cursor: "pointer" },
-  dateWrap: { position: "relative" },
-  dateInput: { width: "100%", boxSizing: "border-box", padding: "15px 48px 15px 16px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 16, colorScheme: "dark" },
-  calendarHint: { position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 20 },
-  hint: { margin: "7px 0 0", color: "#777", fontSize: 12 },
-  primary: { width: "100%", marginTop: 20, padding: "16px 15px", border: 0, borderRadius: 14, background: "#fe2c55", color: "#fff", fontWeight: 900, fontSize: 17, cursor: "pointer" },
+  privacy: { color: "#777", fontSize: 13, lineHeight: 1.45, marginTop: 12 },
+  hint: { color: "#777", fontSize: 12, lineHeight: 1.45 },
   error: { color: "#ff7184", background: "rgba(254,44,85,.08)", border: "1px solid rgba(254,44,85,.25)", padding: 12, borderRadius: 12, fontSize: 13, lineHeight: 1.4 },
+  continueButton: { width: "100%", marginTop: 18, padding: "15px", border: 0, borderRadius: 999, background: "#fe2c55", color: "#fff", fontWeight: 900, fontSize: 17, cursor: "pointer" },
+  primary: { width: "100%", padding: "16px 15px", border: 0, borderRadius: 14, background: "#fe2c55", color: "#fff", fontWeight: 900, fontSize: 17, cursor: "pointer" },
   bottom: { textAlign: "center", color: "#999", marginTop: 20 },
-  link: { color: "#25f4ee", fontWeight: 900 }
+  link: { color: "#25f4ee", fontWeight: 900 },
+  codeInput: { width: "100%", boxSizing: "border-box", padding: "18px 14px", borderRadius: 14, border: "1px solid #383838", background: "#181818", color: "#fff", outline: "none", fontSize: 30, letterSpacing: 8, textAlign: "center" },
+  resend: { color: "#999", textAlign: "center", marginTop: 18 },
+  linkButton: { border: 0, background: "transparent", color: "#25f4ee", fontWeight: 800, cursor: "pointer", padding: 0 }
 };
