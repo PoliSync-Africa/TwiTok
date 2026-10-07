@@ -46,8 +46,9 @@ app.use((req, res, next) => {
   if (!stateChanging) return next();
   const origin = req.get("Origin");
   if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: "Origin not allowed" });
-  const site = req.get("Sec-Fetch-Site");
-  if (site === "cross-site") return res.status(403).json({ error: "Cross-site state-changing request blocked" });
+  // twitokapp.com -> Render is intentionally cross-site. The explicit
+  // Origin allow-list above is the CSRF boundary; do not reject a trusted
+  // browser request merely because Sec-Fetch-Site is "cross-site".
   next();
 });
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
