@@ -1,5 +1,8 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
 import { requireUser, requireContactVerificationUser } from "../auth/middleware.js";
@@ -8,10 +11,85 @@ import { sendAccountVerification, verifyAccountCode, type VerificationChannel } 
 
 const WEB_SESSION_COOKIE = "twitok_user_session";
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
+const GOOGLE_STATE_COOKIE = "twitok_google_oauth_state";
+const GOOGLE_CALLBACK = "https://twitok-api-sfig.onrender.com/api/v1/auth/google/callback";
+const WEB_ORIGIN = process.env.WEB_APP_ORIGIN ?? "https://twitokapp.com";
+function googleConfig() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const sessionSecret = process.env.TWITOK_USER_SESSION_SECRET;
+  if (!clientId || !clientSecret || !sessionSecret || sessionSecret.length < 32) throw new Error("Google OAuth is not configured");
+  return { clientId, clientSecret, sessionSecret };
+}
 
 export const authRouter = Router();
 const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const userWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+
+authRouter.get("/google/start", expressRateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false }), rateLimit({ windowMs: 15 * 60 * 1000, max: 20, key: req => req.ip ?? "unknown" }), (req, res) => {
+  try {
+    const { clientId, sessionSecret } = googleConfig();
+    const state = jwt.sign({ typ: "google_oauth_state", nonce: crypto.randomUUID() }, sessionSecret, { expiresIn: "10m", issuer: "twitok", audience: "google-oauth" });
+    res.cookie(GOOGLE_STATE_COOKIE, state, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 10 * 60 * 1000 });
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: GOOGLE_CALLBACK,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      prompt: "select_account"
+    });
+    return res.redirect("https://accounts.google.com/o/oauth2/v2/auth?" + params.toString());
+  } catch {
+    return res.redirect(WEB_ORIGIN + "/login?error=google_not_configured");
+  }
+});
+
+authRouter.get("/google/callback", expressRateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, key: req => req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    const { clientId, clientSecret, sessionSecret } = googleConfig();
+    const code = String(req.query.code ?? "");
+    const state = String(req.query.state ?? "");
+    const stateCookie = String((req.headers.cookie ?? "").split(";").map(part => part.trim()).find(part => part.startsWith(GOOGLE_STATE_COOKIE + "="))?.slice(GOOGLE_STATE_COOKIE.length + 1) ?? "");
+    if (!code || !state || !stateCookie || state !== decodeURIComponent(stateCookie)) return res.redirect(WEB_ORIGIN + "/login?error=google_state");
+    jwt.verify(state, sessionSecret, { issuer: "twitok", audience: "google-oauth", algorithms: ["HS256"] });
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: GOOGLE_CALLBACK, grant_type: "authorization_code" })
+    });
+    if (!tokenResponse.ok) return res.redirect(WEB_ORIGIN + "/login?error=google_token");
+    const tokenData = await tokenResponse.json() as { access_token?: string };
+    if (!tokenData.access_token) return res.redirect(WEB_ORIGIN + "/login?error=google_token");
+    const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: "Bearer " + tokenData.access_token } });
+    if (!profileResponse.ok) return res.redirect(WEB_ORIGIN + "/login?error=google_profile");
+    const profile = await profileResponse.json() as { sub?: string; email?: string; email_verified?: boolean; name?: string };
+    const email = profile.email?.trim().toLowerCase();
+    if (!profile.sub || !email || profile.email_verified !== true) return res.redirect(WEB_ORIGIN + "/login?error=google_email");
+    const db = await getDb();
+    let user = await db.collection("users").findOne({ googleId: profile.sub });
+    if (!user) user = await db.collection("users").findOne({ email });
+    if (!user) {
+      const now = new Date();
+      const result = await db.collection("users").insertOne({
+        googleId: profile.sub, sessionVersion: 0, email, nickname: profile.name?.trim() || email.split("@")[0],
+        accountType: "PERSONAL", monetizationEnabled: false, isPrivate: false, profileSetupComplete: false,
+        status: "ACTIVE", emailVerified: true, phoneVerified: false, createdAt: now, updatedAt: now
+      });
+      user = await db.collection("users").findOne({ _id: result.insertedId });
+    } else {
+      await db.collection("users").updateOne({ _id: user._id }, { $set: { googleId: profile.sub, emailVerified: true, updatedAt: new Date() } });
+      user = await db.collection("users").findOne({ _id: user._id });
+    }
+    if (!user) return res.redirect(WEB_ORIGIN + "/login?error=google_account");
+    const sessionToken = issueUserToken({ _id: user._id.toHexString(), username: user.username, sessionVersion: Number(user.sessionVersion ?? 0) });
+    res.clearCookie(GOOGLE_STATE_COOKIE, { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
+    res.cookie(WEB_SESSION_COOKIE, sessionToken, cookieOptions);
+    const destination = user.profileSetupComplete === true && user.username ? "/" : "/profile-setup";
+    return res.redirect(WEB_ORIGIN + destination);
+  } catch {
+    return res.redirect(WEB_ORIGIN + "/login?error=google_failed");
+  }
+});
 
 authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
   try {
