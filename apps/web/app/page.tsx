@@ -22,18 +22,6 @@ type FeedVideo = {
   engagement?: { likeCount: number; commentCount: number; shareCount: number; saveCount: number; repostCount: number; liked: boolean; saved: boolean; reposted: boolean };
 };
 
-const demoVideos: FeedVideo[] = [
-  { id: "demo-1", ownerUsername: "@kofi_creates", country: "Ghana", caption: "Accra after sunset 🌍✨", hashtags: ["Ghana","Africa","TwiTok"] },
-  { id: "demo-2", ownerUsername: "@amakaofficial", country: "Nigeria", caption: "Our culture, our story.", hashtags: ["Nigeria","Culture","Africa"] },
-  { id: "demo-3", ownerUsername: "@zuri_daily", country: "Kenya", caption: "A morning in Nairobi.", hashtags: ["Kenya","Nairobi","TwiTok"] }
-];
-
-const demoLocations = [
-  { city: "Accra", country: "Ghana", kicker: "GOLD COAST NIGHTS" },
-  { city: "Lagos", country: "Nigeria", kicker: "CITY LIGHTS" },
-  { city: "Nairobi", country: "Kenya", kicker: "EAST AFRICA" }
-];
-
 const tabs = [
   { label: "Following", surface: "FOLLOWING" },
   { label: "For You", surface: "FOR_YOU" },
@@ -42,7 +30,7 @@ const tabs = [
 
 export default function Home() {
   const [tab, setTab] = useState<(typeof tabs)[number]["surface"]>("FOR_YOU");
-  const [videos, setVideos] = useState<FeedVideo[]>(demoVideos);
+  const [videos, setVideos] = useState<FeedVideo[]>([]);
   const [feedCursor, setFeedCursor] = useState<string | null>(null);
   const [feedLoading, setFeedLoading] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -72,7 +60,7 @@ export default function Home() {
         if (!response.ok) return;
         const data = await response.json();
         const items = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];
-        if (!cancelled) { setVideos(items.length ? items : demoVideos); setFeedCursor(data.nextCursor ?? null); }
+        if (!cancelled) { setVideos(items); setFeedCursor(data.nextCursor ?? null); }
       } catch {} finally { if (!cancelled) setFeedLoading(false); }
     }
     setFeedCursor(null);
@@ -155,7 +143,7 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all(videos.filter(v => !v.id.startsWith("demo-")).map(async v => {
+    Promise.all(videos.map(async v => {
       try { const r = await authFetch(`${api}/music/videos/${v.id}/sound`, { headers: {} }); if (!r.ok) return null; const d = await r.json(); return d.sound ? [v.id, d.sound] as const : null; } catch { return null; }
     })).then(items => { if (!cancelled) setSoundMap(prev => { const next = { ...prev }; items.forEach(item => { if (item) next[item[0]] = item[1]; }); return next; }); });
     return () => { cancelled = true; };
@@ -330,7 +318,7 @@ export default function Home() {
         </button>)}
       </div>}
 
-      <div className="vertical-feed">
+      <div className="vertical-feed">\n      {!feedLoading && videos.length === 0 && <div className="feed-empty-state"><strong>No videos yet</strong><span>Real posts from real TwiTok users will appear here.</span><Link href="/create">Create the first post</Link></div>}\n
         {videos.map((v, i) => {
           const playback = v.playback?.mp4Url ?? v.playback?.hlsUrl;
           return <article className="video-card" data-video-id={v.id} key={v.id}>
@@ -343,7 +331,7 @@ export default function Home() {
                     ? <video className="real-video" data-caption-language={captionLanguage[v.id] ?? v.autoCaptionLanguage ?? ""} src={playback} poster={v.thumbnail ?? undefined} playsInline loop controls={false} muted={muted} preload={i < 2 ? "auto" : "metadata"} onEnded={() => track(v.id, "VIEW_COMPLETE")}>
                         {v.autoCaptionsUrl ? <track kind="captions" src={v.autoCaptionsUrl} srcLang={v.autoCaptionLanguage ?? "en"} label="Original captions" /> : null}{Object.values(v.captionTracks ?? {}).map(captionTrack => <track key={captionTrack.language} kind="captions" src={captionTrack.url} srcLang={captionTrack.language} label={captionTrack.label} />)}
                       </video>
-                    : <div className={`video-art demo-art-${i % 3}`}><div className="demo-atmosphere" /><div className="demo-aurora" /><div className="demo-grid" /><div className="demo-location-badge"><span>{demoLocations[i % demoLocations.length].kicker}</span><strong>{demoLocations[i % demoLocations.length].city}</strong><small>{demoLocations[i % demoLocations.length].country}</small></div><div className="demo-brand-stamp">TwiTok</div><div className="demo-horizon" /></div>}
+                    : <div className="video-art empty-video-art"><div className="empty-feed-message">No published videos yet.<br/><span>Be the first to create on TwiTok.</span></div></div>}
               <div className="gradient"/>
               <div className="video-copy">
                 <strong>{v.owner?.username ?? v.ownerUsername ?? "@creator"}{v.country ? ` · ${v.country}` : ""}</strong>
