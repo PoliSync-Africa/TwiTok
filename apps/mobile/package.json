@@ -29,7 +29,8 @@
     "@livekit/react-native-expo-plugin": "^1.0.3",
     "@livekit/react-native-webrtc": "^144.2.0",
     "@config-plugins/react-native-webrtc": "^15.0.2",
-    "livekit-client": "^2.22.3"
+    "livekit-client": "^2.22.3",
+    "expo-linking": "57.0.10"
   },
   "overrides": {
     "decode-uri-component": "0.5.0",
