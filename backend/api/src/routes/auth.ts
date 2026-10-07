@@ -2,6 +2,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { rateLimit as expressRateLimit } from "express-rate-limit";
 import { getDb } from "../db/mongo.js";
 import { authenticateUser, createUser, issueUserToken } from "../auth/user.js";
 import { requireUser, requireContactVerificationUser } from "../auth/middleware.js";
@@ -25,7 +26,7 @@ export const authRouter = Router();
 const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 const userWriteLimit = rateLimit({ windowMs: 60 * 1000, max: 30, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
 
-authRouter.get("/google/start", rateLimit({ windowMs: 15 * 60 * 1000, max: 20, key: req => req.ip ?? "unknown" }), (req, res) => {
+authRouter.get("/google/start", expressRateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false }), rateLimit({ windowMs: 15 * 60 * 1000, max: 20, key: req => req.ip ?? "unknown" }), (req, res) => {
   try {
     const { clientId, sessionSecret } = googleConfig();
     const state = jwt.sign({ typ: "google_oauth_state", nonce: crypto.randomUUID() }, sessionSecret, { expiresIn: "10m", issuer: "twitok", audience: "google-oauth" });
@@ -44,7 +45,7 @@ authRouter.get("/google/start", rateLimit({ windowMs: 15 * 60 * 1000, max: 20, k
   }
 });
 
-authRouter.get("/google/callback", rateLimit({ windowMs: 15 * 60 * 1000, max: 30, key: req => req.ip ?? "unknown" }), async (req, res) => {
+authRouter.get("/google/callback", expressRateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, key: req => req.ip ?? "unknown" }), async (req, res) => {
   try {
     const { clientId, clientSecret, sessionSecret } = googleConfig();
     const code = String(req.query.code ?? "");
