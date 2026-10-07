@@ -30,10 +30,14 @@
     "@livekit/react-native-webrtc": "^144.2.0",
     "@config-plugins/react-native-webrtc": "^15.0.2",
     "livekit-client": "^2.22.3",
-    "expo-linking": "57.0.10"
+    "expo-linking": "57.0.10",
+    "react-native-safe-area-context": "^5.6.0"
   },
   "overrides": {
     "decode-uri-component": "0.5.0",
     "uuid": "11.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0"
   }
 }
