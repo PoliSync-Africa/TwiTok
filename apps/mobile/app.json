@@ -10,10 +10,10 @@
     "icon": "./assets/images/twitok-logo.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "africa.twitok.app"
+      "bundleIdentifier": "com.twitokapp"
     },
     "android": {
-      "package": "africa.twitok.app"
+      "package": "com.twitokapp"
     },
     "web": {
       "bundler": "metro"
