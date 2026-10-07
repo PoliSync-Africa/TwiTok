@@ -34,7 +34,9 @@ import { initializeVerificationIndexes } from "./verification/service.js";
 const app = express();
 const httpServer = createServer(app);
 attachRealtime(httpServer);
+
 const port = Number(process.env.PORT ?? 4000);
+const host = process.env.HOST ?? "0.0.0.0";
 
 app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
 app.use(helmet());
@@ -46,9 +48,6 @@ app.use((req, res, next) => {
   if (!stateChanging) return next();
   const origin = req.get("Origin");
   if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: "Origin not allowed" });
-  // twitokapp.com -> Render is intentionally cross-site. The explicit
-  // Origin allow-list above is the CSRF boundary; do not reject a trusted
-  // browser request merely because Sec-Fetch-Site is "cross-site".
   next();
 });
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
@@ -63,6 +62,6 @@ async function start() {
     await ensureOwnerAccount(db);
     await initializeMoneyIndexes(db); await initializeWalletIndexes(db); await initializeGiftIndexes(db); await initializeWithdrawalIndexes(db); await initializeCreatorIndexes(db); await initializeLiveIndexes(db); await initializeSafetyIndexes(db); await initializeMonetizationIndexes(db); await ensureUserIndexes(db); await ensureFollowIndexes(db); await initializeVideoIndexes(db); await initializeVideoProcessingIndexes(db); await initializeFeedIndexes(db); await initializeEngagementIndexes(db); await initializeNotificationIndexes(db); await initializeSearchIndexes(db); await ensureSoundIndexes(db); await ensureTranscriptionIndexes(db); await ensureTranslationIndexes(db); await ensureStickerIndexes(db); await initializePlaylistIndexes(db); await initializeStoryIndexes(db); await initializeVerificationIndexes(db); await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
   } else console.warn("MONGODB_URI is not configured. Database features are disabled.");
-  httpServer.listen(port, () => console.log(`TwiTok API listening on port ${port}`));
+  httpServer.listen(port, host, () => console.log(`TwiTok API listening on ${host}:${port}`));
 }
 start().catch(error => { console.error("TwiTok API failed to start", error); process.exit(1); });
