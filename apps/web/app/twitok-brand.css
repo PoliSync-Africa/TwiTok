@@ -128,26 +128,54 @@ a{color:inherit}
 /* Thin continuous Kente-inspired trim for primary authentication actions. */
 .kente-button-wrap{
   display:block;
+  width:100%;
   padding:1px;
-  border-radius:15px;
+  border-radius:16px;
   background:repeating-linear-gradient(90deg,#d6ad60 0 7px,#8b1e3f 7px 14px,#151515 14px 21px,#2f7d5a 21px 28px,#d6ad60 28px 35px);
   box-sizing:border-box;
   margin-top:20px;
+  overflow:hidden;
 }
 .kente-button-wrap .auth-primary,
 .kente-button-wrap .auth-secondary{
-  display:block;
-  width:100%;
+  appearance:none;
+  -webkit-appearance:none;
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  width:100%!important;
+  min-height:52px;
   box-sizing:border-box;
-  min-height:48px;
-  border:0;
-  border-radius:14px;
+  border:0!important;
+  border-radius:15px;
+  margin:0!important;
+  padding:15px 18px;
   text-align:center;
   text-decoration:none;
   font-weight:900;
+  font-size:17px;
+  line-height:1.2;
+  cursor:pointer;
+  opacity:1;
 }
 .kente-button-wrap .auth-primary{background:var(--tt-pink)!important;color:#fff!important;}
-.kente-button-wrap .auth-signup-primary{background:var(--tt-cyan)!important;color:#000!important;}
-.kente-button-wrap .auth-signup-primary:hover{background:var(--tt-cyan-deep)!important;color:#000!important;}
-.kente-button-wrap .auth-secondary{background:#181818;color:#fff;padding:14px 15px;}
-.kente-button-wrap:hover{filter:brightness(1.08);}
+.kente-button-wrap .auth-signup-primary{
+  background:var(--tt-cyan)!important;
+  background-color:var(--tt-cyan)!important;
+  color:#000!important;
+  box-shadow:0 0 0 1px rgba(37,244,238,.18),0 8px 24px rgba(37,244,238,.18);
+}
+.kente-button-wrap .auth-signup-primary:hover{
+  background:var(--tt-cyan-deep)!important;
+  background-color:var(--tt-cyan-deep)!important;
+  color:#000!important;
+}
+.kente-button-wrap .auth-signup-primary:disabled{
+  background:var(--tt-cyan)!important;
+  background-color:var(--tt-cyan)!important;
+  color:#000!important;
+  cursor:not-allowed;
+  filter:none!important;
+}
+.kente-button-wrap .auth-secondary{background:#181818!important;color:#fff!important;padding:15px 18px;}
+.kente-button-wrap:hover{filter:none;}
