@@ -145,7 +145,7 @@ export default function RegisterPage() {
         <p style={styles.hint}>Tap the date field to open the calendar and choose your birth date.</p>
 
         {error ? <p role="alert" style={styles.error}>{error}</p> : null}
-        <button disabled={busy} style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>{busy ? "Creating account…" : "Sign up"}</button>
+        <div className="kente-button-wrap"><button disabled={busy} className="auth-primary" style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>{busy ? "Creating account…" : "Sign up"}</button></div>
         <p style={styles.bottom}>Already have an account? <Link href="/login" style={styles.link}>Sign in</Link></p>
       </form>
     </main>
