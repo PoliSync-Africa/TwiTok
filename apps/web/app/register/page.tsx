@@ -223,7 +223,7 @@ export default function RegisterPage() {
             <p style={styles.hint}>Your date of birth helps us apply age-appropriate safety settings.</p>
 
             {error ? <p role="alert" style={styles.error}>{error}</p> : null}
-            <div className="kente-button-wrap"><button disabled={busy} className="auth-primary" style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>{busy ? "Creating account…" : "Create account"}</button></div>
+            <div className="kente-button-wrap"><button disabled={busy} className="auth-primary auth-signup-primary" style={{ ...styles.primary, opacity: busy ? 0.65 : 1 }}>{busy ? "Creating account…" : "Create account"}</button></div>
           </>
         ) : (
           <>
