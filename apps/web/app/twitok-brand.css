@@ -147,5 +147,7 @@ a{color:inherit}
   font-weight:900;
 }
 .kente-button-wrap .auth-primary{background:var(--tt-pink)!important;color:#fff!important;}
+.kente-button-wrap .auth-signup-primary{background:var(--tt-cyan)!important;color:#000!important;}
+.kente-button-wrap .auth-signup-primary:hover{background:var(--tt-cyan-deep)!important;color:#000!important;}
 .kente-button-wrap .auth-secondary{background:#181818;color:#fff;padding:14px 15px;}
 .kente-button-wrap:hover{filter:brightness(1.08);}
