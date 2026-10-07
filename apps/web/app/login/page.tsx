@@ -23,9 +23,16 @@ export default function LoginPage(){
  return <main style={styles.page}><div style={styles.card}><Link href="/" style={styles.back}>← TwiTok</Link><h1>Sign in</h1><p style={styles.muted}>Sign in to your TwiTok account.</p>
  <button type="button" onClick={beginQrLogin} style={styles.qrButton}><QrIcon/> <span>Sign in with QR code</span></button>
  <div style={styles.tabs}>{(["email","phone","username"] as const).map(item=><button type="button" key={item} onClick={()=>setMethod(item)} style={method===item?styles.tabActive:styles.tab}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div>
- {method==="phone"?<div style={styles.phoneRow}><CountryCodePicker value={countryCode} onChange={setCountryCode}/><input value={identifier} onChange={e=>setIdentifier(e.target.value.replace(/[^0-9+\s().-]/g,""))} style={styles.input} placeholder="Phone number" type="tel" inputMode="tel" required autoComplete="tel"/>:<input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder={method==="email"?"Email address":"Username"} required autoCapitalize="none"/>}
+ {method==="phone" ? (
+   <div style={styles.phoneRow}>
+     <CountryCodePicker value={countryCode} onChange={setCountryCode}/>
+     <input value={identifier} onChange={e=>setIdentifier(e.target.value.replace(/[^0-9+\s().-]/g,""))} style={styles.input} placeholder="Phone number" type="tel" inputMode="tel" required autoComplete="tel"/>
+   </div>
+ ) : (
+   <input value={identifier} onChange={e=>setIdentifier(e.target.value)} style={styles.input} placeholder={method==="email"?"Email address":"Username"} required autoCapitalize="none" autoComplete={method==="email"?"email":"username"}/>
+ )}
  <input value={password} onChange={e=>setPassword(e.target.value)} style={styles.input} placeholder="Password" type="password" required minLength={8}/>
- {error?<p style={styles.error} role="alert">{error}</p>:null}<div className="kente-button-wrap"><button disabled={busy} className="auth-primary" style={styles.primary}>{busy?"Signing in…":"Sign in"}</button></div>
+ {error?<p style={styles.error} role="alert">{error}</p>:null}<div className="kente-button-wrap"><button onClick={submit} disabled={busy} className="auth-primary" style={styles.primary}>{busy?"Signing in…":"Sign in"}</button></div>
  <div style={styles.divider}><span>or continue with</span></div>
  <div style={styles.providerStack}>{[["Google",GoogleLogo],["Apple",AppleLogo],["Facebook",FacebookLogo]].map(([name,Logo])=><button type="button" key={name as string} onClick={()=>provider(name as string)} style={styles.providerButton}><Logo/><span>Continue with {name as string}</span></button>)}</div>
  <div style={styles.legal}>Continuing with an account located in {countryName} means you agree to our <Link href="/terms" style={styles.link}>Terms of Service</Link> and acknowledge that you have read our <Link href="/privacy" style={styles.link}>Privacy Policy</Link>.</div>
