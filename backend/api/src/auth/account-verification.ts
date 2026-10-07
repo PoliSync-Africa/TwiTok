@@ -52,7 +52,7 @@ async function sendPhoneOtp(phone: string) {
     method: "POST",
     headers: { accept: "application/json", "api-key": apiKey, "content-type": "application/json" },
     body: JSON.stringify({
-      expiry: 10,
+      expiry: 5,
       length: 6,
       medium: "sms",
       message: "Your TwiTok verification code is %otp_code%. It expires in %expiry% minutes.",
