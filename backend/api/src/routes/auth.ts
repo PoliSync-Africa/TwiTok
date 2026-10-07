@@ -78,7 +78,7 @@ authRouter.post("/verification/verify", requireContactVerificationUser, rateLimi
     const db = await getDb();
     const result = await verifyAccountCode(db, req.userId!.toHexString(), code);
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { passwordHash: 0 } });
-    const remainingVerificationRequired = user?.emailVerified !== true || user?.phoneVerified !== true;
+    const remainingVerificationRequired = Boolean((user?.email && user.emailVerified !== true) || (user?.phone && user.phoneVerified !== true));
     return res.json({ ...result, user, verificationRequired: remainingVerificationRequired });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Verification failed";
@@ -96,7 +96,7 @@ authRouter.get("/verification/status", requireContactVerificationUser, userReadL
     if (!user) return res.status(404).json({ error: "Account not found" });
     return res.json({
       user,
-      verificationRequired: user.emailVerified !== true || user.phoneVerified !== true,
+      verificationRequired: Boolean((user.email && user.emailVerified !== true) || (user.phone && user.phoneVerified !== true)),
       verificationChannels: [ ...(user.email && user.emailVerified !== true ? ["email"] : []), ...(user.phone && user.phoneVerified !== true ? ["phone"] : []) ]
     });
   } catch {
