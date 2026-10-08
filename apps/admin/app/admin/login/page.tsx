@@ -50,7 +50,7 @@ export default function OwnerLogin() {
 
         <form onSubmit={submit}>
           <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-          <label>Password<<div className="password-wrap"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /><button type="button" className="show-password" onClick={() => setShowPassword(v => !v)}>{showPassword ? "Hide" : "Show"}</button></div></label>
+          <label>Password<div className="password-wrap"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /><button type="button" className="show-password" onClick={() => setShowPassword(v => !v)}>{showPassword ? "Hide" : "Show"}</button></div></label>
           <label>MFA code <span className="muted">(if enabled)</span><input inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" /></label>
           {error && <div className="login-error">{error}</div>}
           <button disabled={loading}>{loading ? "Signing in…" : "Sign in as Owner"}</button>
