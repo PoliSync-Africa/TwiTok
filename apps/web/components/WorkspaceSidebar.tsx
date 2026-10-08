@@ -171,3 +171,4 @@ export default function WorkspaceSidebar({
       <Link className="workspace-link" href="/logout"><Icon>↪</Icon><span>Log Out</span></Link>
     </div>
   </aside>
+}
