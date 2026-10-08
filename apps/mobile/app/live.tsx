@@ -526,8 +526,8 @@ const styles = StyleSheet.create({
   broadcastModeInactive: { color: "#888", fontSize: 14, fontWeight: "800" },
 
   ttLiveScreen: { flex: 1, backgroundColor: "#000" },
-  ttPreviewFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: "#45494a" },
-  ttDimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,.10)" },
+  ttPreviewFallback: { ...StyleSheet.absoluteFill, backgroundColor: "#45494a" },
+  ttDimOverlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,.10)" },
   ttTopBar: { position: "absolute", left: 0, right: 0, zIndex: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 26 },
   ttClose: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   ttTopActions: { flexDirection: "row", alignItems: "center", gap: 10 },
