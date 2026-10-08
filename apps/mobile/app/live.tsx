@@ -329,7 +329,7 @@ function BroadcastTool({ label, icon, onPress }: { label: string; icon: string; 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#000" },
-  previewBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "#3c302c" },
+  previewBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: "#3c302c" },
   close: { position: "absolute", left: 34, top: 34, zIndex: 50, width: 42, height: 42, alignItems: "center", justifyContent: "center" },
   closeText: { color: WHITE, fontSize: 42, fontWeight: "300", lineHeight: 42 },
   liveCentre: { position: "absolute", right: 34, top: 32, zIndex: 40, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: PILL, paddingHorizontal: 23, paddingVertical: 15, borderRadius: 30 },
@@ -394,8 +394,8 @@ const styles = StyleSheet.create({
   getAccess: { height: 66, borderRadius: 34, backgroundColor: RED, alignItems: "center", justifyContent: "center", marginTop: 24 },
   getAccessText: { color: WHITE, fontSize: 21, fontWeight: "900" },
   broadcast: { flex: 1, backgroundColor: "#000" },
-  broadcastVideo: { ...StyleSheet.absoluteFillObject },
-  broadcastFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: "#090909", alignItems: "center", justifyContent: "center" },
+  broadcastVideo: { ...StyleSheet.absoluteFill },
+  broadcastFallback: { ...StyleSheet.absoluteFill, backgroundColor: "#090909", alignItems: "center", justifyContent: "center" },
   broadcastFallbackText: { color: WHITE, fontSize: 16, fontWeight: "800", marginTop: 10 },
   broadcastTop: { position: "absolute", left: 16, right: 16, top: 8, zIndex: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   broadcastPill: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,.6)", paddingHorizontal: 15, paddingVertical: 9, borderRadius: 22 },
