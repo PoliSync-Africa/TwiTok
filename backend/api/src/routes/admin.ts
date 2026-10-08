@@ -119,7 +119,7 @@ adminRouter.get("/platform/control", requireOwner, adminReadLimit, async (_req, 
       strictYouthSafety: true,
       aiModerationEnforced: true
     };
-    const platformControls = db.collection("platform_control");
+    const platformControls = db.collection<any>("platform_control");
     const row = await platformControls.findOne({ _id: "global" });
     return res.json({ controls: { ...defaults, ...((row?.controls ?? {}) as Record<string, boolean>) }, updatedAt: row?.updatedAt ?? null });
   } catch {
