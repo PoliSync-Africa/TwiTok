@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import WorkspaceSidebar from "../components/WorkspaceSidebar";
 
 type FeedVideo = {
   id: string;
@@ -30,6 +31,8 @@ const tabs = [
 
 export default function Home() {
   const [tab, setTab] = useState<(typeof tabs)[number]["surface"]>("FOR_YOU");
+  const [category, setCategory] = useState("");
+  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(false);
   const [videos, setVideos] = useState<FeedVideo[]>([]);
   const [feedCursor, setFeedCursor] = useState<string | null>(null);
   const [feedLoading, setFeedLoading] = useState(false);
@@ -51,12 +54,24 @@ export default function Home() {
   const [storyOpen, setStoryOpen] = useState<string | null>(null);
 
   useEffect(() => {
+    try { setWorkspaceCollapsed(window.localStorage.getItem("twitok-workspace-collapsed") === "1"); } catch {}
+  }, []);
+
+  function toggleWorkspace() {
+    setWorkspaceCollapsed(value => {
+      const next = !value;
+      try { window.localStorage.setItem("twitok-workspace-collapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
   
         setFeedLoading(true);
       try {
-        const response = await authFetch(api + "/feed/" + tab + "?limit=10", { headers: {}, cache: "no-store" });
+        const response = await authFetch(api + "/feed/" + tab + "?limit=10" + (category ? "&category=" + encodeURIComponent(category) : ""), { headers: {}, cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         const rawItems = Array.isArray(data.videos) ? data.videos : Array.isArray(data.items) ? data.items : [];
@@ -67,13 +82,13 @@ export default function Home() {
     setFeedCursor(null);
     load();
     return () => { cancelled = true; };
-  }, [api, tab]);
+  }, [api, tab, category]);
 
   async function loadMoreFeed() {
     if (feedLoading || !feedCursor) return;
     setFeedLoading(true);
     try {
-      const response = await authFetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor), { headers: {}, cache: "no-store" });
+      const response = await authFetch(api + "/feed/" + tab + "?limit=10&cursor=" + encodeURIComponent(feedCursor) + (category ? "&category=" + encodeURIComponent(category) : ""), { headers: {}, cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
       const items = (Array.isArray(data.videos) ? data.videos : []).filter((item: FeedVideo) => !String(item.id ?? "").startsWith("demo-"));
@@ -88,7 +103,7 @@ export default function Home() {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [feedCursor, feedLoading, tab]);
+  }, [feedCursor, feedLoading, tab, category]);
 
   useEffect(() => {
     let cancelled = false;
@@ -292,29 +307,7 @@ export default function Home() {
   }, [videos, muted]);
 
   return <main className="app">
-    <aside className="rail desktop-workspace" aria-label="TwiTok desktop workspace">
-      <div className="logo workspace-logo" aria-label="TwiTok"><span className="logo-word">TwiTok</span><span className="logo-mark" aria-hidden="true" /></div>
-      <form className="workspace-search" onSubmit={event => { event.preventDefault(); const q = (event.currentTarget.elements.namedItem("q") as HTMLInputElement)?.value.trim(); window.location.href = q ? "/discover?q=" + encodeURIComponent(q) : "/discover"; }}>
-        <span aria-hidden="true">⌕</span><input name="q" type="search" placeholder="Search" aria-label="Search TwiTok" />
-      </form>
-      <nav className="workspace-nav">
-        <Link href="/discover"><span className="workspace-icon">⌕</span><span>Explore</span></Link>
-        <Link href="/?tab=following"><span className="workspace-icon">♡</span><span>Following</span></Link>
-        <Link href="/discover?mode=friends"><span className="workspace-icon">♧</span><span>Friends</span></Link>
-        <Link href="/discover?mode=short-dramas"><span className="workspace-icon">▤</span><span>Short dramas</span></Link>
-        <Link href="/live"><span className="workspace-icon">◉</span><span>LIVE</span></Link>
-        <Link href="/messages"><span className="workspace-icon">✉</span><span>Messages</span></Link>
-        <Link href="/inbox"><span className="workspace-icon">♡</span><span>Activity</span></Link>
-        <Link href="/create"><span className="workspace-icon">＋</span><span>Upload</span></Link>
-        <Link href="/profile"><span className="workspace-icon">♙</span><span>Profile</span></Link>
-        <Link href="/wallet"><span className="workspace-icon">◎</span><span>Get Coins</span></Link>
-        <Link href="/wallet"><span className="workspace-icon">▣</span><span>Sell on TwiTok Shop</span></Link>
-        <Link href="/feedback"><span className="workspace-icon">?</span><span>Help Center</span></Link>
-      </nav>
-      <div className="rail-bottom workspace-footer">
-        <Link href="/logout"><span className="workspace-icon">↪</span><span>Logout</span></Link>
-      </div>
-    </aside>
+    <WorkspaceSidebar collapsed={workspaceCollapsed} onToggle={toggleWorkspace} tab={tab} onTabChange={setTab} category={category} onCategoryChange={setCategory} />
 
     <section className="feed">
       <header className="top">
