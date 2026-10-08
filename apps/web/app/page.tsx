@@ -292,16 +292,28 @@ export default function Home() {
   }, [videos, muted]);
 
   return <main className="app">
-    <aside className="rail">
-      <div className="logo" aria-label="TwiTok"><span className="logo-word">TwiTok</span><span className="logo-mark" aria-hidden="true" /></div>
-      <nav>
-        <Link href="/">⌂ <span>Home</span></Link>
-        <Link href="/discover">⌕ <span>Discover</span></Link>
-        <Link href="/live">◉ <span>LIVE</span></Link>
-        <Link href="/creator/studio">▣ <span>Studio</span></Link>
-        <Link href="/inbox">✉ <span>Inbox</span></Link>
+    <aside className="rail desktop-workspace" aria-label="TwiTok desktop workspace">
+      <div className="logo workspace-logo" aria-label="TwiTok"><span className="logo-word">TwiTok</span><span className="logo-mark" aria-hidden="true" /></div>
+      <form className="workspace-search" onSubmit={event => { event.preventDefault(); const q = (event.currentTarget.elements.namedItem("q") as HTMLInputElement)?.value.trim(); window.location.href = q ? "/discover?q=" + encodeURIComponent(q) : "/discover"; }}>
+        <span aria-hidden="true">⌕</span><input name="q" type="search" placeholder="Search" aria-label="Search TwiTok" />
+      </form>
+      <nav className="workspace-nav">
+        <Link href="/discover"><span className="workspace-icon">⌕</span><span>Explore</span></Link>
+        <Link href="/?tab=following"><span className="workspace-icon">♡</span><span>Following</span></Link>
+        <Link href="/discover?mode=friends"><span className="workspace-icon">♧</span><span>Friends</span></Link>
+        <Link href="/discover?mode=short-dramas"><span className="workspace-icon">▤</span><span>Short dramas</span></Link>
+        <Link href="/live"><span className="workspace-icon">◉</span><span>LIVE</span></Link>
+        <Link href="/messages"><span className="workspace-icon">✉</span><span>Messages</span></Link>
+        <Link href="/inbox"><span className="workspace-icon">♡</span><span>Activity</span></Link>
+        <Link href="/create"><span className="workspace-icon">＋</span><span>Upload</span></Link>
+        <Link href="/profile"><span className="workspace-icon">♙</span><span>Profile</span></Link>
+        <Link href="/wallet"><span className="workspace-icon">◎</span><span>Get Coins</span></Link>
+        <Link href="/wallet"><span className="workspace-icon">▣</span><span>Sell on TwiTok Shop</span></Link>
+        <Link href="/feedback"><span className="workspace-icon">?</span><span>Help Center</span></Link>
       </nav>
-      <div className="rail-bottom"><Link className="primary" href="/create">＋ Create</Link><small>Global social video</small></div>
+      <div className="rail-bottom workspace-footer">
+        <Link href="/logout"><span className="workspace-icon">↪</span><span>Logout</span></Link>
+      </div>
     </aside>
 
     <section className="feed">
