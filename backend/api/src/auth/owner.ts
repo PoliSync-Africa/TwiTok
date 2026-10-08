@@ -68,6 +68,7 @@ export function createOwnerToken(owner: StoredOwnerAccount, mfaVerified = false)
       sub: String(owner._id),
       role: "OWNER",
       email: owner.email,
+      typ: "owner_session",
       mfaVerified
     },
     JWT_SECRET(),
