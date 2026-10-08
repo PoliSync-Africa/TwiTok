@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { ObjectId, type Filter } from "mongodb";
+import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
 import { createOwnerToken, ensureOwnerAccount, verifyOwner } from "../auth/owner.js";
 import { requireOwner } from "../auth/admin-middleware.js";
@@ -83,7 +83,7 @@ adminRouter.get("/verification/requests", requireOwner, adminReadLimit, async (r
 adminRouter.get("/verification/requests/:requestId/document-url", requireOwner, adminReadLimit, async (req, res) => {
   try {
     const requestId = String(req.params.requestId);
-    const request = await (await getDb()).collection("verification_requests").findOne({ requestId } as Filter<any>, { projection: { identityDocumentKey: 1 } });
+    const request = await (await getDb()).collection("verification_requests").findOne({ requestId }, { projection: { identityDocumentKey: 1 } });
     if (!request?.identityDocumentKey) return res.status(404).json({ error: "Verification document not found" });
     const signed = await createPresignedPlayback(String(request.identityDocumentKey), 300);
     return res.json({ url: signed.url, expiresInSeconds: signed.expiresInSeconds });
@@ -120,7 +120,7 @@ adminRouter.get("/platform/control", requireOwner, adminReadLimit, async (_req, 
       aiModerationEnforced: true
     };
     const platformControls = db.collection<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>("platform_control");
-    const row = await platformControls.findOne({ _id: "global" } as Filter<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>);
+    const row = await platformControls.findOne({ _id: "global" } as any);
     return res.json({ controls: { ...defaults, ...(row?.controls ?? {}) }, updatedAt: row?.updatedAt ?? null });
   } catch {
     return res.status(500).json({ error: "Unable to load platform controls" });
@@ -148,9 +148,9 @@ adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 
     if (!Object.keys(controls).length) return res.status(400).json({ error: "No supported platform controls supplied" });
     const db = await getDb();
     const platformControls = db.collection<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>("platform_control");
-    const before = await platformControls.findOne({ _id: "global" } as Filter<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>);
+    const before = await platformControls.findOne({ _id: "global" } as any);
     await platformControls.updateOne(
-      { _id: "global" } as Filter<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>,
+      { _id: "global" } as any,
       { $set: { controls: { ...(before?.controls ?? {}), ...controls }, updatedAt: new Date(), updatedBy: req.ownerId } },
       { upsert: true }
     );
@@ -162,7 +162,7 @@ adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 
       metadata: { changed: controls },
       createdAt: new Date()
     });
-    const saved = await platformControls.findOne({ _id: "global" } as Filter<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>);
+    const saved = await platformControls.findOne({ _id: "global" } as any);
     return res.json({ controls: saved?.controls ?? controls, updatedAt: saved?.updatedAt ?? new Date() });
   } catch {
     return res.status(500).json({ error: "Unable to update platform controls" });
