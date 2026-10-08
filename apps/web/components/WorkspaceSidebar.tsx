@@ -156,8 +156,8 @@ export default function WorkspaceSidebar({
         <button className="workspace-section-trigger" type="button" onClick={() => setToolsOpen(v => !v)}><Icon>✦</Icon><span>Tools</span><b>{toolsOpen ? "−" : "+"}</b></button>
         {!collapsed && toolsOpen && <div className="workspace-nested">
           <Link href="/studio">TwiTok Studio</Link>
-          <Link href="/effects">Create TwiTok effects</Link>
-          <Link href="/promote">Promote post</Link>
+          <Link href="/create?tool=effects">Create TwiTok effects</Link>
+          <Link href="/create?tool=promote">Promote post</Link>
           <Link href="/live">LIVE tools</Link>
           <Link href="/wallet">Get Coins</Link>
           <Link href="/wallet">Sell on TwiTok Shop</Link>
