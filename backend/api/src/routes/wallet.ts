@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/mongo.js";
-import { COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet, recordPurchasedCoinRefund } from "../money/wallet.js";
+import { COIN_PACKAGES, WEB_GH_COIN_PACKAGES, MIN_WITHDRAWAL_USD, creditPurchasedCoins, ensureWallet, recordPurchasedCoinRefund } from "../money/wallet.js";
 import { giftCatalogForCountry, GIFT_CATALOG, sendGift } from "../money/gifts.js";
 import { createWithdrawal, processGhanaWithdrawal, processFlutterwaveWithdrawal, reconcilePaystackTransfer, reconcileFlutterwaveTransfer, refreshFlutterwaveWithdrawal } from "../money/withdrawal.js";
 import { initializeCoinPurchase, verifyPaystackTransaction, verifyPaystackWebhookSignature } from "../money/providers/paystack.js";
@@ -18,6 +18,21 @@ export const walletRouter = Router();
 
 
 const monetizationWriteLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
+
+function resolveCoinCheckoutPackage(sku: string, countryCode: string) {
+  const standard = COIN_PACKAGES.find(item => item.sku === sku);
+  if (standard) return { ...standard };
+  if (countryCode.toUpperCase() === "GH") {
+    const regional = WEB_GH_COIN_PACKAGES.find(item => item.sku === sku);
+    if (regional) {
+      const rate = Number(process.env.TWITOK_USD_GHS_RATE);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error("GHS payment exchange rate is not configured");
+      return { ...regional, priceUsd: Number((regional.priceGhs / rate).toFixed(8)) };
+    }
+  }
+  return null;
+}
+
 
 walletRouter.get("/monetization", requireUser, async (req, res) => {
   try {
@@ -62,18 +77,56 @@ walletRouter.get("/revenuecat/config", requireUser, async (req, res) => {
 
 walletRouter.get("/catalog", requireAdultUser, async (req, res) => {
   const user = await (await getDb()).collection("users").findOne({ _id: req.userId! }, { projection: { countryCode: 1 } });
-  const countryCode = String(user?.countryCode ?? "");
+  const countryCode = String(user?.countryCode ?? "").toUpperCase();
   const { collectionProviders, currencyForCountry } = await import("../money/providers/routing.js");
+  const featuredCoinPackages = countryCode === "GH" ? WEB_GH_COIN_PACKAGES : [];
   return res.json({
-    coinPackages: COIN_PACKAGES,
+    coinPackages: [...featuredCoinPackages, ...COIN_PACKAGES],
+    featuredCoinPackages,
+    additionalCoinPackages: COIN_PACKAGES,
     gifts: giftCatalogForCountry(countryCode),
     collectionProviders: collectionProviders(countryCode),
     collectionCurrency: currencyForCountry(countryCode),
-    pricingRegion: giftCatalogForCountry(countryCode).some((g) => g.coins !== g.baseCoins) ? "NON_AFRICA" : "AFRICA",
+    pricingRegion: countryCode === "GH" ? "GH_WEB" : (giftCatalogForCountry(countryCode).some((g) => g.coins !== g.baseCoins) ? "NON_AFRICA" : "AFRICA"),
     nonAfricanGiftMultiplier: 1.5,
     creatorSharePercent: 30, platformSharePercent: 70,
-    diamondsPerCoin: 0.30, minWithdrawalUsd: MIN_WITHDRAWAL_USD, accountingModel: "NET_PROCEEDS_70_30"
+    diamondsPerCoin: 0.30, minWithdrawalUsd: MIN_WITHDRAWAL_USD, accountingModel: "NET_PROCEEDS_70_30",
+    cashbackOffer: { percent: 5, maxUsd: 250, eligibility: "Recharge once to unlock 5% cash back on your next order" }
   });
+});
+
+walletRouter.get("/referral", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { username: 1, nickname: 1 } });
+    const code = "TW" + req.userId!.toHexString().slice(-8).toUpperCase();
+    const baseOrigin = String(process.env.PUBLIC_WEB_ORIGIN ?? process.env.TWITOK_WEB_ORIGIN ?? "https://twitokapp.com").replace(/\\/$/, "");
+    const shareUrl = baseOrigin + "/register?invite=" + encodeURIComponent(code);
+    const invitedCount = await db.collection("referrals").countDocuments({ referrerId: req.userId!.toHexString() });
+    return res.json({ code, shareUrl, invitedCount, rewardLabel: "Invite & Get Rewards", username: user?.username ?? "", nickname: user?.nickname ?? "" });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Referral details lookup failed" });
+  }
+});
+
+walletRouter.get("/offers", requireUser, async (req, res) => {
+  try {
+    const creditedPurchase = await (await getDb()).collection("coin_purchases").findOne({ userId: req.userId!.toHexString(), status: "CREDITED" }, { projection: { reference: 1, creditedAt: 1 } });
+    const unlocked = Boolean(creditedPurchase);
+    return res.json({ percent: 5, maxUsd: 250, unlocked, active: true, trigger: "Recharge once to unlock 5% cash back on your next order", reference: creditedPurchase?.reference ?? null, creditedAt: creditedPurchase?.creditedAt ?? null });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Offer lookup failed" });
+  }
+});
+
+walletRouter.get("/me/purchases", requireUser, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+    const rows = await (await getDb()).collection("coin_purchases").find({ userId: req.userId!.toHexString() }).sort({ createdAt: -1 }).limit(limit).project({ _id: 0, reference: 1, sku: 1, coins: 1, priceUsd: 1, amountGhs: 1, amountLocal: 1, currency: 1, status: 1, provider: 1, createdAt: 1, creditedAt: 1 }).toArray();
+    return res.json({ purchases: rows });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Coin purchase history lookup failed" });
+  }
 });
 
 walletRouter.get("/me", requireUser, async (req, res) => {
@@ -326,8 +379,6 @@ walletRouter.post("/iap/revenuecat/webhook", async (req, res) => {
 walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req, res) => {
   try {
     const sku = String(req.body?.sku ?? "");
-    const pkg = COIN_PACKAGES.find((item) => item.sku === sku);
-    if (!pkg) return res.status(400).json({ error: "Invalid Coin package" });
 
     const db = await getDb();
     const user = await db.collection("users").findOne(
@@ -344,6 +395,8 @@ walletRouter.post("/coins/flutterwave/initialize", requireAdultUser, async (req,
     }
 
     const countryCode = String(user.countryCode ?? "").toUpperCase();
+    const pkg = resolveCoinCheckoutPackage(sku, countryCode);
+    if (!pkg) return res.status(400).json({ error: "Invalid Coin package" });
     const provider = resolveCollectionProvider(countryCode, req.body?.provider ? String(req.body.provider) : undefined);
     if (provider !== "FLUTTERWAVE") return res.status(400).json({ error: "Flutterwave is not the selected provider for this country" });
 
