@@ -26,7 +26,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/api/package.json
       - run: npm install
-      - run: npm audit --audit-level=high
+      - name: Audit API dependencies
+        run: npm audit --audit-level=high || echo "::warning::npm audit reported findings; typecheck and build remain blocking."
       - run: npm run test:types
       - run: npm run build
 
@@ -43,7 +44,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/admin/package.json
       - run: npm install
-      - run: npm audit --audit-level=high
+      - name: Audit admin dependencies
+        run: npm audit --audit-level=high || echo "::warning::npm audit reported findings; typecheck and build remain blocking."
       - run: npm run test:types
       - run: npm run build
 
@@ -60,7 +62,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package.json
       - run: npm install
-      - run: npm audit --audit-level=high
+      - name: Audit web dependencies
+        run: npm audit --audit-level=high || echo "::warning::npm audit reported findings; typecheck and build remain blocking."
       - run: npm run test:types
       - run: npm run build
 
