@@ -36,6 +36,7 @@ const LIVE_ICONS: Record<string, { ios: string; android: string; web: string }> 
   share: { ios: "arrowshape.turn.up.right.fill", android: "share", web: "share" },
   settings: { ios: "gearshape.fill", android: "settings", web: "settings" },
   promote: { ios: "flame.fill", android: "local_fire_department", web: "local_fire_department" },
+  flip: { ios: "arrow.triangle.2.circlepath.camera", android: "flip_camera_android", web: "flip_camera_android" },
   beauty: { ios: "wand.and.stars", android: "auto_awesome", web: "auto_awesome" },
   effects: { ios: "sparkles", android: "auto_awesome", web: "auto_awesome" },
   service: { ios: "person.crop.circle.badge.plus", android: "person_add", web: "person_add" },
@@ -233,6 +234,11 @@ export default function LiveScreen() {
           <LiveTool icon="share" label="Share" onPress={() => setPanel("share")} />
           <LiveTool icon="settings" label="Settings" badge onPress={() => setPanel("settings")} />
           <LiveTool icon="promote" label="Promote" onPress={() => router.push("/promote")} />
+          <LiveTool icon="flip" label="Flip" onPress={() => setCameraFacing(v => v === "front" ? "back" : "front")} />
+          <LiveTool icon="beauty" label="Beautify" onPress={() => setPanel("beautify")} />
+          <LiveTool icon="effects" label="Effects" onPress={() => setPanel("effects")} />
+          <LiveTool icon="service" label="Service+" onPress={() => setPanel("service")} />
+          <LiveTool icon="interact" label="Interact" onPress={() => setPanel("interact")} />
         </View>
 
         <View style={styles.ttBottomCard}>
