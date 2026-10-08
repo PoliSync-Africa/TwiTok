@@ -3,6 +3,8 @@ import { createPresignedPlayback, mediaConfigured } from "../media/storage.js";
 import { cacheGet, cacheSet, cacheDelete } from "../cache/redis.js";
 import { listMutedUsers } from "../safety/engine.js";
 
+function escapeRegex(value: string) { return value.replace(/[.*+?^${}()|[\\]\\]/g, "\\import { listMutedUsers } from "../safety/engine.js";"); }
+
 export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
 
@@ -106,7 +108,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !excludedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
   if (normalizedCategory && normalizedCategory.toLowerCase() !== "all") {
-    const categoryPattern = new RegExp(normalizedCategory.replace(/[.*+?^$\\{}()|[\\]\\\\]/g, "\\\\$&"), "i");
+    const categoryPattern = new RegExp(escapeRegex(normalizedCategory), "i");
     query.$or = [{ hashtags: categoryPattern }, { caption: categoryPattern }];
   }
   const videos = await db.collection("videos").aggregate([
