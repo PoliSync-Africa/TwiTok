@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   broadcastGoLiveText: { color: WHITE, fontSize: 20, fontWeight: "900" },
   broadcastModes: { flexDirection: "row", justifyContent: "space-around", paddingTop: 14 },
   broadcastModeActive: { color: WHITE, fontSize: 14, fontWeight: "900" },
-  broadcastModeInactive: { color: "#888", fontSize: 14, fontWeight: "800" }
+  broadcastModeInactive: { color: "#888", fontSize: 14, fontWeight: "800" },
 
   ttLiveScreen: { flex: 1, backgroundColor: "#000" },
   ttPreviewFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: "#45494a" },
