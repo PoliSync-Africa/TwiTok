@@ -83,7 +83,7 @@ adminRouter.get("/verification/requests", requireOwner, adminReadLimit, async (r
 adminRouter.get("/verification/requests/:requestId/document-url", requireOwner, adminReadLimit, async (req, res) => {
   try {
     const requestId = String(req.params.requestId);
-    const request = await (await getDb()).collection("verification_requests").findOne({ requestId }, { projection: { identityDocumentKey: 1 } });
+    const request = await (await getDb()).collection("verification_requests").findOne({ requestId } as Filter<any>, { projection: { identityDocumentKey: 1 } });
     if (!request?.identityDocumentKey) return res.status(404).json({ error: "Verification document not found" });
     const signed = await createPresignedPlayback(String(request.identityDocumentKey), 300);
     return res.json({ url: signed.url, expiresInSeconds: signed.expiresInSeconds });
