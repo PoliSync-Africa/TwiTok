@@ -103,6 +103,70 @@ adminRouter.post("/verification/requests/:requestId/review", requireOwner, rateL
   }
 });
 
+adminRouter.get("/platform/control", requireOwner, adminReadLimit, async (_req, res) => {
+  try {
+    const db = await getDb();
+    const defaults = {
+      maintenanceMode: false,
+      readOnlyMode: false,
+      registrationEnabled: true,
+      uploadsEnabled: true,
+      commentsEnabled: true,
+      liveEnabled: true,
+      giftsEnabled: true,
+      withdrawalsEnabled: true,
+      globalAnnouncementEnabled: false,
+      strictYouthSafety: true,
+      aiModerationEnforced: true
+    };
+    const row = await db.collection("platform_control").findOne({ _id: "global" });
+    return res.json({ controls: { ...defaults, ...(row?.controls ?? {}) }, updatedAt: row?.updatedAt ?? null });
+  } catch {
+    return res.status(500).json({ error: "Unable to load platform controls" });
+  }
+});
+
+adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 60 * 1000, max: 120, key: req => req.ownerId ?? req.ip ?? "unknown" }), async (req, res) => {
+  try {
+    const allowed = [
+      "maintenanceMode", "readOnlyMode", "registrationEnabled", "uploadsEnabled",
+      "commentsEnabled", "liveEnabled", "giftsEnabled", "withdrawalsEnabled",
+      "globalAnnouncementEnabled", "strictYouthSafety", "aiModerationEnforced"
+    ] as const;
+    const incoming = req.body?.controls;
+    if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+      return res.status(400).json({ error: "controls must be an object" });
+    }
+    const controls: Record<string, boolean> = {};
+    for (const key of allowed) {
+      if (key in incoming && typeof incoming[key] !== "boolean") {
+        return res.status(400).json({ error: `${key} must be true or false` });
+      }
+      if (key in incoming) controls[key] = incoming[key];
+    }
+    if (!Object.keys(controls).length) return res.status(400).json({ error: "No supported platform controls supplied" });
+    const db = await getDb();
+    const before = await db.collection("platform_control").findOne({ _id: "global" });
+    await db.collection("platform_control").updateOne(
+      { _id: "global" },
+      { $set: { controls: { ...(before?.controls ?? {}), ...controls }, updatedAt: new Date(), updatedBy: req.ownerId } },
+      { upsert: true }
+    );
+    await db.collection("audit_logs").insertOne({
+      actorId: req.ownerId,
+      actorRole: "OWNER",
+      action: "PLATFORM_CONTROL_UPDATE",
+      resourceType: "PLATFORM_CONTROL",
+      metadata: { changed: controls },
+      createdAt: new Date()
+    });
+    const saved = await db.collection("platform_control").findOne({ _id: "global" });
+    return res.json({ controls: saved?.controls ?? controls, updatedAt: saved?.updatedAt ?? new Date() });
+  } catch {
+    return res.status(500).json({ error: "Unable to update platform controls" });
+  }
+});
+
 adminRouter.get("/overview",requireOwner,adminReadLimit,async(req,res)=>{
   try {
     const db=await getDb();
