@@ -106,12 +106,7 @@ function RowItem({ row, summary }: { row: Row; summary?: string }) {
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => {
         if (row.key === "balance") return router.push("/balance");
-        if (row.key === "switch") {
-          return Alert.alert("Switch account", "Sign in to another TwiTok account on this device.", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Sign in", onPress: () => router.push("/login") },
-          ]);
-        }
+        if (row.key === "switch") return router.push("/switch-account");
         router.push({ pathname: "/settings-detail", params: { kind: row.key, title: row.label } });
       }}
       accessibilityRole="button"
