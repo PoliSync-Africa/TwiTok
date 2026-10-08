@@ -90,7 +90,7 @@ walletRouter.get("/catalog", requireAdultUser, async (req, res) => {
     pricingRegion: countryCode === "GH" ? "GH_WEB" : (giftCatalogForCountry(countryCode).some((g) => g.coins !== g.baseCoins) ? "NON_AFRICA" : "AFRICA"),
     nonAfricanGiftMultiplier: 1.5,
     creatorSharePercent: 30, platformSharePercent: 70,
-    diamondsPerCoin: 0.30, minWithdrawalUsd: MIN_WITHDRAWAL_USD, accountingModel: "NET_PROCEEDS_70_30",
+    diamondsPerCoin: 0.30, diamondCashValueUsd: 0.003, minWithdrawalUsd: MIN_WITHDRAWAL_USD, accountingModel: "NET_PROCEEDS_70_30",
     cashbackOffer: { percent: 5, maxUsd: 250, eligibility: "Recharge once to unlock 5% cash back on your next order" }
   });
 });
