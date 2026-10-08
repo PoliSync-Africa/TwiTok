@@ -64,6 +64,7 @@ export default async function AdminHome() {
           <Link href="/admin/communities">Communities</Link>
           <Link href="/admin/marketplace">Marketplace</Link>
           <Link href="/admin/analytics">Analytics</Link>
+          <Link href="/admin/control">Platform Control</Link>
           <Link href="/admin/settings">Platform Settings</Link>
           <Link href="/admin/security">Security & Audit</Link>
         </nav>
@@ -111,7 +112,7 @@ export default async function AdminHome() {
           <article className="panel wide">
             <div className="panel-head">
               <div><p className="eyebrow">CONTROL</p><h2>Administrator Powers</h2></div>
-              <Link href="/admin/notifications">Open communications</Link>
+              <Link href="/admin/control">Open platform controls</Link>
             </div>
             <div className="power-grid">
               {powers.map((item) => <div className="power" key={item}>✓ {item}</div>)}
