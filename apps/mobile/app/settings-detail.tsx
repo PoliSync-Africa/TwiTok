@@ -343,7 +343,7 @@ export default function SettingsDetailScreen() {
             <View key={item.id}>
               <Pressable
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-                onPress={item.kind === "toggle" ? undefined : () => void action(item.id)}
+                onPress={item.kind === "toggle" ? undefined : item.kind === "choice" ? () => {\n                  if (item.id === "mentionEveryone") void chooseValue(item.id, ["Everyone", "People you follow", "Friends", "No one"]);\n                  else if (item.id === "dmEveryone") void chooseValue(item.id, ["Everyone", "Friends", "No one"]);\n                  else if (item.id === "followingList" || item.id === "likedVideos") void chooseValue(item.id, ["Everyone", "Friends", "Only you"]);\n                  else if (item.id === "appLanguage") void chooseValue(item.id, ["English", "French", "Spanish", "Portuguese", "Arabic", "Swahili", "Twi"]);\n                  else if (item.id === "dailyLimit") void chooseValue(item.id, ["Not set", "30 minutes", "1 hour", "2 hours", "3 hours"]);\n                } : () => void action(item.id)}
                 accessibilityRole={item.kind === "toggle" ? "switch" : "button"}
                 accessibilityLabel={item.label}
               >
