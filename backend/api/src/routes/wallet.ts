@@ -100,7 +100,7 @@ walletRouter.get("/referral", requireUser, async (req, res) => {
     const db = await getDb();
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { username: 1, nickname: 1 } });
     const code = "TW" + req.userId!.toHexString().slice(-8).toUpperCase();
-    const baseOrigin = String(process.env.PUBLIC_WEB_ORIGIN ?? process.env.TWITOK_WEB_ORIGIN ?? "https://twitokapp.com").replace(/\\/$/, "");
+    const baseOrigin = String(process.env.PUBLIC_WEB_ORIGIN ?? process.env.TWITOK_WEB_ORIGIN ?? "https://twitokapp.com").replace(/\/$/, "");
     const shareUrl = baseOrigin + "/register?invite=" + encodeURIComponent(code);
     const invitedCount = await db.collection("referrals").countDocuments({ referrerId: req.userId!.toHexString() });
     return res.json({ code, shareUrl, invitedCount, rewardLabel: "Invite & Get Rewards", username: user?.username ?? "", nickname: user?.nickname ?? "" });
