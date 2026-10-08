@@ -218,7 +218,7 @@ export default function SettingsDetailScreen() {
 
   async function press(id: string) {
     switch (id) {
-      case "profile": return router.push("/edit-profile");
+      case "profile": return router.push("/profile");
       case "verification": return router.push("/verification");
       case "live": return router.push("/live");
       case "notifications": return router.push("/messages");
@@ -229,7 +229,7 @@ export default function SettingsDetailScreen() {
       case "helpCentre": return Alert.alert("Help Centre", "TwiTok support and help resources are available from the Help & Feedback page.");
       case "clearCache": case "clearDownloads": return Alert.alert("Storage", "Temporary TwiTok storage can be cleared safely on this device.");
       case "offlineVideos": return Alert.alert("Offline videos", "Offline video management is ready for the next download batch.");
-      case "appLanguage": return router.push("/currency");
+      case "appLanguage": return Alert.alert("Language", "English is currently the default TwiTok app language. More language packs can be added without changing your account.");
       case "dailyLimit": return Alert.alert("Time and well-being", "Daily limits can be configured here. TwiTok will use this setting for reminders.");
       case "familyPairing": return Alert.alert("Family Pairing", "Family Pairing is available for linked family accounts.");
       case "blockedAccounts": return Alert.alert("Blocked accounts", "Blocked-account management is connected to profile safety controls.");
