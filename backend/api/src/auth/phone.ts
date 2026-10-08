@@ -1,6 +1,11 @@
-export const COUNTRY_DIAL_CODES: Record<string, string> = {
-  GH:"+233",NG:"+234",US:"+1",CA:"+1",GB:"+44",IN:"+91",ZA:"+27",KE:"+254",UG:"+256",TZ:"+255",RW:"+250",ET:"+251",EG:"+20",MA:"+212",DZ:"+213",TN:"+216",SN:"+221",CI:"+225",CM:"+237",BJ:"+229",BF:"+226",ML:"+223",NE:"+227",TG:"+228",SL:"+232",LR:"+231",GM:"+220",GN:"+224",GW:"+245",CV:"+238",MR:"+222",BR:"+55",MX:"+52",AR:"+54",CL:"+56",CO:"+57",PE:"+51",VE:"+58",UY:"+598",PY:"+595",BO:"+591",EC:"+593",CR:"+506",PA:"+507",GT:"+502",HN:"+504",SV:"+503",NI:"+505",DO:"+1",JM:"+1",TT:"+1",BB:"+1",BS:"+1",HT:"+509",LY:"+218",MG:"+261",MW:"+265",CU:"+53",AU:"+61",NZ:"+64",JP:"+81",CN:"+86",KR:"+82",SG:"+65",MY:"+60",ID:"+62",PH:"+63",TH:"+66",VN:"+84",PK:"+92",BD:"+880",LK:"+94",NP:"+977",AE:"+971",SA:"+966",QA:"+974",KW:"+965",BH:"+973",CF:"+236",TD:"+235",OM:"+968",JO:"+962",IL:"+972",TR:"+90",IR:"+98",IQ:"+964",SY:"+963",LB:"+961",YE:"+967",DE:"+49",FR:"+33",IT:"+39",ES:"+34",PT:"+351",NL:"+31",BE:"+32",CH:"+41",KM:"+269",CG:"+242",AT:"+43",SE:"+46",NO:"+47",DK:"+45",FI:"+358",IE:"+353",PL:"+48",CZ:"+420",SK:"+421",HU:"+36",RO:"+40",BG:"+359",GR:"+30",UA:"+380",RU:"+7",RS:"+381",HR:"+385",SI:"+386",BA:"+387",AL:"+355",MK:"+389",EE:"+372",GQ:"+240",ER:"+291",LV:"+371",LT:"+370",IS:"+354",MT:"+356",CY:"+357",LU:"+352",LI:"+423",MC:"+377",SM:"+378",VA:"+39",AD:"+376",AO:"+244",ME:"+382",MD:"+373",GE:"+995",AM:"+374",AZ:"+994",KZ:"+7",UZ:"+998",KG:"+996",TJ:"+992",TM:"+993",MN:"+976",AF:"+93",BI:"+257",BZ:"+501",BT:"+975",KH:"+855",LA:"+856",MM:"+95",BN:"+673",FJ:"+679",GA:"+241",GY:"+592",HK:"+852",PG:"+675",WS:"+685",TO:"+676",VU:"+678",SB:"+677",FM:"+691",MH:"+692",PW:"+680",NR:"+674",KI:"+686",TV:"+688"
-};
+const COUNTRY_DIAL_DATA = "AD|376,AE|971,AF|93,AG|1,AI|1,AL|355,AM|374,AO|244,AQ|672,AR|54,AT|43,AU|61,AZ|994,BA|387,BB|1,BD|880,BE|32,BF|226,BG|359,BH|973,BI|257,BJ|229,BL|590,BM|1,BN|673,BO|591,BQ|599,BR|55,BS|1,BT|975,BW|267,BZ|501,CA|1,CC|61,CD|243,CF|236,CG|242,CH|41,CI|225,CK|682,CL|56,CM|237,CN|86,CO|57,CR|506,CU|53,CV|238,CW|599,CX|61,CY|357,CZ|420,DE|49,DJ|253,DK|45,DM|1,DO|1,DZ|213,EC|593,EE|372,EG|20,EH|212,ER|291,ES|34,ET|251,FI|358,FJ|679,FK|500,FM|691,FO|298,FR|33,GA|241,GB|44,GD|1,GE|995,GF|594,GG|44,GH|233,GI|350,GL|299,GM|220,GN|224,GP|590,GQ|240,GR|30,GS|500,GT|502,GU|1,GW|245,GY|592,HK|852,HM|672,HN|504,HR|385,HT|509,HU|36,ID|62,IE|353,IL|972,IM|44,IN|91,IO|246,IQ|964,IR|98,IS|354,IT|39,JE|44,JM|1,JO|962,JP|81,KE|254,KG|996,KH|855,KI|686,KM|269,KN|1,KP|850,KR|82,KW|965,KY|1,KZ|7,LA|856,LB|961,LC|1,LI|423,LK|94,LR|231,LS|266,LT|370,LU|352,LV|371,LY|218,MA|212,MC|377,MD|373,ME|382,MF|590,MG|261,MH|692,MK|389,ML|223,MM|95,MN|976,MO|853,MP|1,MQ|596,MR|222,MS|1,MT|356,MU|230,MV|960,MW|265,MX|52,MY|60,MZ|258,NA|264,NC|687,NE|227,NF|672,NG|234,NI|505,NL|31,NO|47,NP|977,NR|674,NU|683,NZ|64,OM|968,PA|507,PE|51,PF|689,PG|675,PH|63,PK|92,PL|48,PM|508,PN|64,PR|1,PS|970,PT|351,PW|680,PY|595,QA|974,RE|262,RO|40,RS|381,RU|7,RW|250,SA|966,SB|677,SC|248,SD|249,SE|46,SG|65,SH|290,SI|386,SJ|47,SK|421,SL|232,SM|378,SN|221,SO|252,SR|597,SS|211,ST|239,SV|503,SX|1,SY|963,SZ|268,TC|1,TD|235,TF|262,TG|228,TH|66,TJ|992,TK|690,TL|670,TM|993,TN|216,TO|676,TR|90,TT|1,TV|688,TW|886,TZ|255,UA|380,UG|256,UM|1,US|1,UY|598,UZ|998,VA|39,VC|1,VE|58,VG|1,VI|1,VN|84,VU|678,WF|681,WS|685,YE|967,YT|262,ZA|27,ZM|260,ZW|263";
+
+export const COUNTRY_DIAL_CODES: Record<string, string> = Object.fromEntries(
+  COUNTRY_DIAL_DATA.split(",").map(entry => {
+    const [country, dial] = entry.split("|");
+    return [country, "+" + dial];
+  })
+);
 
 export function normalizeInternationalPhone(value: unknown, country?: string) {
   const raw = String(value ?? "").trim();
@@ -8,8 +13,19 @@ export function normalizeInternationalPhone(value: unknown, country?: string) {
   const cleaned = raw.replace(/[\\s().-]/g, "");
   const iso = String(country ?? "").trim().toUpperCase();
   const dial = COUNTRY_DIAL_CODES[iso];
-  const withCode = cleaned.startsWith("+") ? cleaned : dial ? dial + cleaned.replace(/^0+/, "") : cleaned;
-  if (!/^\\+[0-9]{7,15}$/.test(withCode)) throw new Error("Enter a valid international phone number");
+
+  // The UI supplies a national number after the country picker. Accept that
+  // input and normalize it server-side; also accept an already-E.164 value.
+  let withCode = cleaned;
+  if (withCode.startsWith("00")) withCode = "+" + withCode.slice(2);
+  if (!withCode.startsWith("+") && dial) {
+    const national = withCode.replace(/^0+/, "");
+    withCode = national.startsWith(dial.slice(1)) ? "+" + national : dial + national;
+  }
+
+  if (!/^\\+[0-9]{7,15}$/.test(withCode)) {
+    throw new Error("Enter a valid phone number for the selected country");
+  }
   return withCode;
 }
 

@@ -34,84 +34,34 @@ import { initializeVerificationIndexes } from "./verification/service.js";
 const app = express();
 const httpServer = createServer(app);
 attachRealtime(httpServer);
+
 const port = Number(process.env.PORT ?? 4000);
+const host = process.env.HOST ?? "0.0.0.0";
 
 app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
 app.use(helmet());
-
-const allowedOrigins = Array.from(new Set(
-  (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "")
-    .split(",").map(x => x.trim()).filter(Boolean)
-    .concat(["https://twitokapp.com", "https://www.twitokapp.com", "https://twitok-web.onrender.com"])
-));
-
+const allowedOrigins = Array.from(new Set((process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean).concat(["https://twitokapp.com", "https://www.twitokapp.com", "https://twitok-web.onrender.com"])));
 if (!allowedOrigins.length) throw new Error("ALLOWED_WEB_ORIGINS or ADMIN_WEB_ORIGIN must be configured");
-
-app.use(cors({
-  origin: (origin, callback) => !origin || allowedOrigins.includes(origin)
-    ? callback(null, true)
-    : callback(new Error("CORS origin denied")),
-  credentials: true
-}));
-
-// CSRF boundary: validate the browser Origin against the explicit allow-list.
-// twitokapp.com -> Render is cross-site by design, so Sec-Fetch-Site=
-// cross-site is expected and must not be rejected by itself.
+app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error("CORS origin denied")), credentials: true }));
 app.use((req, res, next) => {
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  const stateChanging = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  if (!stateChanging) return next();
   const origin = req.get("Origin");
-  if (origin && !allowedOrigins.includes(origin)) {
-    return res.status(403).json({ error: "Origin not allowed" });
-  }
+  if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: "Origin not allowed" });
   next();
 });
-
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
-app.use(express.json({
-  limit: "2mb",
-  verify: (req, _res, buf) => { (req as any).rawBody = Buffer.from(buf); }
-}));
+app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { (req as any).rawBody = Buffer.from(buf); } }));
 
-app.get("/health", (_req, res) => res.json({
-  service: "twitok-api", status: "ok", platform: "TwiTok", version: "0.6.0"
-}));
+app.get("/health", (_req, res) => res.json({ service: "twitok-api", status: "ok", platform: "TwiTok", version: "0.6.0" }));
 app.use("/api/v1", apiRouter);
 
 async function start() {
   if (process.env.MONGODB_URI) {
     const db = await getDb();
     await ensureOwnerAccount(db);
-    await initializeMoneyIndexes(db);
-    await initializeWalletIndexes(db);
-    await initializeGiftIndexes(db);
-    await initializeWithdrawalIndexes(db);
-    await initializeCreatorIndexes(db);
-    await initializeLiveIndexes(db);
-    await initializeSafetyIndexes(db);
-    await initializeMonetizationIndexes(db);
-    await ensureUserIndexes(db);
-    await ensureFollowIndexes(db);
-    await initializeVideoIndexes(db);
-    await initializeVideoProcessingIndexes(db);
-    await initializeFeedIndexes(db);
-    await initializeEngagementIndexes(db);
-    await initializeNotificationIndexes(db);
-    await initializeSearchIndexes(db);
-    await ensureSoundIndexes(db);
-    await ensureTranscriptionIndexes(db);
-    await ensureTranslationIndexes(db);
-    await ensureStickerIndexes(db);
-    await initializePlaylistIndexes(db);
-    await initializeStoryIndexes(db);
-    await initializeVerificationIndexes(db);
-    await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
-  } else {
-    console.warn("MONGODB_URI is not configured. Database features are disabled.");
-  }
-  httpServer.listen(port, () => console.log(`TwiTok API listening on port ${port}`));
+    await initializeMoneyIndexes(db); await initializeWalletIndexes(db); await initializeGiftIndexes(db); await initializeWithdrawalIndexes(db); await initializeCreatorIndexes(db); await initializeLiveIndexes(db); await initializeSafetyIndexes(db); await initializeMonetizationIndexes(db); await ensureUserIndexes(db); await ensureFollowIndexes(db); await initializeVideoIndexes(db); await initializeVideoProcessingIndexes(db); await initializeFeedIndexes(db); await initializeEngagementIndexes(db); await initializeNotificationIndexes(db); await initializeSearchIndexes(db); await ensureSoundIndexes(db); await ensureTranscriptionIndexes(db); await ensureTranslationIndexes(db); await ensureStickerIndexes(db); await initializePlaylistIndexes(db); await initializeStoryIndexes(db); await initializeVerificationIndexes(db); await (await import("./social/messaging.js")).ensureMessagingIndexes(db);
+  } else console.warn("MONGODB_URI is not configured. Database features are disabled.");
+  httpServer.listen(port, host, () => console.log(`TwiTok API listening on ${host}:${port}`));
 }
-
-start().catch(error => {
-  console.error("TwiTok API failed to start", error);
-  process.exit(1);
-});
+start().catch(error => { console.error("TwiTok API failed to start", error); process.exit(1); });

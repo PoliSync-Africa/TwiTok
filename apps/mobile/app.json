@@ -6,17 +6,24 @@
     "scheme": "twitok",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "icon": "./assets/images/twitok-logo.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "africa.twitok.app"
+      "bundleIdentifier": "com.twitokapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "africa.twitok.app"
+      "package": "com.twitokapp"
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "49a4aa29-6266-437e-8423-7505caa46dd9"
+      }
     },
     "plugins": [
       "expo-router",

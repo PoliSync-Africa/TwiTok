@@ -86,6 +86,8 @@ export default function CreatePage() {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const cameraRecorderRef = useRef<MediaRecorder | null>(null);
   const cameraChunksRef = useRef<Blob[]>([]);
+  const cameraAutoStartRef = useRef(false);
+  const openBrowserCameraRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); }, [preview]);
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = speed; }, [speed, preview]);
@@ -181,6 +183,7 @@ export default function CreatePage() {
       .then(async response => { const data = await response.json(); if (response.ok && data.sound) { setSelectedSound(data.sound); setSoundInitialized(true); } })
       .catch(() => undefined);
   }, []);
+
 
   async function toggleSoundPreview(sound: Sound) {
     if (!sound.audioUrl) return setMessage("This sound does not have a preview available yet.");
@@ -339,12 +342,16 @@ export default function CreatePage() {
     }
   }
 
+  // Opening /create is the explicit user action that enters TwiTok's creator camera.
+  // Browser permissions still require the browser/OS decision; this automatically
+  // starts the request on supported secure contexts without stale hook dependencies.
+  openBrowserCameraRef.current = async () => { await openBrowserCamera(); };
+
   useEffect(() => {
-    if (preview || cameraActive) return;
+    if (cameraAutoStartRef.current) return;
+    cameraAutoStartRef.current = true;
     void refreshCameraPermission();
-    const timer = window.setTimeout(() => {
-      void openBrowserCamera("user");
-    }, 250);
+    const timer = window.setTimeout(() => { void openBrowserCameraRef.current?.(); }, 80);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -517,7 +524,7 @@ export default function CreatePage() {
               <div className="camera-stage">
                 {cameraActive ? <video ref={cameraPreviewRef} className="browser-camera-preview" autoPlay playsInline muted /> : <div className="camera-unavailable"><b>{cameraStarting ? "Starting camera…" : "Camera unavailable"}</b><small>{cameraPermission === "denied" ? "Camera permission is blocked for this site. Enable Camera for Chrome in iPhone Settings, return here, refresh, then retry." : "TwiTok is requesting camera access. If the browser does not show a prompt, use Retry camera or Record with phone."}</small><button type="button" className="camera-enable" disabled={cameraStarting} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void openBrowserCamera(); }}>{cameraStarting ? "Opening…" : "Retry camera"}</button><label className="camera-phone-capture">▣ Record with phone<input type="file" accept="video/*" capture="user" onChange={e => { stopBrowserCamera(); chooseFiles(e.target.files); }} /></label></div>}
                 <button type="button" className="camera-close" onClick={() => { stopBrowserCamera(); window.history.back(); }}>×</button>
-                <button type="button" className="camera-sound" onClick={() => setSoundOpen(v => !v)}>♫ Add sound</button>
+                <button type="button" className="camera-sound" onClick={() => { window.location.href = "/sound"; }}>♫ Add sound</button>
                 <div className="camera-side-tools">
                   <button type="button" onClick={() => { const next = cameraFacingMode === "user" ? "environment" : "user"; void openBrowserCamera(next); }}>↻<small>Flip</small></button>
                   <button type="button" onClick={() => setSpeed(v => v === 2 ? .5 : v === .5 ? 1 : v === 1 ? 1.5 : 2)}>{speed}×<small>Speed</small></button>
@@ -732,7 +739,7 @@ export default function CreatePage() {
           {file && <>
             <div className="file-pill"><b>{file.name}</b><span>{sizeText}</span></div>
 
-            <button type="button" className="sound-button" onClick={() => setSoundOpen(v => !v)}>
+            <button type="button" className="sound-button" onClick={() => { window.location.href = "/sound"; }}>
               ♪ {selectedSound ? selectedSound.title + " — " + selectedSound.artist : "Add sound"}{soundInitialized ? " ✓" : ""}
             </button>
 

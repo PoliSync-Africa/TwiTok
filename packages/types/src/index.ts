@@ -55,3 +55,6 @@ export const DEFAULT_YOUTH_POLICY: YouthPolicy = {
   mandatoryBreakSeconds: 2 * 60 * 60,
   warningSeconds: [15 * 60, 10 * 60, 5 * 60, 60],
 };
+
+export { TWITOK_COUNTRIES, TWITOK_COUNTRY_BY_ALPHA2, countryFlag } from "./countries";
+export type { TwiTokCountry } from "./countries.js";
