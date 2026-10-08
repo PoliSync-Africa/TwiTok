@@ -3,7 +3,7 @@ import { createPresignedPlayback, mediaConfigured } from "../media/storage.js";
 import { cacheGet, cacheSet, cacheDelete } from "../cache/redis.js";
 import { listMutedUsers } from "../safety/engine.js";
 
-function escapeRegex(value: string) { return value.replace(/[.*+?^${}()|[\\]\\]/g, "\\import { listMutedUsers } from "../safety/engine.js";"); }
+function escapeRegex(value: string) { return value.split("").map(ch => ".^$*+?()[]{}|\\".includes(ch) ? "\\" + ch : ch).join(""); }
 
 export type FeedSurface = "FOR_YOU" | "FOLLOWING" | "AFRICA";
 export type FeedEventType = "IMPRESSION" | "VIEW_START" | "VIEW_2S" | "VIEW_COMPLETE" | "REWATCH" | "LIKE" | "COMMENT" | "SHARE" | "SAVE" | "FOLLOW" | "NOT_INTERESTED";
