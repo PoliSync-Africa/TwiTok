@@ -55,12 +55,11 @@ export default function WalletPage() {
   const [destination, setDestination] = useState({ name: "", accountNumber: "", bankCode: "" });
   const [payoutMessage, setPayoutMessage] = useState("");
 
-  const authHeaders = () => {
-    const token = typeof window !== "undefined" ? window.localStorage.getItem("twitok_user_token") : null;
-    return token ? { Authorization: "Bearer " + token } : {};
-  };
   async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-    return fetch(input, { ...init, credentials: "include", headers: { ...authHeaders(), ...(init.headers ?? {}) }, cache: "no-store" });
+    const headers = new Headers(init.headers);
+    const token = typeof window !== "undefined" ? window.localStorage.getItem("twitok_user_token") : null;
+    if (token) headers.set("Authorization", "Bearer " + token);
+    return fetch(input, { ...init, credentials: "include", headers, cache: "no-store" });
   }
 
   const signedIn = Boolean(user);
