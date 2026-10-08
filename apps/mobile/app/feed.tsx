@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Image, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Image, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { getAuthToken, requireAuth } from "../lib/auth";
 import { useLocalSearchParams } from "expo-router";
@@ -27,6 +27,7 @@ type Video = {
 type Engagement = { likeCount:number; commentCount:number; shareCount:number; saveCount:number; repostCount:number; liked:boolean; saved:boolean; reposted:boolean };
 
 const API = process.env.EXPO_PUBLIC_TWITOK_API_URL ?? "http://localhost:4000/api/v1";
+const CATEGORIES = ["All","Singing & dancing","Comedy","Sports","Anime and comics","Relationship","Shows","Lipsync","Daily Life","Beauty","Games","Society","Outfit","Cars","Food","Animals","Family","Drama","Fitness and Health","Education","Technology"];
 
 const FEED_ICONS: Record<string, { ios: string; android: string; web: string }> = {
   search: { ios: "magnifyingglass", android: "search", web: "search" },
@@ -48,7 +49,7 @@ function FeedIcon({ name, size = 22, color = "#fff" }: { name: string; size?: nu
 }
 const { height, width } = Dimensions.get("window");
 
-function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onNotInterested: () => void }) {
+function VideoCard({ item, active, onEvent, surface, onSurface, category, onCategory, onNotInterested }: { item: Video; active: boolean; onEvent: (type: string, watchMs?: number) => void; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; category: string; onCategory: (value: string) => void; onNotInterested: () => void }) {
   const insets = useSafeAreaInsets();
   const [engagement, setEngagement] = useState<Engagement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -160,7 +161,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   }, [active, player, source]);
 
   if (item.mediaType === "PHOTO") {
-    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFill} />{heartBurst ? <FeedIcon name="heart" size={72} color="#fe2c55" /> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
+    return <View style={styles.video}>{item.photos?.[0] ? <Image source={{uri:item.photos[0]}} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}<View style={styles.photoStrip}>{(item.photos ?? []).slice(1).map((uri,i)=><Image key={uri+i} source={{uri}} style={styles.photoThumb} />)}</View><Pressable style={styles.doubleTapZone} onPress={handleTap} onLongPress={handleLongPress} onPressOut={handleRelease} delayLongPress={280} accessibilityLabel="Tap to pause, double tap to like, hold for 2x speed"><View pointerEvents="none" style={StyleSheet.absoluteFill} />{heartBurst ? <FeedIcon name="heart" size={72} color="#fe2c55" /> : null}{speedHold ? <View pointerEvents="none" style={styles.speedBadge}><Text style={styles.speedBadgeText}>2×</Text></View> : null}</Pressable><Overlay item={item} engagement={engagement} surface={surface} onSurface={onSurface} category={category} onCategory={onCategory} onAction={action} onComments={() => router.push({ pathname:"/comments", params:{videoId:item.id} })} onNotInterested={onNotInterested} /></View>;
   }
 
   if (item.mediaType === "TEXT") {
@@ -179,7 +180,7 @@ function VideoCard({ item, active, onEvent, surface, onSurface, onNotInterested 
   );
 }
 
-function Overlay({ item, engagement, surface, onSurface, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
+function Overlay({ item, engagement, surface, onSurface, category, onCategory, onAction, onComments, onNotInterested }: { item: Video; engagement: Engagement | null; surface: "FOR_YOU"|"FOLLOWING"|"AFRICA"; onSurface: (surface: "FOR_YOU"|"FOLLOWING"|"AFRICA") => void; category: string; onCategory: (value: string) => void; onAction: (kind: "like"|"save"|"share"|"repost") => void; onComments: () => void; onNotInterested: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <>
@@ -208,7 +209,7 @@ function Overlay({ item, engagement, surface, onSurface, onAction, onComments, o
         <Text style={styles.caption} numberOfLines={4}>{item.caption || "TwiTok video"}</Text>
         {item.sound ? <Pressable style={styles.soundMeta} onPress={() => router.push({ pathname: "/sounds", params: { videoId: item.id } })}><FeedIcon name="music" size={18} /><Text style={styles.soundText} numberOfLines={1}>{item.sound.title || "Original sound"}{item.sound.artist ? " · " + item.sound.artist : ""}</Text></Pressable> : null}
       </View>
-      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><FeedIcon name="home" size={22} color={surface==="FOR_YOU" ? "#fff" : "#8f8f8f"} /><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")} style={styles.bottomTab}><FeedIcon name="friends" size={22} /><Text style={styles.bottomLabel}>Friends</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/camera")} accessibilityLabel="Create"><FeedIcon name="plus" size={27} color="#000" /></Pressable><Pressable onPress={() => router.push("/messages")} style={styles.bottomTab}><FeedIcon name="inbox" size={22} /><Text style={styles.bottomLabel}>Inbox</Text></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><FeedIcon name="profile" size={22} /><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
+      <View style={[styles.bottomTabs, { bottom: Math.max(12, insets.bottom + 4) }]}><Pressable onPress={() => onSurface("FOR_YOU")} style={styles.bottomTab}><FeedIcon name="home" size={21} color={surface==="FOR_YOU" ? "#fff" : "#8f8f8f"} /><Text style={surface==="FOR_YOU"?styles.bottomLabelActive:styles.bottomLabel}>Home</Text></Pressable><Pressable onPress={() => router.push("/discover")} style={styles.bottomTab}><FeedIcon name="search" size={21} /><Text style={styles.bottomLabel}>Explore</Text></Pressable><Pressable onPress={() => onSurface("FOLLOWING")} style={styles.bottomTab}><FeedIcon name="friends" size={21} color={surface==="FOLLOWING" ? "#fff" : "#8f8f8f"} /><Text style={surface==="FOLLOWING"?styles.bottomLabelActive:styles.bottomLabel}>Following</Text></Pressable><Pressable onPress={() => router.push("/wallet")} style={styles.bottomTab}><Text style={styles.giftGlyph}>🎁</Text><Text style={styles.bottomLabel}>Gifts</Text></Pressable><Pressable style={styles.createButton} onPress={() => router.push("/camera")} accessibilityLabel="Create"><FeedIcon name="plus" size={27} color="#000" /></Pressable><Pressable onPress={() => router.push("/profile")} style={styles.bottomTab}><FeedIcon name="profile" size={21} /><Text style={styles.bottomLabel}>Profile</Text></Pressable></View>
     </>
   );
 }
@@ -217,6 +218,7 @@ export default function FeedScreen() {
   const { videoId: requestedVideoId } = useLocalSearchParams<{ videoId?: string }>();
   const [videos, setVideos] = useState<Video[]>([]);
   const [surface, setSurface] = useState<"FOR_YOU"|"FOLLOWING"|"AFRICA">("FOR_YOU");
+  const [category, setCategory] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -236,7 +238,7 @@ export default function FeedScreen() {
       try {
         const token = await getAuthToken();
         if (!token) throw new Error("Sign in to view your feed.");
-        const r = await fetch(API + "/feed/" + surface + "?limit=10", { headers: { Authorization: `Bearer ${token}` } });
+        const r = await fetch(API + "/feed/" + surface + "?limit=10" + (category ? "&category=" + encodeURIComponent(category) : ""), { headers: { Authorization: `Bearer ${token}` } });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error ?? "Feed unavailable");
         if (active) {
@@ -253,7 +255,7 @@ export default function FeedScreen() {
       }
     })();
     return () => { active = false; };
-  }, [surface]);
+  }, [surface, category]);
 
   const recordEvent = async (videoId: string, type: string, watchMs?: number) => {
     try {
@@ -277,7 +279,7 @@ export default function FeedScreen() {
     try {
       const token = await getAuthToken();
       if (!token) return;
-      const r = await fetch(API + "/feed/" + surface + "?limit=10&cursor=" + encodeURIComponent(nextCursor), { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(API + "/feed/" + surface + "?limit=10&cursor=" + encodeURIComponent(nextCursor) + (category ? "&category=" + encodeURIComponent(category) : ""), { headers: { Authorization: `Bearer ${token}` } });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) return;
       setVideos(current => {
@@ -307,7 +309,7 @@ export default function FeedScreen() {
       viewabilityConfig={viewabilityConfig}
       onViewableItemsChanged={onViewableItemsChanged}
       ListFooterComponent={loadingMore ? <View style={styles.feedFooter}><ActivityIndicator color="#fff" /><Text style={styles.muted}>Loading more…</Text></View> : null}
-      renderItem={({ item, index }) => <VideoCard item={item} active={index === activeIndex} surface={surface} onSurface={setSurface} onEvent={(type, watchMs) => recordEvent(item.id, type, watchMs)} onNotInterested={async () => { await recordEvent(item.id, "NOT_INTERESTED"); setVideos(v => v.filter(x => x.id !== item.id)); }} />}
+      renderItem={({ item, index }) => <VideoCard item={item} active={index === activeIndex} surface={surface} onSurface={setSurface} category={category} onCategory={setCategory} onEvent={(type, watchMs) => recordEvent(item.id, type, watchMs)} onNotInterested={async () => { await recordEvent(item.id, "NOT_INTERESTED"); setVideos(v => v.filter(x => x.id !== item.id)); }} />}
       getItemLayout={(_, index) => ({ length: height, offset: height * index, index })}
       ListEmptyComponent={<View style={styles.center}><Text style={styles.muted}>No videos available yet.</Text></View>}
     />
@@ -330,6 +332,7 @@ const styles = StyleSheet.create({
   feedTabActive:{color:"#fff",fontSize:15,fontWeight:"900"},
   feedTabUnderline:{height:3,width:28,borderRadius:3,backgroundColor:"#fff",marginTop:5},
   searchGlyph:{color:"#fff",fontSize:28,fontWeight:"300"},
+  categoryRow:{position:"absolute",top:88,left:8,right:8,zIndex:8,maxHeight:38},categoryRowContent:{paddingHorizontal:4,gap:7},categoryChip:{paddingHorizontal:12,paddingVertical:7,borderRadius:18,backgroundColor:"rgba(0,0,0,.45)",borderWidth:1,borderColor:"rgba(255,255,255,.18)"},categoryChipActive:{backgroundColor:"rgba(255,255,255,.95)",borderColor:"#fff"},categoryChipText:{color:"#fff",fontSize:11,fontWeight:"800"},categoryChipActiveText:{color:"#000"},giftGlyph:{fontSize:19,lineHeight:21},
   rightRail: { position: "absolute", right: 10, bottom: 105, alignItems: "center", gap: 14 }, profileAction:{width:54,height:60,alignItems:"center",justifyContent:"flex-start"},profileActionAvatar:{width:48,height:48,borderRadius:24,borderWidth:2,borderColor:"#fff",backgroundColor:"#333",alignItems:"center",justifyContent:"center"},profileActionText:{color:"#fff",fontSize:18,fontWeight:"900"},profilePlus:{position:"absolute",bottom:2,width:22,height:22,borderRadius:11,backgroundColor:"#fe2c55",alignItems:"center",justifyContent:"center"},profilePlusText:{color:"#fff",fontSize:18,fontWeight:"900",lineHeight:20},
   action: { alignItems: "center", minWidth: 54, paddingVertical: 3 },
   actionIcon: { color: "#fff", fontSize: 32, fontWeight: "300", textShadowColor: "#000", textShadowRadius: 4 },
