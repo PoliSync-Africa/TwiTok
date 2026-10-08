@@ -119,8 +119,8 @@ adminRouter.get("/platform/control", requireOwner, adminReadLimit, async (_req, 
       strictYouthSafety: true,
       aiModerationEnforced: true
     };
-    const platformControls = db.collection<any>("platform_control");
-    const row = await platformControls.findOne({ _id: "global" });
+    const platformControls = db.collection("platform_control");
+    const row = await platformControls.findOne({ _id: "global" } as any);
     return res.json({ controls: { ...defaults, ...((row?.controls ?? {}) as Record<string, boolean>) }, updatedAt: row?.updatedAt ?? null });
   } catch {
     return res.status(500).json({ error: "Unable to load platform controls" });
@@ -148,10 +148,10 @@ adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 
     if (!Object.keys(controls).length) return res.status(400).json({ error: "No supported platform controls supplied" });
     const db = await getDb();
     const platformControls = db.collection("platform_control");
-    const before = await platformControls.findOne({ _id: "global" });
+    const before = await platformControls.findOne({ _id: "global" } as any);
     const beforeControls = (before?.controls ?? {}) as Record<string, boolean>;
     await platformControls.updateOne(
-      { _id: "global" },
+      { _id: "global" } as any,
       { $set: { controls: { ...beforeControls, ...controls }, updatedAt: new Date(), updatedBy: req.ownerId } },
       { upsert: true }
     );
@@ -163,7 +163,7 @@ adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 
       metadata: { changed: controls },
       createdAt: new Date()
     });
-    const saved = await platformControls.findOne({ _id: "global" });
+    const saved = await platformControls.findOne({ _id: "global" } as any);
     return res.json({ controls: (saved?.controls ?? controls) as Record<string, boolean>, updatedAt: saved?.updatedAt ?? new Date() });
   } catch {
     return res.status(500).json({ error: "Unable to update platform controls" });
