@@ -227,7 +227,7 @@ walletRouter.get("/me/withdrawals", requireUser, async (req, res) => {
 walletRouter.post("/coins/paystack/initialize", requireAdultUser, async (req, res) => {
   try {
     const sku = String(req.body?.sku ?? "");
-    const pkg = COIN_PACKAGES.find((item) => item.sku === sku);
+    const pkg = resolveCoinCheckoutPackage(sku, "GH");
     if (!pkg) return res.status(400).json({ error: "Invalid Coin package" });
     const db = await getDb();
     const user = await db.collection("users").findOne({ _id: req.userId! }, { projection: { email: 1, dateOfBirth: 1 } });
