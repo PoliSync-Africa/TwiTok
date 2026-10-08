@@ -106,7 +106,7 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !excludedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
   if (normalizedCategory && normalizedCategory.toLowerCase() !== "all") {
-    const categoryPattern = new RegExp(normalizedCategory.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\  if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();"), "i");
+    const categoryPattern = new RegExp(normalizedCategory.replace(/[.*+?^$\\{}()|[\\]\\\\]/g, "\\\\$&"), "i");
     query.$or = [{ hashtags: categoryPattern }, { caption: categoryPattern }];
   }
   const videos = await db.collection("videos").aggregate([
