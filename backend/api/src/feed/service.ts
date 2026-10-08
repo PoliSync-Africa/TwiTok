@@ -58,12 +58,13 @@ export async function recordFeedEvent(db: Db, userId: ObjectId, input: { videoId
   }
 }
 
-export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string) {
+export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, countryCode?: string, limit = 20, cursor?: string, category?: string) {
   const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 20, 1), 20);
   const normalizedCountry = String(countryCode ?? "").toUpperCase();
+  const normalizedCategory = String(category ?? "").trim().slice(0, 60);
   const cacheKey = cursor
     ? ""
-    : "feed:v1:" + userId.toHexString() + ":" + surface + ":" + normalizedCountry + ":" + safeLimit;
+    : "feed:v1:" + userId.toHexString() + ":" + surface + ":" + normalizedCountry + ":" + safeLimit + ":" + normalizedCategory;
   if (cacheKey) {
     const cached = await cacheGet<{ videos: unknown[]; nextCursor: string | null }>(cacheKey);
     if (cached) return cached;
@@ -104,6 +105,10 @@ export async function getFeed(db: Db, userId: ObjectId, surface: FeedSurface, co
   const query: any = { status: "PUBLISHED", visibility: "PUBLIC", ownerId: { $nin: excludedOwnerIds }, _id: { $nin: excludedVideoIds } };
   if (surface === "FOLLOWING") query.ownerId = { $in: followingIds.filter((id: ObjectId) => !excludedOwnerIds.some((x: ObjectId) => x.equals(id))) };
   if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();
+  if (normalizedCategory && normalizedCategory.toLowerCase() !== "all") {
+    const categoryPattern = new RegExp(normalizedCategory.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\  if (surface === "AFRICA" && countryCode) query.countryCode = String(countryCode).toUpperCase();"), "i");
+    query.$or = [{ hashtags: categoryPattern }, { caption: categoryPattern }];
+  }
   const videos = await db.collection("videos").aggregate([
     { $match: query },
     { $lookup: { from: "feed_events", let: { videoId: "$_id" }, pipeline: [
