@@ -9,6 +9,20 @@ export const COIN_PACKAGES = [
   { sku: "10000_twitok_coins", coins: 10000, priceUsd: 99.99 }
 ] as const;
 
+
+
+// Web checkout packages matching the approved TikTok-style recharge surface for Ghana.
+// Existing COIN_PACKAGES are intentionally preserved for mobile/IAP compatibility.
+export const WEB_GH_COIN_PACKAGES = [
+  { sku: "web_30_coins_gh", coins: 30, priceGhs: 4.49 },
+  { sku: "web_50_coins_gh", coins: 50, priceGhs: 7.49 },
+  { sku: "web_70_coins_gh", coins: 70, priceGhs: 10.49 },
+  { sku: "web_100_coins_gh", coins: 100, priceGhs: 14.99 },
+  { sku: "web_200_coins_gh", coins: 200, priceGhs: 29.95 },
+  { sku: "web_300_coins_gh", coins: 300, priceGhs: 44.89 },
+  { sku: "web_500_coins_gh", coins: 500, priceGhs: 74.85 }
+] as const;
+
 export const CREATOR_DIAMONDS_PER_COIN = 0.30;
 export const MIN_WITHDRAWAL_USD = 10;
 
