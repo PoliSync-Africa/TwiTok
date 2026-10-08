@@ -159,7 +159,7 @@ export default function WorkspaceSidebar({
           <Link href="/create?tool=effects">Create TwiTok effects</Link>
           <Link href="/create?tool=promote">Promote post</Link>
           <Link href="/live">LIVE tools</Link>
-          <Link href="/wallet">Get Coins</Link>
+          <Link href="/coin">Get Coins</Link>
           <Link href="/wallet">Sell on TwiTok Shop</Link>
         </div>}
       </div>
