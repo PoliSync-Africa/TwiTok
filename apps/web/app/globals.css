@@ -448,3 +448,28 @@ body{background:radial-gradient(1200px 600px at 70% -15%,rgba(226,189,98,.10),tr
 .sound-library-message{margin:16px 0;padding:12px;border-radius:10px;background:#191919;color:#bbb;font-size:12px}.sound-rights-note{margin:22px 4px 0;color:#5f5f5f;font-size:10px;line-height:1.5;text-align:center}
 @media(max-width:520px){.sound-library-shell{padding-left:10px;padding-right:10px}.sound-featured{grid-template-columns:86px minmax(0,1fr);gap:11px}.sound-featured-art{width:86px;height:86px}.sound-use-button{grid-column:2;justify-self:start;padding:7px 12px}.sound-row-card{grid-template-columns:30px 45px minmax(0,1fr) 38px 28px 20px;gap:7px}.sound-row-duration{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.sound-library-page *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Desktop workspace navigation */
+@media (min-width:901px){
+  .desktop-workspace{width:270px;padding:24px 16px 20px;overflow-y:auto}
+  .workspace-logo{margin:4px 12px 24px;font-size:32px}
+  .workspace-logo .logo-word{font-size:30px;color:#fff}
+  .workspace-search{height:46px;display:flex;align-items:center;gap:10px;padding:0 13px;margin:0 4px 22px;border:1px solid #303030;border-radius:12px;background:#171717}
+  .workspace-search span{font-size:21px;color:#aaa}
+  .workspace-search input{width:100%;border:0;outline:0;background:transparent;color:#fff;font:600 15px Inter,ui-sans-serif,system-ui,sans-serif}
+  .workspace-search input::placeholder{color:#888}
+  .workspace-nav{display:grid;gap:3px}
+  .workspace-nav a,.workspace-footer a{min-height:46px;display:flex;align-items:center;gap:14px;padding:9px 12px;border-radius:10px;color:#ddd;text-decoration:none;font-size:15px;font-weight:700}
+  .workspace-nav a:hover,.workspace-footer a:hover{background:#191919;color:#fff}
+  .workspace-nav a:first-child{background:#191919;color:#fff}
+  .workspace-icon{width:24px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:22px;line-height:1}
+  .workspace-nav a:nth-child(5) .workspace-icon{color:#fe2c55}
+  .workspace-nav a:nth-child(10) .workspace-icon{color:#25f4ee}
+  .workspace-footer{margin-top:12px;padding-top:12px;border-top:1px solid #242424}
+  .workspace-footer a{font-weight:800}
+  .feed{margin-left:270px;width:min(980px,calc(100% - 300px))}
+}
+@media (min-width:1400px){
+  .desktop-workspace{width:290px;padding-left:20px;padding-right:20px}
+  .feed{margin-left:290px}
+}
