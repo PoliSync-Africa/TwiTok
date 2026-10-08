@@ -518,3 +518,41 @@ html[data-twitok-theme="light"] .top{border-bottom-color:#ddd!important}
 
 .drama-page{min-height:100vh;background:#070707;color:#fff;padding:28px 34px 70px;margin-left:0}.drama-header{display:flex;gap:18px;align-items:center;max-width:1280px;margin:0 auto 22px}.drama-header a{color:#aaa;text-decoration:none;font-size:26px}.drama-header h1{margin:0;font-size:32px}.drama-header p{margin:6px 0 0;color:#888}.drama-filters{max-width:1280px;margin:0 auto 22px;display:flex;gap:8px;overflow:auto;padding-bottom:8px}.drama-filters button{white-space:nowrap;border:1px solid #292929;background:#111;color:#aaa;border-radius:999px;padding:9px 13px;cursor:pointer}.drama-filters button.active{background:var(--tt-cyan);border-color:var(--tt-cyan);color:#000;font-weight:850}.drama-state,.drama-empty{max-width:1280px;margin:35px auto;color:#999;text-align:center}.drama-empty{display:grid;gap:8px;padding:70px 20px;border:1px dashed #2a2a2a;border-radius:18px}.drama-empty strong{color:#fff}.drama-grid{max-width:1280px;margin:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.drama-card{background:#101010;border:1px solid #252525;border-radius:14px;overflow:hidden}.drama-card a{color:inherit;text-decoration:none}.drama-card video,.drama-placeholder{display:block;width:100%;aspect-ratio:9/13;object-fit:cover;background:#050505}.drama-placeholder{display:grid;place-items:center;color:#555;font-weight:900}.drama-card div{padding:12px;display:grid;gap:6px}.drama-card strong{font-size:14px}.drama-card small,.drama-card time{color:#888;font-size:11px}.drama-card time{font-variant-numeric:tabular-nums}@media(max-width:1000px){.drama-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:700px){.drama-page{padding:20px 14px 80px}.drama-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.drama-header h1{font-size:26px}}
 @media (prefers-color-scheme: light){html[data-twitok-theme="system"] body{background:#f7f7f8!important;color:#111}html[data-twitok-theme="system"] .rail,html[data-twitok-theme="system"] .top,html[data-twitok-theme="system"] .drama-page{background:#fff!important;color:#111}html[data-twitok-theme="system"] .workspace-link,html[data-twitok-theme="system"] .workspace-section-trigger,html[data-twitok-theme="system"] .workspace-nested a,html[data-twitok-theme="system"] .workspace-nested button{color:#333}}
+
+
+/* TikTok-style desktop More panel parity */
+.twitok-more-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:70}
+.twitok-more-panel{position:fixed;left:0;top:0;bottom:0;width:420px;max-width:calc(100vw - 52px);background:#080808;color:#fff;border-right:1px solid #292929;box-shadow:18px 0 50px rgba(0,0,0,.48);z-index:80;display:flex;flex-direction:column}
+.twitok-more-head{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #242424;flex:0 0 auto}
+.twitok-more-head strong{font-size:21px;letter-spacing:-.02em}
+.twitok-more-head button{width:38px;height:38px;border:0;border-radius:50%;background:#242424;color:#fff;font-size:29px;line-height:1;cursor:pointer}
+.twitok-more-scroll{overflow:auto;padding:18px 22px 30px}
+.twitok-more-label{margin:5px 0 8px;color:#777;font-size:12px;font-weight:800}
+.twitok-more-scroll>a,.twitok-more-scroll>button{width:100%;min-height:48px;display:flex;align-items:center;gap:14px;padding:10px 10px;border:0;border-radius:9px;background:transparent;color:#eee;text-decoration:none;font:600 15px/1.2 inherit;text-align:left;cursor:pointer}
+.twitok-more-scroll>a:hover,.twitok-more-scroll>button:hover{background:#191919}
+.twitok-more-scroll>a>span,.twitok-more-scroll>button>span{width:25px;text-align:center;color:#ddd;font-size:19px}
+.twitok-more-scroll a i{margin-left:0;color:#fe2c55;font-style:normal}
+.twitok-more-scroll a b,.twitok-more-scroll button b{margin-left:auto;color:#777}
+.twitok-theme-row{min-height:54px;display:flex;align-items:center;gap:12px;padding:8px 10px;color:#eee}
+.twitok-theme-row>span{width:25px;text-align:center;font-size:19px}
+.twitok-theme-row strong{font-size:15px}
+.twitok-theme-row>div{margin-left:auto;display:flex;gap:2px;padding:3px;border-radius:20px;background:#222}
+.twitok-theme-row button{width:34px;height:30px;border:0;border-radius:16px;background:transparent;color:#aaa;cursor:pointer}
+.twitok-theme-row button.selected{background:#5a5a5a;color:#fff}
+.twitok-more-separator{height:1px;background:#252525;margin:13px 4px 17px}
+@media(max-width:600px){.twitok-more-panel{width:min(420px,calc(100vw - 12px))}}
+
+
+.profile-tabbar{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid #222;gap:12px;padding:0 14px}
+.profile-tabbar .profile-tabs{flex:1;border-bottom:0}
+.profile-sort{display:flex;gap:3px;padding-bottom:8px}
+.profile-sort button{border:1px solid #292929;background:#171717;color:#888;border-radius:5px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}
+.profile-sort button.active{background:#ddd;color:#111;border-color:#ddd}
+.profile-header-actions{display:flex;gap:3px}
+.profile-footer-actions{display:flex;justify-content:center;padding:22px;border-top:1px solid #191919}
+.profile-footer-actions button{border:0;background:transparent;color:#777;cursor:pointer;font-weight:700}
+.profile-empty{grid-column:1/-1;min-height:340px;display:grid;place-content:center;justify-items:center;text-align:center;color:#777;gap:7px}
+.profile-empty strong{color:#fff;font-size:19px}
+.profile-empty p{margin:0;color:#777;font-size:13px}
+.profile-empty-icon{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:#191919;color:#bbb;margin-bottom:7px}
+@media(max-width:700px){.profile-tabbar{align-items:center}.profile-sort{max-width:46vw;overflow:auto}.profile-sort button{white-space:nowrap}.profile-tabs{gap:28px}.profile-tabbar .profile-tabs{justify-content:flex-start}.profile-card{width:calc(100% - 18px);padding:18px}}
