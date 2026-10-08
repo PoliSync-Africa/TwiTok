@@ -49,7 +49,7 @@ adminRouter.get("/verification/requests", requireOwner, adminReadLimit, async (r
     const db = await getDb();
     const rows = await db.collection("verification_requests").find(query).sort({ createdAt: 1 }).limit(limit).toArray();
     const userIds = [...new Set(rows.map(row => String(row.userId)))].filter(ObjectId.isValid).map(id => new ObjectId(id));
-    const users = await db.collection("users").find({ _id: { $in: userIds } }, { projection: { username: 1, nickname: 1, countryCode: 1, accountType: 1, isVerified: 1, profilePhotoKey: 1 } }).toArray();
+    const users = await db.collection("users").find({ _id: { $in: userIds } }).project({ username: 1, nickname: 1, countryCode: 1, accountType: 1, isVerified: 1, profilePhotoKey: 1 }).toArray();
     const byId = new Map(users.map(user => [user._id.toHexString(), user]));
     return res.json({
       requests: rows.map(row => {
