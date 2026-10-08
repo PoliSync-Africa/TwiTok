@@ -119,7 +119,8 @@ adminRouter.get("/platform/control", requireOwner, adminReadLimit, async (_req, 
       strictYouthSafety: true,
       aiModerationEnforced: true
     };
-    const row = await db.collection("platform_control").findOne({ _id: "global" });
+    const platformControls = db.collection<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>("platform_control");
+    const row = await platformControls.findOne({ _id: "global" });
     return res.json({ controls: { ...defaults, ...(row?.controls ?? {}) }, updatedAt: row?.updatedAt ?? null });
   } catch {
     return res.status(500).json({ error: "Unable to load platform controls" });
@@ -146,8 +147,9 @@ adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 
     }
     if (!Object.keys(controls).length) return res.status(400).json({ error: "No supported platform controls supplied" });
     const db = await getDb();
-    const before = await db.collection("platform_control").findOne({ _id: "global" });
-    await db.collection("platform_control").updateOne(
+    const platformControls = db.collection<{ _id: string; controls?: Record<string, boolean>; updatedAt?: Date; updatedBy?: string }>("platform_control");
+    const before = await platformControls.findOne({ _id: "global" });
+    await platformControls.updateOne(
       { _id: "global" },
       { $set: { controls: { ...(before?.controls ?? {}), ...controls }, updatedAt: new Date(), updatedBy: req.ownerId } },
       { upsert: true }
@@ -160,7 +162,7 @@ adminRouter.patch("/platform/control", requireOwner, rateLimit({ windowMs: 60 * 
       metadata: { changed: controls },
       createdAt: new Date()
     });
-    const saved = await db.collection("platform_control").findOne({ _id: "global" });
+    const saved = await platformControls.findOne({ _id: "global" });
     return res.json({ controls: saved?.controls ?? controls, updatedAt: saved?.updatedAt ?? new Date() });
   } catch {
     return res.status(500).json({ error: "Unable to update platform controls" });
