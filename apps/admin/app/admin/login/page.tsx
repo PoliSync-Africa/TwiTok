@@ -10,6 +10,7 @@ export default function OwnerLogin() {
   const [mfaCode, setMfaCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -45,12 +46,12 @@ export default function OwnerLogin() {
         <div className="login-mark">T</div>
         <p className="eyebrow">TWITOK PLATFORM</p>
         <h1>Owner Control Center</h1>
-        <p className="muted">Private administration access. This is not a public TwiTok user login.</p>
+        <p className="muted">Private owner administration. Public TwiTok accounts cannot use this portal.</p><div className="security-banner">Protected session • MFA supported • All privileged actions are audit logged</div>
 
         <form onSubmit={submit}>
           <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-          <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
-          <label>MFA code <span className="muted">(if enabled)</span><input inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\\D/g, "").slice(0, 6))} placeholder="6-digit code" /></label>
+          <label>Password<<div className="password-wrap"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /><button type="button" className="show-password" onClick={() => setShowPassword(v => !v)}>{showPassword ? "Hide" : "Show"}</button></div></label>
+          <label>MFA code <span className="muted">(if enabled)</span><input inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" /></label>
           {error && <div className="login-error">{error}</div>}
           <button disabled={loading}>{loading ? "Signing in…" : "Sign in as Owner"}</button>
         </form>
