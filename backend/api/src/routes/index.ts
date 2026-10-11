@@ -7,6 +7,7 @@ import { liveRouter } from "./live.js";
 import { safetyRouter } from "./safety.js";
 import { monetizationRouter } from "./monetization.js";
 import { authRouter } from "./auth.js";
+import { oauthRouter } from "./oauth.js";
 import { profileRouter } from "./profile.js";
 import { videoRouter } from "./video.js";
 import { feedRouter } from "./feed.js";
@@ -29,6 +30,7 @@ import { aiMediaRouter } from "./ai-media.js";
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/auth/oauth", oauthRouter);
 apiRouter.use(requireCompletedProfileIfAuthenticated);
 apiRouter.use("/profile", profileRouter);
 apiRouter.use("/video", videoRouter);
