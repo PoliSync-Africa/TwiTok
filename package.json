@@ -12,7 +12,10 @@
     "build:admin": "npm --workspace apps/admin run build",
     "start:admin": "npm --workspace apps/admin run start",
     "build:api": "npm --workspace @twitok/api run build",
-    "start:api": "npm --workspace @twitok/api run start"
+    "start:api": "npm --workspace @twitok/api run start",
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "start:web": "npm --workspace apps/web run start"
   },
   "dependencies": {
     "@types/express": "^5.0.3",

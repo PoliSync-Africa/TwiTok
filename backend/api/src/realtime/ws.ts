@@ -8,7 +8,15 @@ const authAttempts = new WeakMap<WebSocket, number>();
 const messageWindows = new WeakMap<WebSocket, { startedAt: number; count: number }>();
 
 function allowedOrigins() {
-  return (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "").split(",").map(x => x.trim()).filter(Boolean);
+  return Array.from(
+    new Set(
+      (process.env.ALLOWED_WEB_ORIGINS ?? process.env.ADMIN_WEB_ORIGIN ?? "")
+        .split(",")
+        .map(x => x.trim())
+        .filter(Boolean)
+        .concat(["https://twitokapp.com", "https://www.twitokapp.com", "https://twitok-web.onrender.com"])
+    )
+  );
 }
 function originAllowed(origin?: string) {
   const allowed = allowedOrigins();

@@ -7,7 +7,25 @@ import { rateLimit, authRateLimit } from "../security/rate-limit.js";
 import { sendAccountVerification, verifyAccountCode, type VerificationChannel } from "../auth/account-verification.js";
 
 const WEB_SESSION_COOKIE = "twitok_user_session";
-const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 24 * 60 * 60 * 1000 };
+
+function getSessionCookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  const configuredSameSite = (process.env.COOKIE_SAME_SITE || "").toLowerCase();
+  const sameSite: "lax" | "strict" | "none" =
+    configuredSameSite === "lax" || configuredSameSite === "strict" || configuredSameSite === "none"
+      ? (configuredSameSite as "lax" | "strict" | "none")
+      : isProd
+        ? "none"
+        : "lax";
+
+  return {
+    httpOnly: true,
+    secure: sameSite === "none" ? true : isProd,
+    sameSite,
+    path: "/",
+    maxAge: 24 * 60 * 60 * 1000
+  };
+}
 
 export const authRouter = Router();
 const userReadLimit = rateLimit({ windowMs: 60 * 1000, max: 120, key: req => req.userId?.toHexString() ?? req.ip ?? "unknown" });
@@ -19,7 +37,7 @@ authRouter.post("/register", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), a
     if (!password || !dateOfBirth || !countryCode) return res.status(400).json({ error: "password, dateOfBirth and countryCode are required" });
     const db = await getDb(), user = await createUser(db, { username, password, email, phone, dateOfBirth, countryCode });
     const token = issueUserToken(user);
-    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
+    res.cookie(WEB_SESSION_COOKIE, token, getSessionCookieOptions());
     res.status(201).json({
       token,
       user,
@@ -43,7 +61,7 @@ authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: aut
     const db = await getDb();
     const user = await authenticateUser(db, identifier, password, countryCode);
     const token = issueUserToken(user);
-    res.cookie(WEB_SESSION_COOKIE, token, cookieOptions);
+    res.cookie(WEB_SESSION_COOKIE, token, getSessionCookieOptions());
     res.json({
       token,
       user,
@@ -107,7 +125,8 @@ authRouter.get("/verification/status", requireContactVerificationUser, userReadL
 authRouter.post("/logout", requireUser, userWriteLimit, async (req, res) => {
   try {
     await (await getDb()).collection("users").updateOne({ _id: req.userId! }, { $inc: { sessionVersion: 1 }, $set: { updatedAt: new Date() } });
-    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    const { maxAge: _maxAge, ...clearCookieOptions } = getSessionCookieOptions();
+    res.clearCookie(WEB_SESSION_COOKIE, clearCookieOptions);
     return res.status(204).send();
   } catch { return res.status(500).json({ error: "Unable to end session" }); }
 });
@@ -125,7 +144,8 @@ authRouter.post("/change-password", requireUser, rateLimit({ windowMs: 15 * 60 *
       { _id: req.userId! },
       { $set: { passwordHash: await bcrypt.hash(newPassword, 12), updatedAt: new Date() }, $inc: { sessionVersion: 1 } }
     );
-    res.clearCookie(WEB_SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    const { maxAge: _maxAge, ...clearCookieOptions } = getSessionCookieOptions();
+    res.clearCookie(WEB_SESSION_COOKIE, clearCookieOptions);
     return res.status(204).send();
   } catch { return res.status(400).json({ error: "Unable to change password" }); }
 });
